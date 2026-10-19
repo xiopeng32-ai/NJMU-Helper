@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>开源与贡献 · 南医助手</title>
+<meta name="description" content="南医助手基于 FengHDSL/XJAU-Helper 改造，MIT 协议开源。技术栈、目录结构、克隆命令、上游溯源与贡献指南。">
+<link rel="icon" href="assets/icon.png">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="bg-layer"></div><div class="bg-grid"></div><div class="grain"></div>
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="index.html"><img src="assets/icon.png" alt="南医助手"><span>南医助手<small>NJMU-Helper</small></span></a>
+    <nav class="nav-links" id="navLinks">
+      <a href="index.html" class="">首页</a>
+      <a href="features.html" class="">功能</a>
+      <a href="opensource.html" class="active">开源</a>
+      <a href="privacy.html" class="">隐私</a>
+      <a class="nav-cta" href="https://www.sydxky.cn/detail.php?id=1034" target="_blank" rel="noopener">下载</a>
+    </nav>
+    <button class="nav-toggle" id="navToggle" aria-label="菜单"><span></span><span></span><span></span></button>
+  </div>
+</header><main>
+<section class="oss" id="opensource">
+    <div class="wrap">
+      <div class="oss-card reveal">
+        <div>
+          <div class="eyebrow">Open Source</div>
+          <h2>代码全部公开，<em style="font-style:normal;background:linear-gradient(96deg,#9ec7ff,#5fd8ff);-webkit-background-clip:text;background-clip:text;color:transparent">包括那些踩过的坑</em></h2>
+          <p>项目基于上游 <b style="color:#dbe8fa">FengHDSL/XJAU-Helper</b> 改造，按 MIT 协议开源。你可以读它、改它、把它适配到自己学校——登录桥接、正方 V9 接口、ArkTS 严格模式下的踩坑记录，都在仓库里。</p>
+          <div class="oss-stats">
+            <div><b>93</b><span>ArkTS 源文件</span></div>
+            <div><b>4.2万</b><span>行代码</span></div>
+            <div><b>MIT</b><span>开源协议</span></div>
+          </div>
+          <div class="chips">
+            <span>ArkTS</span><span>ArkUI</span><span>HarmonyOS NEXT</span><span>API 26</span>
+            <span>正方 V9</span><span>金智 CAS</span><span>ArkWeb</span><span>FormKit</span>
+          </div>
+          <div class="dl-btns">
+            <a class="btn btn-primary" id="repoBtn" href="#" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3 0 0 1-.3 3.2 1.2a11 11 0 0 1 5.8 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.5.2 2.7.1 3 .8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+              在 GitHub 查看源码
+            </a>
+            <a class="btn btn-ghost" href="https://github.com/FengHDSL/XJAU-Helper" target="_blank" rel="noopener">上游项目</a>
+          </div>
+        </div>
+        <div class="terminal">
+          <div class="term-bar"><i></i><i></i><i></i><span>~/NJMU-Helper</span></div>
+          <button class="copy" id="copyBtn">复制</button>
+          <div class="term-body" id="termBody"><span class="c"># 克隆并打开</span>
+<span class="b">git</span> clone https://github.com/<span id="repoOwner">xiopeng32-ai</span>/NJMU-Helper.git
+<span class="b">cd</span> NJMU-Helper
+
+<span class="c"># 用 DevEco Studio 打开，等待 Sync</span>
+<span class="c"># Project Structure → Signing Configs</span>
+<span class="c"># 勾选 Automatically generate signature</span>
+
+<span class="b">hvigorw</span> --mode module -p product=default \
+  assembleHap --no-daemon
+
+<span class="g">✓ BUILD SUCCESSFUL</span>
+<span class="c">entry/build/.../entry-default-signed.hap</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+<section class="log" id="changelog">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <div class="eyebrow">Changelog</div>
+        <h2>一直在<em>修</em>，也一直在<em>加</em></h2>
+        <p>从第一版到现在，几乎每个版本都来自真实使用中的抱怨。下面是最近的改动。</p>
+      </div>
+      <div class="timeline">
+        <article class="tl-item new reveal">
+          <div class="tl-head"><b>v2.0.3</b><time>2026-10-19</time><span class="pill">最新</span></div>
+          <ul>
+            <li><b>2.0 稳定版</b>：云课堂升级为内嵌网页版，统一认证免密直进，页内返回、进度条、失败重载一应俱全</li>
+            <li>新增「今日课表」页面：时间轴卡片三态（已结束 / 进行中剩 X 分钟 / 待开始倒计时），下拉刷新、30 秒自动重算</li>
+            <li>性能与稳定性：课表缓存内存层、离线秒回退缓存、云课堂退出即停网页任务</li>
+          </ul>
+        </article>
+        <article class="tl-item reveal">
+          <div class="tl-head"><b>v1.9.21</b><time>2026-10-19</time></div>
+          <ul>
+            <li>云课堂过渡版：错误页主按钮改为「网页登录云课堂」，应用内 WebView 完成统一认证后自动续接会话</li>
+            <li>课程、实录、通知仍走原生接口，体验与直连一致，会话 2 小时内免重复登录</li>
+          </ul>
+        </article>
+        <article class="tl-item reveal">
+          <div class="tl-head"><b>v1.9.8</b><time>2026-10-18</time></div>
+          <ul>
+            <li>修复成绩、学业导出图片在课程较多时底部被截断的问题，现在完整渲染全部所选课程</li>
+          </ul>
+        </article>
+        <article class="tl-item reveal">
+          <div class="tl-head"><b>v1.9.7</b><time>2026-10-18</time></div>
+          <ul>
+            <li>修复导出图片卡在「生成中」：不支持相册授权弹窗的设备自动改为保存位置选择框</li>
+            <li>修复成绩查询页无法选择学期的问题，导出成功、取消、失败均有明确提示</li>
+          </ul>
+        </article>
+        <article class="tl-item reveal">
+          <div class="tl-head"><b>v1.9.6</b><time>2026-10-18</time></div>
+          <ul>
+            <li>成绩导出支持勾选课程，不再一刀切全部导出</li>
+            <li>学业情况页新增图片导出，可勾选学业概览、课程明细、学业提醒模块</li>
+          </ul>
+        </article>
+        <article class="tl-item reveal">
+          <div class="tl-head"><b>v1.9.5</b><time>2026-10-18</time></div>
+          <ul>
+            <li>成绩查询新增导出：一键生成成绩单图片并保存到相册</li>
+            <li>课程表默认展示 15 节（南医大每天 15 节课），本地缓存全面兜底</li>
+          </ul>
+        </article>
+        <article class="tl-item reveal">
+          <div class="tl-head"><b>v1.9.4</b><time>2026-10-18</time></div>
+          <ul>
+            <li>学业情况页升级：平均学分绩点、学业总评、修读情况修复并支持自定义显示</li>
+            <li>课程表支持一键导出到系统日历；应修学分按培养方案精确匹配</li>
+            <li>登录流程优化：网页登录支持记住密码与无感自动登录</li>
+          </ul>
+        </article>
+        <article class="tl-item reveal">
+          <div class="tl-head"><b>v1.9.0</b><time>2026-10-18</time></div>
+          <ul>
+            <li>登录白名单与无感登录：一次认证，长期有效</li>
+          </ul>
+        </article>
+      </div>
+    </div>
+  </section>
+</main>
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <div><img src="assets/icon.png" alt="">南医助手 · NJMU-Helper</div>
+        <p>南京医科大学教务信息鸿蒙原生客户端。学生自发的开源项目，非官方应用。</p>
+      </div>
+      <div class="foot-links">
+        <div class="foot-col"><h5>产品</h5>
+          <a href="features.html">功能特性</a>
+          <a href="features.html#screens">界面预览</a>
+          <a href="opensource.html#changelog">更新日志</a>
+          <a href="https://www.sydxky.cn/detail.php?id=1034" target="_blank" rel="noopener">下载安装</a>
+        </div>
+        <div class="foot-col"><h5>开发</h5>
+          <a id="repoBtn3" href="#" target="_blank" rel="noopener">GitHub 仓库</a>
+          <a href="https://github.com/FengHDSL/XJAU-Helper" target="_blank" rel="noopener">上游项目</a>
+          <a id="contribLink" href="#" target="_blank" rel="noopener">参与贡献</a>
+          <a id="changelogLink" href="#" target="_blank" rel="noopener">完整日志</a>
+        </div>
+        <div class="foot-col"><h5>关于</h5>
+          <a href="privacy.html">隐私政策</a>
+          <a href="features.html">应用信息</a>
+          <a href="features.html#faq">常见问题</a>
+          <a href="https://www.sydxky.cn/detail.php?id=1034" target="_blank" rel="noopener">反馈问题</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bot">
+      <div class="disclaimer">© 2026 NJMU-Helper contributors · 基于 MIT 协议开源 · 「南京医科大学」「NJMU」等名称与标识归南京医科大学所有。本应用为非官方学生作品，数据以学校官方系统为准。</div>
+      <div>Made with ArkTS on HarmonyOS</div>
+    </div>
+  </div>
+</footer>
+<script src="assets/app.js"></script>
+</body>
+</html>
