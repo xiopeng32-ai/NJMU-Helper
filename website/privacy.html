@@ -5,113 +5,142 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>隐私政策 · 南医助手</title>
 <meta name="description" content="南医助手（NJMU-Helper）隐私政策：信息收集与使用、本地存储与保护、共享披露边界、用户权利、未成年人保护与联系方式。">
+<meta name="theme-color" content="#05090f">
 <link rel="icon" href="assets/icon.png">
 <link rel="stylesheet" href="assets/style.css">
+<script>document.documentElement.classList.add("js");</script>
 </head>
 <body>
+<div class="progress" id="progress"></div>
+<div class="spot" id="spot" aria-hidden="true"></div>
 <div class="bg-layer"></div><div class="bg-grid"></div><div class="grain"></div>
+
 <header class="nav" id="nav">
   <div class="wrap nav-in">
     <a class="brand" href="index.html"><img src="assets/icon.png" alt="南医助手"><span>南医助手<small>NJMU-Helper</small></span></a>
     <nav class="nav-links" id="navLinks">
-      <a href="index.html" class="">首页</a>
-      <a href="features.html" class="">功能</a>
-      <a href="opensource.html" class="">开源</a>
+      <a href="index.html">首页</a>
+      <a href="features.html">功能</a>
+      <a href="shots.html">界面</a>
+      <a href="opensource.html">开源</a>
       <a href="privacy.html" class="active">隐私</a>
-      <a class="nav-cta" href="https://www.sydxky.cn/detail.php?id=1034" target="_blank" rel="noopener">下载</a>
+      <a class="nav-cta" href="https://www.sydxky.cn/detail.php?id=1034" target="_blank" rel="noopener">
+        下载
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+      </a>
     </nav>
-    <button class="nav-toggle" id="navToggle" aria-label="菜单"><span></span><span></span><span></span></button>
+    <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false"><span></span></button>
   </div>
-</header><main>
-<section class="privacy" id="privacy">
+</header>
+
+<main>
+  <section class="page-head">
     <div class="wrap">
-      <div class="sec-head reveal">
-        <div class="eyebrow">Privacy</div>
-        <h2>隐私政策</h2>
-        <p>我们认真对待你的数据。下面说清楚我们收集什么、用在哪里、怎么保护——没有弯弯绕绕。</p>
-      </div>
-      <div class="privacy-card reveal">
-        <div class="pv-meta">
-          <span>生效日期：2026-10-19</span>
-          <span>更新日期：2026-10-19</span>
-        </div>
-        <div class="pv-body">
-          <h3>一、我们如何收集和使用您的信息</h3>
-          <p>南医助手是面向南京医科大学学生的教务辅助工具。为提供成绩查询、课表查看、校历资讯、空闲教室、学业进度、云课堂、快捷选课、今日课表与个人信息（头像）展示等功能，在您主动登录并授权的前提下，我们会收集和使用以下信息：</p>
-          <h4>1. 您主动提供的登录信息</h4>
-          <ul>
-            <li><b>教务系统账号（学号）及密码</b>：仅在本设备本地用于模拟登录教务系统（jxglc.njmu.edu.cn）与统一身份认证（cas.njmu.edu.cn），以获取成绩、课表、学业、云课堂等数据。<b>明文密码不会上传至应用自有服务器。</b></li>
-          </ul>
-          <h4>2. 经教务系统获取的学业与校园信息</h4>
-          <ul>
-            <li>学号、姓名、专业、院系、个人头像；</li>
-            <li>成绩、课表、学业进度、总评、绩点、等级考试；</li>
-            <li>云课堂课程、课堂实录与课堂通知。</li>
-            <li>用途：在应用内为您展示并提供上述核心功能。</li>
-          </ul>
-          <h4>3. 选课操作信息（快捷选课）</h4>
-          <ul>
-            <li>您设置的选课时间、目标课程与策略：仅用于按您的设定自动轮询空位并提交，操作全程发生在您的设备与学校教务系统之间。</li>
-          </ul>
-          <h4>4. 设备与运行信息</h4>
-          <ul>
-            <li>为保障稳定运行，可能在本地记录应用版本、运行状态等基础信息，不用于识别个人身份。</li>
-          </ul>
+      <div class="eyebrow rv">Privacy</div>
+      <h1 class="rv" style="--d:60ms">隐私政策</h1>
+      <p class="rv" style="--d:120ms">我们认真对待你的数据。下面说清楚我们收集什么、用在哪里、怎么保护——没有弯弯绕绕。</p>
+    </div>
+  </section>
 
-          <h3>二、我们如何存储和保护您的信息</h3>
-          <ul>
-            <li>您的信息<b>主要存储于您的个人设备本地</b>，用于应用功能展示；</li>
-            <li>采取合理的安全措施防止未经授权的访问、泄露或篡改；</li>
-            <li>除您主动登录的教务系统及学校统一身份认证服务外，本应用<b>不向任何第三方共享、出售</b>您的个人信息；</li>
-            <li>您可随时在应用内<b>退出登录或清除本地缓存</b>，删除设备上的相关信息。</li>
-          </ul>
+  <section class="sec">
+    <div class="wrap">
+      <div class="pv-layout">
+        <aside class="pv-toc rv" data-spy>
+          <h5>目录</h5>
+          <a href="#p1" class="active">一、收集与使用</a>
+          <a href="#p2">二、存储与保护</a>
+          <a href="#p3">三、共享与披露</a>
+          <a href="#p4">四、你的权利</a>
+          <a href="#p5">五、未成年人保护</a>
+          <a href="#p6">六、政策更新</a>
+          <a href="#p7">七、联系我们</a>
+        </aside>
 
-          <h3>三、我们如何共享、转让、公开披露</h3>
-          <p>除以下情形外，我们不会向任何第三方共享您的个人信息：</p>
-          <ul>
-            <li>取得您的明确同意；</li>
-            <li>依据法律法规、政府机关或司法机关的强制性要求；</li>
-            <li>为维护国家安全、公共安全、社会公共利益所需。</li>
-          </ul>
-          <p>我们不会将您的个人信息用于本政策未载明的其他用途。</p>
+        <div class="privacy-card rv" style="--d:80ms">
+          <div class="pv-meta">
+            <span>生效日期：2026-10-19</span>
+            <span>更新日期：2026-10-19</span>
+            <span>版本：2.0.3</span>
+          </div>
+          <div class="pv-body">
+            <h3 id="p1">一、我们如何收集和使用您的信息</h3>
+            <p>南医助手是面向南京医科大学学生的教务辅助工具。为提供成绩查询、课表查看、校历资讯、空闲教室、学业进度、云课堂、快捷选课、今日课表与个人信息（头像）展示等功能，在您主动登录并授权的前提下，我们会收集和使用以下信息：</p>
+            <h4>1. 您主动提供的登录信息</h4>
+            <ul>
+              <li><b>教务系统账号（学号）及密码</b>：仅在本设备本地用于模拟登录教务系统（jxglc.njmu.edu.cn）与统一身份认证（cas.njmu.edu.cn），以获取成绩、课表、学业、云课堂等数据。<b>明文密码不会上传至应用自有服务器。</b></li>
+            </ul>
+            <h4>2. 经教务系统获取的学业与校园信息</h4>
+            <ul>
+              <li>学号、姓名、专业、院系、个人头像；</li>
+              <li>成绩、课表、学业进度、总评、绩点、等级考试；</li>
+              <li>云课堂课程、课堂实录与课堂通知。</li>
+              <li>用途：在应用内为您展示并提供上述核心功能。</li>
+            </ul>
+            <h4>3. 选课操作信息（快捷选课）</h4>
+            <ul>
+              <li>您设置的选课时间、目标课程与策略：仅用于按您的设定自动轮询空位并提交，操作全程发生在您的设备与学校教务系统之间。</li>
+            </ul>
+            <h4>4. 设备与运行信息</h4>
+            <ul>
+              <li>为保障稳定运行，可能在本地记录应用版本、运行状态等基础信息，不用于识别个人身份。</li>
+            </ul>
 
-          <h3>四、您的权利</h3>
-          <ul>
-            <li>查询、更正您的个人信息；</li>
-            <li>通过退出登录、清除缓存删除设备本地的个人信息；</li>
-            <li>撤回授权同意（停止使用本应用即视为撤回）；</li>
-            <li>注销相关账号信息。</li>
-          </ul>
+            <h3 id="p2">二、我们如何存储和保护您的信息</h3>
+            <ul>
+              <li>您的信息<b>主要存储于您的个人设备本地</b>，用于应用功能展示；</li>
+              <li>采取合理的安全措施防止未经授权的访问、泄露或篡改；</li>
+              <li>除您主动登录的教务系统及学校统一身份认证服务外，本应用<b>不向任何第三方共享、出售</b>您的个人信息；</li>
+              <li>您可随时在应用内<b>退出登录或清除本地缓存</b>，删除设备上的相关信息。</li>
+            </ul>
 
-          <h3>五、未成年人保护</h3>
-          <p>本应用面向在校大学生。若您未满 18 周岁，请在监护人指导下使用。</p>
+            <h3 id="p3">三、我们如何共享、转让、公开披露</h3>
+            <p>除以下情形外，我们不会向任何第三方共享您的个人信息：</p>
+            <ul>
+              <li>取得您的明确同意；</li>
+              <li>依据法律法规、政府机关或司法机关的强制性要求；</li>
+              <li>为维护国家安全、公共安全、社会公共利益所需。</li>
+            </ul>
+            <p>我们不会将您的个人信息用于本政策未载明的其他用途。</p>
 
-          <h3>六、政策更新</h3>
-          <p>我们可能适时更新本政策。更新后将在本应用内及本页面公布并注明更新日期；重大变更将通过显著方式提示您。</p>
+            <h3 id="p4">四、您的权利</h3>
+            <ul>
+              <li>查询、更正您的个人信息；</li>
+              <li>通过退出登录、清除缓存删除设备本地的个人信息；</li>
+              <li>撤回授权同意（停止使用本应用即视为撤回）；</li>
+              <li>注销相关账号信息。</li>
+            </ul>
 
-          <h3>七、联系我们</h3>
-          <p>如对本政策有疑问、意见或建议，可通过以下方式联系我们：</p>
-          <ul>
-            <li>反馈邮箱：<span class="pv-mail">peng24@stu.njmu.edu.cn</span></li>
-          </ul>
-          <div class="pv-foot">备案主体：个人开发者 · 应用名称：南医助手（NJMU-Helper）</div>
+            <h3 id="p5">五、未成年人保护</h3>
+            <p>本应用面向在校大学生。若您未满 18 周岁，请在监护人指导下使用。</p>
+
+            <h3 id="p6">六、政策更新</h3>
+            <p>我们可能适时更新本政策。更新后将在本应用内及本页面公布并注明更新日期；重大变更将通过显著方式提示您。</p>
+
+            <h3 id="p7">七、联系我们</h3>
+            <p>如对本政策有疑问、意见或建议，可通过以下方式联系我们：</p>
+            <ul>
+              <li>反馈邮箱：<a class="pv-mail" href="mailto:peng24@stu.njmu.edu.cn">peng24@stu.njmu.edu.cn</a></li>
+            </ul>
+            <div class="pv-foot">备案主体：个人开发者 · 应用名称：南医助手（NJMU-Helper）</div>
+          </div>
         </div>
       </div>
     </div>
   </section>
 </main>
+
 <footer>
   <div class="wrap">
     <div class="foot-top">
-      <div class="foot-brand">
+      <div class="foot-brand rv">
         <div><img src="assets/icon.png" alt="">南医助手 · NJMU-Helper</div>
         <p>南京医科大学教务信息鸿蒙原生客户端。学生自发的开源项目，非官方应用。</p>
       </div>
       <div class="foot-links">
         <div class="foot-col"><h5>产品</h5>
           <a href="features.html">功能特性</a>
-          <a href="features.html#screens">界面预览</a>
-          <a href="features.html#tablet">平板界面</a>
+          <a href="shots.html">界面预览</a>
+          <a href="shots.html#tablet">平板界面</a>
           <a href="opensource.html#changelog">更新日志</a>
           <a href="https://www.sydxky.cn/detail.php?id=1034" target="_blank" rel="noopener">应用商店下载</a>
           <a href="https://github.com/xiopeng32-ai/NJMU-Helper/releases/download/v2.0.3/NJMU-Helper-2.0.3.hap" target="_blank" rel="noopener">GitHub 直装 .hap</a>
@@ -126,7 +155,7 @@
           <a href="privacy.html">隐私政策</a>
           <a href="features.html">应用信息</a>
           <a href="features.html#faq">常见问题</a>
-          <a href="https://www.sydxky.cn/detail.php?id=1034" target="_blank" rel="noopener">反馈问题</a>
+          <a href="mailto:peng24@stu.njmu.edu.cn">反馈邮箱</a>
         </div>
       </div>
     </div>
@@ -136,6 +165,12 @@
     </div>
   </div>
 </footer>
+
+<button class="to-top" id="toTop" aria-label="回到顶部">
+  <svg class="ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22"/></svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+</button>
+
 <script src="assets/app.js"></script>
 </body>
 </html>

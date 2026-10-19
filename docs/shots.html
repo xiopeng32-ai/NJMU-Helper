@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>界面预览 · 南医助手</title>
+<meta name="description" content="南医助手手机端 6 屏与平板端实拍截图，逐张可放大查看。">
+<meta name="theme-color" content="#05090f">
+<link rel="icon" href="assets/icon.png">
+<link rel="stylesheet" href="assets/style.css">
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="spot" id="spot" aria-hidden="true"></div>
+<div class="bg-layer"></div><div class="bg-grid"></div><div class="grain"></div>
+
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="index.html"><img src="assets/icon.png" alt="南医助手"><span>南医助手<small>NJMU-Helper</small></span></a>
+    <nav class="nav-links" id="navLinks">
+      <a href="index.html">首页</a>
+      <a href="features.html">功能</a>
+      <a href="shots.html" class="active">界面</a>
+      <a href="opensource.html">开源</a>
+      <a href="privacy.html">隐私</a>
+      <a class="nav-cta" href="https://www.sydxky.cn/detail.php?id=1034" target="_blank" rel="noopener">
+        下载
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+      </a>
+    </nav>
+    <button class="nav-toggle" id="navToggle" aria-label="打开菜单" aria-expanded="false"><span></span></button>
+  </div>
+</header>
+
+<main>
+  <section class="page-head">
+    <div class="wrap">
+      <div class="eyebrow rv">Screenshots</div>
+      <h1 class="rv" style="--d:60ms">全部是<em class="hl">实拍</em>，没有一张设计稿</h1>
+      <p class="rv" style="--d:120ms">手机 6 屏、平板端 4 屏，全部来自应用内真实运行（示例数据模式）。点任意一张可以放大逐字看，左右键翻页。</p>
+    </div>
+  </section>
+
+  <div class="subnav-bar">
+    <div class="wrap"><nav class="subnav rv" data-spy style="--d:180ms">
+        <a href="#phone" class="active">手机端</a>
+        <a href="#tablet">平板 / 2in1</a>
+        <a href="#specs">规格信息</a>
+      </nav></div>
+  </div>
+
+  <section class="sec" id="phone">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div class="eyebrow">Phone · 6 屏</div>
+        <h2>从睁眼到熄灯，<em class="hl">一屏一件事</em></h2>
+        <p>每张都是 912 × 1920 原图，点开可看细节。</p>
+      </div>
+
+      <div class="gallery">
+        <figure class="shot-card rv">
+          <button type="button" class="phone" data-zoom="assets/shots/home.jpg" data-cap="首页 · 今天要做什么" aria-label="放大查看首页截图"><div class="screen"><img class="shot" src="assets/shots/home.jpg" alt="首页截图：问候、下一节课、快捷入口与校历" width="912" height="1920" /></div></button>
+          <figcaption><span class="no">01</span><div><h4>首页 · 今天要做什么</h4><p>问候、下一节课倒计时、六大快捷入口与官方校历月历，一屏之内全部交代清楚。</p></div></figcaption>
+        </figure>
+        <figure class="shot-card rv" style="--d:70ms">
+          <button type="button" class="phone" data-zoom="assets/shots/timetable.jpg" data-cap="课程表 · 第几周，上什么" aria-label="放大查看课程表截图"><div class="screen"><img class="shot" src="assets/shots/timetable.jpg" alt="课程表截图：15 节作息与彩色课程块" width="912" height="1920" loading="lazy" /></div></button>
+          <figcaption><span class="no">02</span><div><h4>课程表 · 第几周，上什么</h4><p>15 节完整作息，彩色课程块区分课程，左右滑动切换周次，点开即看教室与教师。</p></div></figcaption>
+        </figure>
+        <figure class="shot-card rv" style="--d:140ms">
+          <button type="button" class="phone" data-zoom="assets/shots/academics.jpg" data-cap="学业情况 · 离毕业还差多少" aria-label="放大查看学业情况截图"><div class="screen"><img class="shot" src="assets/shots/academics.jpg" alt="学业情况截图：绩点与成绩分布" width="912" height="1920" loading="lazy" /></div></button>
+          <figcaption><span class="no">03</span><div><h4>学业情况 · 离毕业还差多少</h4><p>绩点大字直读、总体成绩概览、等级考试与成绩分布，数据来源教务系统学业员。</p></div></figcaption>
+        </figure>
+        <figure class="shot-card rv" style="--d:0ms">
+          <button type="button" class="phone" data-zoom="assets/shots/news.jpg" data-cap="南医新闻 · 校园里发生了什么" aria-label="放大查看南医新闻截图"><div class="screen"><img class="shot" src="assets/shots/news.jpg" alt="南医新闻截图：分类标签与公告列表" width="912" height="1920" loading="lazy" /></div></button>
+          <figcaption><span class="no">04</span><div><h4>南医新闻 · 校园里发生了什么</h4><p>官网公告、动物中心、创新器械与学院公告聚合，分类标签加搜索，还能跳网页端。</p></div></figcaption>
+        </figure>
+        <figure class="shot-card rv" style="--d:70ms">
+          <button type="button" class="phone" data-zoom="assets/shots/mine.jpg" data-cap="我的 · 一切从这里设置" aria-label="放大查看我的页面截图"><div class="screen"><img class="shot" src="assets/shots/mine.jpg" alt="我的页面截图：设置与入口" width="912" height="1920" loading="lazy" /></div></button>
+          <figcaption><span class="no">05</span><div><h4>我的 · 一切从这里设置</h4><p>绩点速览、外观主题、深色模式、头像显示，教室 / 考试 / 学业 / 快捷选课入口集中。</p></div></figcaption>
+        </figure>
+        <figure class="shot-card rv" style="--d:140ms">
+          <button type="button" class="phone" data-zoom="assets/shots/grab.jpg" data-cap="快捷选课 · 选课季的秘密武器" aria-label="放大查看快捷选课截图"><div class="screen"><img class="shot" src="assets/shots/grab.jpg" alt="快捷选课截图：抢课队列与策略" width="912" height="1920" loading="lazy" /></div></button>
+          <figcaption><span class="no">06</span><div><h4>快捷选课 · 选课季的秘密武器</h4><p>抢课队列 + 定时策略轮询空位并自动提交，重试间隔、次数、并行路数与检漏模式全可调。</p></div></figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="tablet">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div class="eyebrow">Tablet &amp; 2in1</div>
+        <h2>大屏之上，<em class="hl">更从容</em></h2>
+        <p>同一套 ArkUI 代码在平板与 2in1 上自动铺开：课程表纵览整周、学业数据左右分栏、新闻多列并排。</p>
+      </div>
+
+      <div class="tab-grid">
+        <figure class="tab-card rv">
+          <button type="button" class="tab-win" data-zoom="assets/shots-tablet/home.jpg" data-cap="平板端 · 首页双栏信息流" aria-label="放大查看平板端首页截图"><img src="assets/shots-tablet/home.jpg" alt="平板端首页：双栏信息流" width="1920" height="1280" /></button>
+          <figcaption><span class="no">01</span><div><h4>首页 · 双栏信息流</h4><p>左侧今日课程与快捷入口，右侧近期考试、消息与官网公告，一屏读完当天所有要紧事。</p></div></figcaption>
+        </figure>
+        <figure class="tab-card rv" style="--d:70ms">
+          <button type="button" class="tab-win" data-zoom="assets/shots-tablet/timetable.jpg" data-cap="平板端 · 课程表整周纵览" aria-label="放大查看平板端课程表截图"><img src="assets/shots-tablet/timetable.jpg" alt="平板端课程表：整周纵览" width="1920" height="1280" loading="lazy" /></button>
+          <figcaption><span class="no">02</span><div><h4>课程表 · 整周纵览</h4><p>左侧点阵周次导航，右侧整周 15 节课程一次性铺开，彩色课程块与教室信息清晰可读。</p></div></figcaption>
+        </figure>
+        <figure class="tab-card rv" style="--d:140ms">
+          <button type="button" class="tab-win" data-zoom="assets/shots-tablet/academics.jpg" data-cap="平板端 · 学业情况数据分栏" aria-label="放大查看平板端学业截图"><img src="assets/shots-tablet/academics.jpg" alt="平板端学业情况：数据分栏" width="1920" height="1280" loading="lazy" /></button>
+          <figcaption><span class="no">03</span><div><h4>学业情况 · 数据分栏</h4><p>绩点大字、总体成绩、成绩分布与课程明细纵向排布，大屏下信息密度更高也更易读。</p></div></figcaption>
+        </figure>
+        <figure class="tab-card rv" style="--d:0ms">
+          <button type="button" class="tab-win" data-zoom="assets/shots-tablet/news.jpg" data-cap="平板端 · 南医新闻双列阅读" aria-label="放大查看平板端新闻截图"><img src="assets/shots-tablet/news.jpg" alt="平板端南医新闻：双列阅读" width="1920" height="1280" loading="lazy" /></button>
+          <figcaption><span class="no">04</span><div><h4>南医新闻 · 双列阅读</h4><p>要闻、综合、科研、媒体分类切换，公告以双列卡片铺开，单屏可见条目翻倍。</p></div></figcaption>
+        </figure>
+      </div>
+
+      <div class="tab-note rv"><i></i>平板端与手机端共用同一份安装包，无需单独下载。</div>
+    </div>
+  </section>
+
+  <section class="sec" id="specs">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <div class="eyebrow">Specs</div>
+        <h2>规格信息</h2>
+      </div>
+      <div class="specs rv">
+        <div class="spec"><span>Package</span><b>com.njmu.helper</b></div>
+        <div class="spec"><span>Version</span><b>2.0.3 (2000003)</b></div>
+        <div class="spec"><span>System</span><b>HarmonyOS NEXT · API 26</b></div>
+        <div class="spec"><span>Package Size</span><b>8.39 MB</b></div>
+        <div class="spec"><span>Devices</span><b>手机 · 平板 · 2in1</b></div>
+        <div class="spec"><span>Language</span><b>简体中文</b></div>
+        <div class="spec"><span>License</span><b>MIT</b></div>
+        <div class="spec"><span>Price</span><b>免费 · 无内购</b></div>
+      </div>
+
+      <div class="dl-btns" style="margin-top:34px">
+        <a class="btn btn-primary" href="https://www.sydxky.cn/detail.php?id=1034" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/></svg>
+          应用商店下载
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/xiopeng32-ai/NJMU-Helper/releases/download/v2.0.3/NJMU-Helper-2.0.3.hap" target="_blank" rel="noopener">GitHub 直装 .hap</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand rv">
+        <div><img src="assets/icon.png" alt="">南医助手 · NJMU-Helper</div>
+        <p>南京医科大学教务信息鸿蒙原生客户端。学生自发的开源项目，非官方应用。</p>
+      </div>
+      <div class="foot-links">
+        <div class="foot-col"><h5>产品</h5>
+          <a href="features.html">功能特性</a>
+          <a href="shots.html">界面预览</a>
+          <a href="shots.html#tablet">平板界面</a>
+          <a href="opensource.html#changelog">更新日志</a>
+          <a href="https://www.sydxky.cn/detail.php?id=1034" target="_blank" rel="noopener">应用商店下载</a>
+          <a href="https://github.com/xiopeng32-ai/NJMU-Helper/releases/download/v2.0.3/NJMU-Helper-2.0.3.hap" target="_blank" rel="noopener">GitHub 直装 .hap</a>
+        </div>
+        <div class="foot-col"><h5>开发</h5>
+          <a id="repoBtn3" href="#" target="_blank" rel="noopener">GitHub 仓库</a>
+          <a href="https://github.com/FengHDSL/XJAU-Helper" target="_blank" rel="noopener">上游项目</a>
+          <a id="contribLink" href="#" target="_blank" rel="noopener">参与贡献</a>
+          <a id="changelogLink" href="#" target="_blank" rel="noopener">完整日志</a>
+        </div>
+        <div class="foot-col"><h5>关于</h5>
+          <a href="privacy.html">隐私政策</a>
+          <a href="features.html">应用信息</a>
+          <a href="features.html#faq">常见问题</a>
+          <a href="mailto:peng24@stu.njmu.edu.cn">反馈邮箱</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bot">
+      <div class="disclaimer">© 2026 NJMU-Helper contributors · 基于 MIT 协议开源 · 「南京医科大学」「NJMU」等名称与标识归南京医科大学所有。本应用为非官方学生作品，数据以学校官方系统为准。</div>
+      <div>Made with ArkTS on HarmonyOS</div>
+    </div>
+  </div>
+</footer>
+
+<button class="to-top" id="toTop" aria-label="回到顶部">
+  <svg class="ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22"/></svg>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+</button>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
