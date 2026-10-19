@@ -220,10 +220,11 @@
     });
   }
 
-  /* ---------- 8. 交互预览（手机 / 平板） ---------- */
+  /* ---------- 8. 交互预览（点击 / 滑动 / 自动巡览） ---------- */
   var demo = doc.getElementById("demo");
   if (demo) {
-    var modes = {
+    var stage = $("[data-stage]", demo);
+    var modeCfg = {
       phone: {
         pane: $('[data-pane="phone"]', demo),
         list: $('[data-list="phone"]', demo),
@@ -238,72 +239,229 @@
     var capNum = doc.getElementById("dvNum");
     var capTitle = doc.getElementById("dvTitle");
     var capDesc = doc.getElementById("dvDesc");
+    var dotsBox = $("[data-dots]", demo);
+    var autoBtn = $("[data-auto]", demo);
     var current = "phone";
+    var index = { phone: 0, tablet: 0 };
 
-    var swapImg = function (imgEl, src, alt) {
-      if (!imgEl || imgEl.getAttribute("src") === src) return;
-      imgEl.style.opacity = "0.25";
-      var pre = new Image();
-      pre.onload = function () {
-        imgEl.src = src;
-        imgEl.alt = alt || "";
-        imgEl.style.opacity = "1";
+    var itemsOf = function (mode) {
+      return modeCfg[mode].list ? $$("button[data-src]", modeCfg[mode].list) : [];
+    };
+
+    var setShot = function (mode, src, alt, dir) {
+      var img = modeCfg[mode].img;
+      if (!img || !src) return;
+      var paint = function () {
+        img.src = src;
+        img.alt = alt || "";
+        img.classList.remove("shot-in-r", "shot-in-l");
+        void img.offsetWidth;
+        if (dir) img.classList.add(dir > 0 ? "shot-in-r" : "shot-in-l");
       };
-      pre.onerror = function () { imgEl.style.opacity = "1"; };
+      if (img.getAttribute("src") === src) return;
+      var pre = new Image();
+      pre.onload = paint;
+      pre.onerror = paint;
       pre.src = src;
     };
 
-    var select = function (btn, mode) {
-      if (!btn) return;
-      $$("button", modes[mode].list).forEach(function (b) { b.classList.toggle("is-on", b === btn); });
-      swapImg(modes[mode].img, btn.getAttribute("data-src"), btn.getAttribute("data-alt"));
+    var paintDots = function (mode) {
+      if (!dotsBox) return;
+      dotsBox.innerHTML = "";
+      itemsOf(mode).forEach(function (b, i) {
+        var d = doc.createElement("button");
+        d.type = "button";
+        d.setAttribute("aria-label", b.getAttribute("data-title") || ("第 " + (i + 1) + " 屏"));
+        d.addEventListener("click", function () {
+          go(mode, i, i > index[mode] ? 1 : -1);
+        });
+        dotsBox.appendChild(d);
+      });
+    };
+
+    var syncDots = function (mode) {
+      if (!dotsBox) return;
+      $$("button", dotsBox).forEach(function (d, i) {
+        d.classList.toggle("is-on", i === index[mode]);
+      });
+    };
+
+    var render = function (mode, i, dir) {
+      var list = itemsOf(mode);
+      if (!list.length) return;
+      index[mode] = (i + list.length) % list.length;
+      var btn = list[index[mode]];
+      list.forEach(function (b) { b.classList.toggle("is-on", b === btn); });
+      setShot(mode, btn.getAttribute("data-src"), btn.getAttribute("data-alt"), dir);
       if (capNum) capNum.textContent = btn.getAttribute("data-num") || "";
       if (capTitle) capTitle.textContent = btn.getAttribute("data-title") || "";
       if (capDesc) capDesc.textContent = btn.getAttribute("data-desc") || "";
+      if (mode === "phone") {
+        $$(".dock-item", demo).forEach(function (d) {
+          d.classList.toggle("is-on", Number(d.getAttribute("data-jump")) === index.phone);
+        });
+      }
+      syncDots(mode);
     };
 
-    var setMode = function (mode) {
-      if (!modes[mode] || !modes[mode].list) return;
+    var go = function (mode, i, dir) {
+      if (mode !== current) setMode(mode);
+      render(mode, i, dir);
+      kickAuto();
+    };
+
+    var step = function (dir) {
+      render(current, index[current] + dir, dir);
+      kickAuto();
+    };
+
+    function setMode(mode) {
+      if (!modeCfg[mode] || !modeCfg[mode].list) return;
       current = mode;
       $$("[data-mode]", demo).forEach(function (b) {
         b.classList.toggle("is-on", b.getAttribute("data-mode") === mode);
       });
-      Object.keys(modes).forEach(function (k) {
-        if (modes[k].pane) modes[k].pane.classList.toggle("is-on", k === mode);
-        if (modes[k].list) modes[k].list.classList.toggle("is-on", k === mode);
+      Object.keys(modeCfg).forEach(function (k) {
+        if (modeCfg[k].pane) modeCfg[k].pane.classList.toggle("is-on", k === mode);
+        if (modeCfg[k].list) modeCfg[k].list.classList.toggle("is-on", k === mode);
       });
-      var btn = $("button.is-on", modes[mode].list) || $("button", modes[mode].list);
-      select(btn, mode);
-    };
+      paintDots(mode);
+      render(mode, index[mode], 0);
+    }
 
+    /* 模式切换 */
     $$("[data-mode]", demo).forEach(function (b) {
-      b.addEventListener("click", function () { setMode(b.getAttribute("data-mode")); });
+      b.addEventListener("click", function () { setMode(b.getAttribute("data-mode")); kickAuto(); });
     });
 
-    Object.keys(modes).forEach(function (mode) {
-      if (!modes[mode].list) return;
-      $$("button", modes[mode].list).forEach(function (b) {
-        b.addEventListener("click", function () {
-          if (mode !== current) setMode(mode);
-          select(b, mode);
-        });
+    /* 右侧列表 */
+    Object.keys(modeCfg).forEach(function (mode) {
+      if (!modeCfg[mode].list) return;
+      $$("button[data-src]", modeCfg[mode].list).forEach(function (b, i) {
+        b.addEventListener("click", function () { go(mode, i, i > index[mode] ? 1 : -1); });
       });
     });
 
-    /* 键盘左右切换当前模式的列表 */
+    /* 模拟底部导航 */
+    $$(".dock-item", demo).forEach(function (d) {
+      d.addEventListener("click", function () {
+        if (current !== "phone") setMode("phone");
+        render("phone", Number(d.getAttribute("data-jump")), 1);
+        kickAuto();
+      });
+    });
+
+    /* 左右浮标 */
+    $$("[data-step]", demo).forEach(function (b) {
+      b.addEventListener("click", function () {
+        step(Number(b.getAttribute("data-step")) || 1);
+      });
+    });
+
+    /* 键盘 */
     demo.addEventListener("keydown", function (e) {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      var list = modes[current].list;
-      if (!list) return;
-      var btns = $$("button", list);
-      var idx = btns.findIndex(function (b) { return b.classList.contains("is-on"); });
-      var next = idx + (e.key === "ArrowRight" ? 1 : -1);
-      if (next < 0) next = btns.length - 1;
-      if (next >= btns.length) next = 0;
-      select(btns[next], current);
-      btns[next].focus();
+      step(e.key === "ArrowRight" ? 1 : -1);
       e.preventDefault();
     });
+
+    /* 点击涟漪 */
+    var ripple = function (e, body) {
+      if (!body || reduce) return;
+      var r = body.getBoundingClientRect();
+      var s = doc.createElement("span");
+      s.className = "tap-ripple";
+      s.style.left = (e.clientX - r.left) + "px";
+      s.style.top = (e.clientY - r.top) + "px";
+      body.appendChild(s);
+      setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 720);
+    };
+
+    /* 拖拽 / 滑动 */
+    var drag = null;
+    stage.addEventListener("pointerdown", function (e) {
+      if (e.target.closest(".phone-dock, .stage-nav")) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      drag = { x: e.clientX, y: e.clientY, dx: 0, t: Date.now(), id: e.pointerId, moved: false };
+      try { stage.setPointerCapture(e.pointerId); } catch (err) { }
+    });
+
+    stage.addEventListener("pointermove", function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.abs(dx) > 9 && Math.abs(dx) > Math.abs(dy)) {
+        drag.moved = true;
+        stage.classList.add("is-drag");
+      }
+      if (!drag.moved) return;
+      drag.dx = dx;
+      var body = $(".dev.is-on .dev-body", stage);
+      if (body) body.style.transform = "translateX(" + (dx * 0.3).toFixed(1) + "px)";
+    });
+
+    var endDrag = function (e) {
+      if (!drag) return;
+      var dx = drag.dx, moved = drag.moved, dt = Date.now() - drag.t;
+      var body = $(".dev.is-on .dev-body", stage);
+      stage.classList.remove("is-drag");
+      if (body) body.style.transform = "";
+      drag = null;
+      if (moved && Math.abs(dx) > 46) { step(dx < 0 ? 1 : -1); return; }
+      if (!moved && dt < 520 && body && !e.target.closest("button")) {
+        ripple(e, body);
+        step(1);
+      }
+    };
+    stage.addEventListener("pointerup", endDrag);
+    stage.addEventListener("pointercancel", function () {
+      stage.classList.remove("is-drag");
+      var body = $(".dev.is-on .dev-body", stage);
+      if (body) body.style.transform = "";
+      drag = null;
+    });
+
+    /* 自动巡览 */
+    var autoOn = false, autoTimer = null, AUTO_MS = 3400;
+    var stopAuto = function () {
+      autoOn = false;
+      if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+      if (autoBtn) {
+        autoBtn.classList.remove("is-on");
+        autoBtn.setAttribute("aria-pressed", "false");
+        var t = $("span", autoBtn);
+        if (t) t.textContent = "自动巡览";
+      }
+    };
+    var startAuto = function () {
+      autoOn = true;
+      if (autoBtn) {
+        autoBtn.classList.add("is-on");
+        autoBtn.setAttribute("aria-pressed", "true");
+        var t = $("span", autoBtn);
+        if (t) t.textContent = "暂停巡览";
+      }
+      if (autoTimer) clearInterval(autoTimer);
+      autoTimer = setInterval(function () {
+        if (doc.hidden) return;
+        render(current, index[current] + 1, 1);
+      }, AUTO_MS);
+    };
+    function kickAuto() {
+      if (autoOn) startAuto();
+    }
+    if (autoBtn) {
+      autoBtn.addEventListener("click", function () {
+        if (autoOn) stopAuto(); else startAuto();
+      });
+    }
+    doc.addEventListener("visibilitychange", function () {
+      if (doc.hidden && autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+      else if (autoOn && !autoTimer) startAuto();
+    });
+
+    /* 初始化 */
+    paintDots("phone");
+    render("phone", 0, 0);
   }
 
   /* ---------- 9. 图集灯箱 ---------- */
@@ -319,7 +477,8 @@
       '<button class="lb-close" type="button" aria-label="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>' +
       '<button class="lb-prev" type="button" aria-label="上一张"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>' +
       '<button class="lb-next" type="button" aria-label="下一张"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>' +
-      '<figure><img alt=""><figcaption></figcaption></figure>';
+      '<figure><img alt=""><figcaption></figcaption></figure>' +
+      '<span class="lb-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12h8M5 9l-3 3 3 3M19 9l3 3-3 3"/></svg>左右拖拽或按 ← → 翻页，Esc 关闭</span>';
     doc.body.appendChild(lb);
 
     var lbImg = $("img", lb);
@@ -340,6 +499,11 @@
       lbImg.style.animation = "none";
       void lbImg.offsetWidth;
       lbImg.style.animation = "";
+      /* 预取相邻 */
+      var nx = new Image();
+      nx.src = zooms[(cur + 1) % zooms.length].getAttribute("data-zoom");
+      var pv = new Image();
+      pv.src = zooms[(cur - 1 + zooms.length) % zooms.length].getAttribute("data-zoom");
     };
 
     var open = function (i) {
@@ -365,7 +529,47 @@
     $(".lb-close", lb).addEventListener("click", close);
     $(".lb-prev", lb).addEventListener("click", function () { show(cur - 1); });
     $(".lb-next", lb).addEventListener("click", function () { show(cur + 1); });
-    lb.addEventListener("click", function (e) { if (e.target === lb) close(); });
+
+    /* 拖拽 / 滑动翻页 */
+    var lbDrag = null, justDragged = false;
+    lb.addEventListener("pointerdown", function (e) {
+      if (e.target.closest("button")) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      lbDrag = { x: e.clientX, y: e.clientY, dx: 0, id: e.pointerId, moved: false };
+      justDragged = false;
+      try { lb.setPointerCapture(e.pointerId); } catch (err) { }
+    });
+    lb.addEventListener("pointermove", function (e) {
+      if (!lbDrag || e.pointerId !== lbDrag.id) return;
+      var dx = e.clientX - lbDrag.x, dy = e.clientY - lbDrag.y;
+      if (!lbDrag.moved && Math.abs(dx) > 9 && Math.abs(dx) > Math.abs(dy)) {
+        lbDrag.moved = true;
+        lb.classList.add("is-drag");
+      }
+      if (!lbDrag.moved) return;
+      lbDrag.dx = dx;
+      lbImg.style.transform = "translateX(" + (dx * 0.55).toFixed(1) + "px)";
+      lbImg.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / 620));
+    });
+    var lbEnd = function () {
+      if (!lbDrag) return;
+      var dx = lbDrag.dx, moved = lbDrag.moved;
+      lb.classList.remove("is-drag");
+      lbImg.style.transform = "";
+      lbImg.style.opacity = "";
+      lbDrag = null;
+      if (moved) {
+        justDragged = true;
+        if (Math.abs(dx) > 58) show(cur + (dx < 0 ? 1 : -1));
+      }
+    };
+    lb.addEventListener("pointerup", lbEnd);
+    lb.addEventListener("pointercancel", lbEnd);
+
+    lb.addEventListener("click", function (e) {
+      if (justDragged) { justDragged = false; return; }
+      if (e.target === lb) close();
+    });
 
     doc.addEventListener("keydown", function (e) {
       if (!lb.classList.contains("is-open")) return;
@@ -461,7 +665,21 @@
     doc.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenu(); });
   }
 
-  /* ---------- 13. 首屏完成 ---------- */
+  /* ---------- 14. 页面离场过渡 ---------- */
+  if (!reduce) {
+    doc.addEventListener("click", function (e) {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      var a = e.target.closest ? e.target.closest("a") : null;
+      if (!a || a.target === "_blank" || a.hasAttribute("download")) return;
+      var href = a.getAttribute("href");
+      if (!href || !/^[\w./-]+\.html(\?[^#]*)?(#.*)?$/.test(href)) return;
+      e.preventDefault();
+      doc.body.classList.add("is-leaving");
+      setTimeout(function () { window.location.href = href; }, 190);
+    });
+  }
+
+  /* ---------- 15. 首屏完成 ---------- */
   window.requestAnimationFrame(function () {
     doc.body.classList.add("ready");
     scrollFrame();
