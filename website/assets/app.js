@@ -192,6 +192,99 @@
     }
   }
 
+  /* ---------- 6b. 首页手机 3D 环绕 ---------- */
+  var heroStage = $(".hero .stage");
+  if (heroStage && !reduce) {
+    var heroPhone = $(".phone", heroStage);
+    if (heroPhone) {
+      var oc = { hx: 0, hy: 0, pz: 0, gx: 50, gy: 0 };
+      var ot = { hx: 0, hy: 0, pz: 0, gx: 50, gy: 0 };
+      var hasPt = false, t0 = 0;
+
+      var paintOrbit = function () {
+        heroPhone.style.setProperty("--hx", oc.hx.toFixed(2) + "deg");
+        heroPhone.style.setProperty("--hy", oc.hy.toFixed(2) + "deg");
+        heroPhone.style.setProperty("--pz", oc.pz.toFixed(1) + "px");
+        heroPhone.style.setProperty("--gx", oc.gx.toFixed(1) + "%");
+        heroPhone.style.setProperty("--gy", oc.gy.toFixed(1) + "%");
+      };
+
+      var orbitLoop = function (t) {
+        if (!t0) t0 = t;
+        if (!hasPt) {
+          var s = (t - t0) * 0.001;
+          ot.hx = Math.sin(s * 0.52) * 9;
+          ot.hy = Math.cos(s * 0.4) * 5;
+          ot.pz = 12 + Math.sin(s * 0.52) * 7;
+          ot.gx = 50 + Math.sin(s * 0.52) * 24;
+          ot.gy = 20 + Math.cos(s * 0.4) * 16;
+        }
+        oc.hx += (ot.hx - oc.hx) * 0.085;
+        oc.hy += (ot.hy - oc.hy) * 0.085;
+        oc.pz += (ot.pz - oc.pz) * 0.085;
+        oc.gx += (ot.gx - oc.gx) * 0.09;
+        oc.gy += (ot.gy - oc.gy) * 0.09;
+        paintOrbit();
+        window.requestAnimationFrame(orbitLoop);
+      };
+
+      var heroDrag = null;
+      heroStage.addEventListener("pointerdown", function (e) {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        heroDrag = { x: e.clientX, y: e.clientY, hx: ot.hx, hy: ot.hy, id: e.pointerId, active: false };
+        hasPt = true;
+        heroStage.classList.add("is-orbit");
+        try { heroStage.setPointerCapture(e.pointerId); } catch (err) { }
+      });
+
+      heroStage.addEventListener("pointermove", function (e) {
+        if (heroDrag && e.pointerId === heroDrag.id) {
+          var dx = e.clientX - heroDrag.x, dy = e.clientY - heroDrag.y;
+          if (!heroDrag.active) {
+            if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+            heroDrag.active = true;
+          }
+          ot.hx = clamp(heroDrag.hx + dx * 0.16, -34, 34);
+          ot.hy = clamp(heroDrag.hy - dy * 0.1, -22, 22);
+          ot.pz = 44;
+          ot.gx = 50 + clamp(dx * 0.5, -90, 90);
+          ot.gy = 40 + clamp(dy * 0.5, -60, 60);
+          return;
+        }
+        if (e.pointerType !== "mouse") return;
+        var r = heroStage.getBoundingClientRect();
+        var nx = clamp((e.clientX - r.left) / Math.max(1, r.width), 0, 1) - 0.5;
+        var ny = clamp((e.clientY - r.top) / Math.max(1, r.height), 0, 1) - 0.5;
+        hasPt = true;
+        heroStage.classList.add("is-orbit");
+        ot.hx = nx * 44;
+        ot.hy = -ny * 30;
+        ot.pz = 40;
+        ot.gx = 50 + nx * 120;
+        ot.gy = 16 + ny * 150;
+      }, { passive: true });
+
+      var endHeroDrag = function (e) {
+        if (!heroDrag) return;
+        heroDrag = null;
+        if (e.pointerType === "mouse") return;
+        setTimeout(function () {
+          if (!heroDrag) { hasPt = false; heroStage.classList.remove("is-orbit"); }
+        }, 700);
+      };
+      heroStage.addEventListener("pointerup", endHeroDrag);
+      heroStage.addEventListener("pointercancel", endHeroDrag);
+
+      heroStage.addEventListener("pointerleave", function () {
+        if (heroDrag) return;
+        hasPt = false;
+        heroStage.classList.remove("is-orbit");
+      });
+
+      window.requestAnimationFrame(orbitLoop);
+    }
+  }
+
   /* ---------- 7. 卡片 3D 倾斜 + 光斑 ---------- */
   if (fine && !reduce) {
     $$("[data-tilt]").forEach(function (el) {

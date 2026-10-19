@@ -285,7 +285,7 @@ em.hl{
 .hero-meta i{width:5px;height:5px;border-radius:50%;background:var(--b2);box-shadow:0 0 8px var(--b2)}
 
 /* stage */
-.stage{position:relative;display:flex;justify-content:center;align-items:center;min-height:620px}
+.stage{position:relative;display:flex;justify-content:center;align-items:center;min-height:620px;touch-action:pan-y}
 .stage-glow{
   position:absolute;width:520px;height:520px;border-radius:50%;
   background:radial-gradient(circle,rgba(0,91,172,.44),rgba(0,91,172,0) 66%);
@@ -312,9 +312,25 @@ em.hl{
   transition:transform .85s var(--ease),box-shadow .6s;
   will-change:transform;
 }
-.stage:hover .phone{
-  transform:perspective(1600px) rotateY(calc(-13deg + var(--hx,0deg))) rotateX(calc(4deg + var(--hy,0deg))) rotateZ(1.2deg);
+/* 3D 环绕：由脚本写入 --hx / --hy / --pz / --gx / --gy */
+.stage .phone{
+  transform:
+    perspective(1500px)
+    translate3d(0,0,var(--pz,0px))
+    rotateY(calc(-13deg + var(--hx,0deg)))
+    rotateX(calc(4deg + var(--hy,0deg)))
+    rotateZ(1.2deg);
+  transition:box-shadow .5s;
 }
+.stage.is-orbit .phone{
+  box-shadow:var(--shadow),0 0 0 1px rgba(255,255,255,.16),0 30px 80px -26px rgba(0,0,0,.96),0 0 74px -8px rgba(0,91,172,.62);
+}
+.stage .phone::after{
+  content:"";position:absolute;inset:0;border-radius:46px;z-index:5;pointer-events:none;
+  background:radial-gradient(240px 300px at var(--gx,50%) var(--gy,0%),rgba(198,226,255,.17),rgba(198,226,255,0) 68%);
+  opacity:0;transition:opacity .45s;
+}
+.stage.is-orbit .phone::after{opacity:1}
 .screen{
   position:relative;border-radius:38px;overflow:hidden;background:#070c14;
   height:592px;display:flex;flex-direction:column;
