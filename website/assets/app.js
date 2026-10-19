@@ -380,8 +380,10 @@
   if (filterBar) {
     var fBtns = $$("button", filterBar);
     var cards = $$("[data-cat]");
+    var bento = $(".bento");
 
     var apply = function (f) {
+      if (bento) bento.classList.toggle("is-filtered", f !== "all");
       cards.forEach(function (c) {
         var cat = c.getAttribute("data-cat") || "";
         var show = f === "all" || cat.indexOf(f) > -1;
