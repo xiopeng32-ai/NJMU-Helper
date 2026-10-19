@@ -5,8 +5,8 @@
   /* ===== 站点配置：只需改这一处 ===== */
   var CONFIG = {
     // 开源仓库地址（Fork 完成后替换为你的地址）
-    repo: "https://github.com/OWNER/NJMU-Helper",
-    owner: "OWNER"
+    repo: "https://github.com/xiopeng32-ai/NJMU-Helper",
+    owner: "xiopeng32-ai"
   };
 
   /* 注入仓库地址 */

@@ -78,7 +78,7 @@
 
 ```bash
 # 1. 克隆
-git clone https://github.com/OWNER/NJMU-Helper.git
+git clone https://github.com/xiopeng32-ai/NJMU-Helper.git
 cd NJMU-Helper
 
 # 2. 用 DevEco Studio 打开本目录，等待 Sync 完成
