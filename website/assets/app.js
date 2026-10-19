@@ -243,6 +243,7 @@
     var autoBtn = $("[data-auto]", demo);
     var current = "phone";
     var index = { phone: 0, tablet: 0 };
+    var touched = false;
 
     var itemsOf = function (mode) {
       return modeCfg[mode].list ? $$("button[data-src]", modeCfg[mode].list) : [];
@@ -305,6 +306,7 @@
     };
 
     var go = function (mode, i, dir) {
+      touched = true;
       demo.classList.add("has-used");
       if (mode !== current) setMode(mode);
       render(mode, i, dir);
@@ -312,6 +314,7 @@
     };
 
     var step = function (dir) {
+      touched = true;
       demo.classList.add("has-used");
       render(current, index[current] + dir, dir);
       kickAuto();
@@ -423,7 +426,7 @@
     });
 
     /* 自动巡览（带模拟点击光标） */
-    var autoOn = false, autoTimer = null, AUTO_MS = 3400, autoSeq = 0;
+    var autoOn = false, autoByView = false, autoTimer = null, AUTO_MS = 3400, autoSeq = 0;
     var cursor = $(".demo-cursor", stage);
 
     var hideCursor = function () {
@@ -472,6 +475,7 @@
       autoSeq++;
       if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
       hideCursor();
+      autoByView = false;
       if (autoBtn) {
         autoBtn.classList.remove("is-on");
         autoBtn.setAttribute("aria-pressed", "false");
@@ -479,8 +483,9 @@
         if (t) t.textContent = "自动巡览";
       }
     };
-    var startAuto = function () {
+    var startAuto = function (byView) {
       autoOn = true;
+      autoByView = !!byView;
       if (autoBtn) {
         autoBtn.classList.add("is-on");
         autoBtn.setAttribute("aria-pressed", "true");
@@ -495,22 +500,37 @@
     };
     function kickAuto() {
       autoSeq++;
-      if (autoOn) startAuto();
+      if (autoByView) { stopAuto(); return; }
+      if (autoOn) startAuto(false);
     }
     if (autoBtn) {
       autoBtn.addEventListener("click", function () {
-        if (autoOn) stopAuto(); else startAuto();
+        if (autoOn) stopAuto(); else startAuto(false);
       });
     }
     doc.addEventListener("visibilitychange", function () {
       if (doc.hidden && autoTimer) { clearInterval(autoTimer); autoTimer = null; }
-      else if (autoOn && !autoTimer) startAuto();
+      else if (autoOn && !autoTimer) startAuto(autoByView);
     });
 
     /* 初始化 */
     paintDots("phone");
     render("phone", 0, 0);
     setTimeout(function () { demo.classList.add("has-used"); }, 9000);
+
+    /* 进入视口自动播放，离开即停 */
+    if (!reduce && "IntersectionObserver" in window) {
+      var dio = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (en.isIntersecting) {
+            if (!autoOn && !touched) startAuto(true);
+          } else if (autoOn) {
+            stopAuto();
+          }
+        });
+      }, { threshold: 0.32 });
+      dio.observe(demo);
+    }
   }
 
   /* ---------- 9. 图集灯箱 ---------- */
