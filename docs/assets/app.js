@@ -422,11 +422,56 @@
       drag = null;
     });
 
-    /* 自动巡览 */
-    var autoOn = false, autoTimer = null, AUTO_MS = 3400;
+    /* 自动巡览（带模拟点击光标） */
+    var autoOn = false, autoTimer = null, AUTO_MS = 3400, autoSeq = 0;
+    var cursor = $(".demo-cursor", stage);
+
+    var hideCursor = function () {
+      if (!cursor) return;
+      cursor.style.opacity = "0";
+      cursor.classList.remove("is-tap");
+    };
+
+    var autoAdvance = function () {
+      var list = itemsOf(current);
+      if (!list.length) return;
+      var token = ++autoSeq;
+      var modeAtStart = current;
+      var next = (index[current] + 1) % list.length;
+      var target = null;
+      if (current === "phone" && next < 5) target = $$(".dock-item", demo)[next];
+      if (!target && dotsBox) target = $$("button", dotsBox)[next];
+
+      if (cursor && target && !reduce) {
+        var sr = stage.getBoundingClientRect();
+        var tr = target.getBoundingClientRect();
+        cursor.style.opacity = "1";
+        cursor.style.left = (tr.left - sr.left + tr.width / 2) + "px";
+        cursor.style.top = (tr.top - sr.top + tr.height / 2) + "px";
+        setTimeout(function () {
+          if (token !== autoSeq || current !== modeAtStart) return;
+          cursor.classList.add("is-tap");
+          target.classList.add("is-tap");
+        }, 430);
+        setTimeout(function () {
+          target.classList.remove("is-tap");
+          if (token !== autoSeq || current !== modeAtStart) return;
+          cursor.classList.remove("is-tap");
+          render(current, next, 1);
+        }, 640);
+        setTimeout(function () {
+          if (token === autoSeq) hideCursor();
+        }, 980);
+      } else {
+        render(current, next, 1);
+      }
+    };
+
     var stopAuto = function () {
       autoOn = false;
+      autoSeq++;
       if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+      hideCursor();
       if (autoBtn) {
         autoBtn.classList.remove("is-on");
         autoBtn.setAttribute("aria-pressed", "false");
@@ -445,10 +490,11 @@
       if (autoTimer) clearInterval(autoTimer);
       autoTimer = setInterval(function () {
         if (doc.hidden) return;
-        render(current, index[current] + 1, 1);
+        autoAdvance();
       }, AUTO_MS);
     };
     function kickAuto() {
+      autoSeq++;
       if (autoOn) startAuto();
     }
     if (autoBtn) {

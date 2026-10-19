@@ -13,7 +13,7 @@
 [![License](https://img.shields.io/badge/license-MIT-2EA44F)](LICENSE)
 [![Fork](https://img.shields.io/badge/fork-XJAU--Helper-8B5CF6)](https://github.com/FengHDSL/XJAU-Helper)
 
-[下载安装](https://www.sydxky.cn/detail.php?id=1034) · [GitHub 直装 .hap](https://github.com/xiopeng32-ai/NJMU-Helper/releases/download/v2.0.3/NJMU-Helper-2.0.3.hap) · [项目主页](website/index.html) · [界面预览](website/shots.html) · [更新日志](CHANGELOG.md) · [参与贡献](CONTRIBUTING.md)
+[应用商店](https://www.sydxky.cn/detail.php?id=1034) · [直接下载 .hap](website/assets/download/NJMU-Helper-2.0.3.hap) · [GitHub 备用](https://github.com/xiopeng32-ai/NJMU-Helper/releases/download/v2.0.3/NJMU-Helper-2.0.3.hap) · [项目主页](website/index.html) · [界面预览](website/shots.html) · [更新日志](CHANGELOG.md) · [参与贡献](CONTRIBUTING.md)
 
 </div>
 
