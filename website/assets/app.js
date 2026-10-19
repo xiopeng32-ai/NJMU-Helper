@@ -267,10 +267,17 @@
       var endHeroDrag = function (e) {
         if (!heroDrag) return;
         heroDrag = null;
-        if (e.pointerType === "mouse") return;
-        setTimeout(function () {
-          if (!heroDrag) { hasPt = false; heroStage.classList.remove("is-orbit"); }
-        }, 700);
+        if (e.pointerType !== "mouse") {
+          setTimeout(function () {
+            if (!heroDrag) { hasPt = false; heroStage.classList.remove("is-orbit"); }
+          }, 700);
+          return;
+        }
+        var r2 = heroStage.getBoundingClientRect();
+        if (e.clientX < r2.left || e.clientX > r2.right || e.clientY < r2.top || e.clientY > r2.bottom) {
+          hasPt = false;
+          heroStage.classList.remove("is-orbit");
+        }
       };
       heroStage.addEventListener("pointerup", endHeroDrag);
       heroStage.addEventListener("pointercancel", endHeroDrag);
