@@ -305,12 +305,14 @@
     };
 
     var go = function (mode, i, dir) {
+      demo.classList.add("has-used");
       if (mode !== current) setMode(mode);
       render(mode, i, dir);
       kickAuto();
     };
 
     var step = function (dir) {
+      demo.classList.add("has-used");
       render(current, index[current] + dir, dir);
       kickAuto();
     };
@@ -462,6 +464,7 @@
     /* 初始化 */
     paintDots("phone");
     render("phone", 0, 0);
+    setTimeout(function () { demo.classList.add("has-used"); }, 9000);
   }
 
   /* ---------- 9. 图集灯箱 ---------- */

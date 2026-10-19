@@ -614,6 +614,20 @@ em.hl{
   box-shadow:0 0 12px rgba(46,139,214,.75);
 }
 
+.swipe-tip{
+  position:absolute;top:12px;left:50%;z-index:3;translate:-50% 0;
+  display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;
+  font-size:10.5px;color:#c9dcf5;background:rgba(8,14,24,.66);
+  border:1px solid rgba(157,195,240,.22);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  animation:tipPulse 2.6s ease-in-out infinite;pointer-events:none;
+  transition:opacity .45s,translate .45s;
+}
+.swipe-tip svg{width:12px;height:12px;animation:tipSlide 2.6s ease-in-out infinite}
+@keyframes tipPulse{0%,100%{opacity:.5}50%{opacity:.92}}
+@keyframes tipSlide{0%,100%{transform:translateX(-2px)}50%{transform:translateX(2px)}}
+.demo.has-used .swipe-tip{opacity:0;translate:-50% -8px}
+
 /* 换屏动画 */
 @keyframes shotInR{from{opacity:0;transform:translateX(38px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes shotInL{from{opacity:0;transform:translateX(-38px) scale(.985)}to{opacity:1;transform:none}}
@@ -652,7 +666,7 @@ em.hl{
 .lb-hint svg{width:13px;height:13px}
 
 /* 页面离场 */
-body.is-leaving{opacity:0;transition:opacity .2s ease}
+body.is-leaving{animation:none;opacity:0;transition:opacity .2s ease}
 
 /* ---------- duo（双端） ---------- */
 .duo{
