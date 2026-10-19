@@ -61,7 +61,7 @@ export struct AboutPage {
   /** 调试模式是否开启（日志/联网任一）：驱动「退出调试」红胶囊显隐（AppState 静态字段非响应式，需本地镜像） */
   @State debugActive: boolean = false;
   /** 当前应用版本（与界面「版本」文本保持同步，发版时两处一起改） */
-  private readonly currentVersion: string = '1.4.1';
+  private readonly currentVersion: string = '1.9.4';
   /** 检查更新请求进行中 */
   @State checkingUpdate: boolean = false;
   /** 连点计时器（超时重置计数） */
@@ -174,8 +174,8 @@ export struct AboutPage {
         .width('100%')
         .margin({ bottom: 10 })
       // 本项目双平台入口（GitHub / Gitee）；Gitee 入口同时见于《用户协议》《隐私政策》联系方式
-      this.linkRow('XJAU-Helper（GitHub）', 'https://github.com/FengHDSL/XJAU-Helper')
-      this.linkRow('XJAU-Helper（Gitee）', 'https://gitee.com/pandasoos/XJAU-Helper')
+      this.linkRow('南医助手（GitHub）', 'https://github.com/FengHDSL/南医助手')
+      this.linkRow('南医助手（Gitee）', 'https://gitee.com/pandasoos/南医助手')
       this.linkRow('miha_hm（参考）', 'https://github.com/MrCashmere/miha_hm')
       this.linkRow('zhengfang-apk（参考）', 'https://github.com/znjhahaha/zhengfang-apk')
       this.linkRow('HiXD（参考）', 'https://github.com/PollenWang6/HiXD')
@@ -213,7 +213,7 @@ export struct AboutPage {
       method: http.RequestMethod.GET,
       connectTimeout: 8000,
       readTimeout: 8000,
-      header: { 'User-Agent': 'Mozilla/5.0 (HarmonyOS) XJAU-Helper' }
+      header: { 'User-Agent': 'Mozilla/5.0 (HarmonyOS) 南医助手' }
     }).then((resp: http.HttpResponse) => {
       if (finished) {
         return;
@@ -234,7 +234,7 @@ export struct AboutPage {
           title: '发现新版本',
           message: `发现新版本：v${remote}，请前往AppTest或前往HAP资源站更新！`,
           buttons: [
-            { text: '前往更新', color: '#079841' },
+            { text: '前往更新', color: '#005BAC' },
             { text: '关闭', color: '#666666' }
           ]
         }).then((res) => {
@@ -247,7 +247,7 @@ export struct AboutPage {
           title: '版本超前',
           message: `当前最新版本为 v${remote}！`,
           buttons: [
-            { text: '知道了', color: '#079841' }
+            { text: '知道了', color: '#005BAC' }
           ]
         });
       } else {
@@ -440,7 +440,7 @@ export struct AboutPage {
                 .onClick(() => {
                   this.onIconTapped();
                 })
-              Text('新农助手')
+              Text('南医助手')
                 .fontSize(20)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
@@ -483,7 +483,7 @@ export struct AboutPage {
               cardMargin: { bottom: 12 }
             }) {
             Column() {
-              Text('新农助手（XJAU Helper）是一款专为新疆农业大学学生打造的校园工具：原生鸿蒙开发，完全开源，完全免费，轻量小巧。课表、成绩、考试、学业、教室查询一站集成，农大新闻、校公众号随时掌握校园动态。数据来源于学校官方网页，不经过也不保存于非学校官方服务器。新农助手，让你的校园生活更便利！')
+              Text('南医助手（NJMU Helper）是一款专为南京医科大学学生打造的校园工具：原生鸿蒙开发，完全开源，完全免费，轻量小巧。课表、成绩、考试、学业、教室查询一站集成，南医新闻、校公众号随时掌握校园动态。数据来源于学校官方网页，不经过也不保存于非学校官方服务器。南医助手，让你的校园生活更便利！')
                 .fontSize(12)
                 .lineHeight(20)
                 .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
@@ -590,7 +590,7 @@ export struct AboutPage {
         // 悬浮顶栏：主题色渐变到透明，内容可滚入其下层
         PageHeader({
           title: '关于应用',
-          subtitle: '新农助手',
+          subtitle: '南医助手',
           onBack: () => {
             AppState.stack.pop();
           }
@@ -679,7 +679,7 @@ export struct AboutPage {
         btnBlur: GlassMaterial.bgBlur(AppStorage.get<boolean>('immersiveEffect') ?? false),
         btnBorderW: GlassMaterial.borderWidth(),
         btnBorderC: GlassMaterial.borderColor(),
-        btnTint: '#079841',
+        btnTint: '#005BAC',
         btnTintRatio: 0.85,
         btnMargin: { top: 12, bottom: 16 },
         btnOnClick: () => {

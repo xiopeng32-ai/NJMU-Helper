@@ -72,9 +72,9 @@ export class DateUtil {
     return {
       id: id,
       label: label,
-      // 统一走 defaultTermStart（含各学年特例），避免与自定义/列表基线出现 9-01 与 8-31 两个来源
+      // 统一走 defaultTermStart（含各学年特例），避免与自定义/列表基线出现 9-07 与 9-01 两个来源
       startDate: DateUtil.defaultTermStart(id),
-      totalWeeks: 20
+      totalWeeks: 19
     };
   }
 
@@ -92,10 +92,10 @@ export class DateUtil {
     return {
       id: id,
       label: label,
-      // 统一走 defaultTermStart（含各学年特例，如 2026-2027 第一学期实为 8-31），
-      // 避免与「跟随教务系统」基线/自定义开学日出现 8-31 与 9-01 两个来源
+      // 统一走 defaultTermStart（含各学年特例，如 2026-2027 第一学期实为 9-07），
+      // 避免与「跟随教务系统」基线/自定义开学日出现 9-07 与 9-01 两个来源
       startDate: DateUtil.defaultTermStart(id),
-      totalWeeks: 20
+      totalWeeks: 19
     };
   }
 
@@ -104,9 +104,10 @@ export class DateUtil {
     const parts: string[] = termId.split('-');
     const s: string = parts[parts.length - 1];
     const y: number = Number.parseInt(parts[0], 10);
-    // 2026-2027 学年第一学期实际开学日为 8-31（先按此默认，后续学期随校历更新）
+    // 2026-2027 学年第一学期实际开学日（上课日）为 2026-09-07（官方校历：9月5日报到注册，9月7日上课）。
+    // 之前误写 8-31，导致课表周次与校历差一周，已按官方校历 xlsx 纠正。
     if (y === 2026 && s === '1') {
-      return '2026-08-31';
+      return '2026-09-07';
     }
     return s === '2' ? `${y + 1}-03-01` : `${y}-09-01`;
   }

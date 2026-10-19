@@ -19,7 +19,7 @@
  * - UTF-8 编解码亦为纯 JS 实现（不依赖 @ohos.buffer，规避真机与 Node 的行为差异）
  */
 const BACKUP_MAGIC_TEXT: string = 'XNDBKP01';
-const KEY_SALT: string = 'xjau-helper-backup-xnd-v1';
+const KEY_SALT: string = 'njmu-helper-backup-njmu-v1';
 const MAGIC_LEN: number = 8;
 const LEN_LEN: number = 4;
 const TAG_LEN: number = 16;

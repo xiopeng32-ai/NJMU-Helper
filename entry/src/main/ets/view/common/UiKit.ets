@@ -161,6 +161,8 @@ export struct StatCell {
   @Prop value: string = '';
   @Prop label: string = '';
   color: ResourceColor = $r('app.color.text_primary');
+  /** 可选点击回调：传入时整个统计卡可点（用于展开具体课程清单） */
+  onTap?: () => void = undefined;
   /** 全局字重响应式订阅：表达式读 this.fwMode 才登记依赖，fwValue 声明即订阅 */
   @StorageProp('fontWeightMode') fwMode: string = 'follow';
   @StorageProp('fontWeightValue') fwValue: number = 400;
@@ -183,6 +185,11 @@ export struct StatCell {
     .alignItems(HorizontalAlign.Center)
     // 灰字广播依赖登记（恒真，不改变视觉）
     .opacity(this.grayTick >= 0 ? 1 : 1)
+    .onClick(() => {
+      if (this.onTap !== undefined) {
+        this.onTap();
+      }
+    })
   }
 }
 
@@ -409,6 +416,8 @@ export struct PageHeader {
   @StorageProp('subtitleColor') subtitleColor: string = '';
   @Prop title: string = '';
   @Prop subtitle: string = '';
+  /** 是否显示返回按钮（tab 内嵌页面传 false 隐藏） */
+  @Prop showBack: boolean = true;
   /** 右侧按钮文字（空 = 不显示按钮） */
   @Prop actionText: string = '';
   /** 按钮色调：'red'=警示红（默认，用于清空等）/ 'theme'=主题色（用于刷新等中性操作） */
@@ -439,12 +448,14 @@ export struct PageHeader {
         })
         .backgroundBlurStyle(Immersive.blur(BlurStyle.Thin, this.barStyle === 'legacy'))
       Row() {
-        // 官方风格圆形返回按钮
-        BackButton({
-        onBack: () => {
-          this.onBack();
+        // 官方风格圆形返回按钮（tab 内嵌模式隐藏）
+        if (this.showBack) {
+          BackButton({
+            onBack: () => {
+              this.onBack();
+            }
+          })
         }
-      })
 
       BarTitle({ title: this.title, subtitle: this.subtitle })
         .margin({ left: 6 })

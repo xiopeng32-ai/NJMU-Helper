@@ -288,7 +288,7 @@ export struct LogPage {
 
   /** 全部日志 → 文本 */
   private allToText(): string {
-    let out: string = `XJAU-Helper 日志导出 ${new Date().toLocaleString()}\n共 ${this.logs.length} 条\n\n`;
+    let out: string = `南医助手 日志导出 ${new Date().toLocaleString()}\n共 ${this.logs.length} 条\n\n`;
     for (const log of this.logs) {
       out += this.entryToText(log) + '\n';
     }
@@ -297,7 +297,7 @@ export struct LogPage {
 
   /** 选中日志 → 文本 */
   private selectedToText(): string {
-    let out: string = `XJAU-Helper 日志导出（选中 ${this.selectedIdx.length} 条）\n\n`;
+    let out: string = `南医助手 日志导出（选中 ${this.selectedIdx.length} 条）\n\n`;
     const idxs: number[] = this.selectedIdx.slice().sort((a: number, b: number) => a - b);
     for (const i of idxs) {
       if (i >= 0 && i < this.logs.length) {
@@ -419,7 +419,7 @@ export struct LogPage {
       return;
     }
     const stamp: string = `${new Date().getHours()}_${new Date().getMinutes()}`;
-    this.exportContent(this.allToText(), `xjau-helper_logs_${stamp}.txt`);
+    this.exportContent(this.allToText(), `njmu-helper_logs_${stamp}.txt`);
   }
 
   /** 导出选中（无选中提示） */
@@ -429,7 +429,7 @@ export struct LogPage {
       return;
     }
     const stamp: string = `${new Date().getHours()}_${new Date().getMinutes()}`;
-    this.exportContent(this.selectedToText(), `xjau-helper_logs_${stamp}.txt`);
+    this.exportContent(this.selectedToText(), `njmu-helper_logs_${stamp}.txt`);
   }
 
   /** 单个分类的日志列表（TabContent 内容） */
@@ -575,7 +575,7 @@ export struct LogPage {
           .width(LayoutPolicy.matchParent)
           .height(LayoutPolicy.matchParent)
           .borderRadius(14)
-          .backgroundColor('#079841')
+          .backgroundColor('#005BAC')
           .opacity(0.85)
           .hitTestBehavior(HitTestMode.None)
           .accessibilityLevel('no')
@@ -711,7 +711,7 @@ export struct LogPage {
           btnRadius: 16,
           btnMargin: { left: 10 },
           btnBg: $r('app.color.brand'),
-          btnTint: '#079841',
+          btnTint: '#005BAC',
           btnTintRatio: 0.85,
           btnBorderW: GlassMaterial.borderWidth(),
           btnBorderC: GlassMaterial.borderColor(),
@@ -731,7 +731,7 @@ export struct LogPage {
         MaterialButton({
           btnRadius: 16,
           btnBg: $r('app.color.brand'),
-          btnTint: '#079841',
+          btnTint: '#005BAC',
           btnTintRatio: 0.85,
           btnBorderW: GlassMaterial.borderWidth(),
           btnBorderC: GlassMaterial.borderColor(),

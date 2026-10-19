@@ -32,7 +32,7 @@ export struct ChangelogCard {
 
   /** 复制本版本更新日志到剪贴板（文本与卡片展示一致：分组标记去前缀、逐条前缀「·」） */
   private copyLogs(): void {
-    let text: string = `新农助手 v${this.version}（${this.date}）更新日志\n`;
+    let text: string = `南医助手 v${this.version}（${this.date}）更新日志\n`;
     for (let i: number = 0; i < this.items.length; i++) {
       const it: string = this.items[i];
       const clean: string = (it.startsWith('@新增@') || it.startsWith('@修复@')) ? it.substring(3) : it;

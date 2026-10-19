@@ -47,7 +47,7 @@ export default class EntryAbility extends UIAbility {
     // 全局壁纸 id（'b1'..'b6' 预置 / 'c:<path>' 自定义 / 'none'=未启用；默认不启用保持原观感）
     const wp: string = DataStore.loadWallpaper();
     AppStorage.setOrCreate('wallpaperId', wp.length > 0 ? wp : 'none');
-    // 恢复顶栏主题色（中国红/天空蓝/农大绿/自定义 #RRGGBB）
+    // 恢复顶栏主题色（中国红/天空蓝/南医蓝/自定义 #RRGGBB）
     Theme.restore();
     // 恢复应用内字体缩放（外观设置页可调；1.0 = 标准）
     try {
@@ -125,7 +125,9 @@ export default class EntryAbility extends UIAbility {
   /** Ability 销毁回调 */
   onDestroy(): void {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onDestroy');
-    // 清理农大新闻图片缓存
+    // 防抖队列立即落盘，避免销毁时丢缓存
+    DataStore.flushNow();
+    // 清理南医新闻图片缓存
     NewsApi.clearCache();
     // 删除空闲教室导出 Excel 临时文件（含解压目录）
     try {
@@ -211,5 +213,7 @@ export default class EntryAbility extends UIAbility {
   onBackground(): void {
     // Ability has back to background
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
+    // 切后台时立即落盘，避免防抖队列中的数据因进程挂起而丢失
+    DataStore.flushNow();
   }
 }

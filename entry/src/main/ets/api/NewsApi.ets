@@ -1,5 +1,5 @@
 /**
- * 农大新闻 API — 解析 news.xjau.edu.cn
+ * 新闻 API — 解析南医大官网 www.njmu.edu.cn（栏目 URL 待接入南医大真实新闻栏目）
  */
 import { http } from '@kit.NetworkKit';
 import { image } from '@kit.ImageKit';
@@ -40,15 +40,51 @@ export class SearchItem {
   thumb: string = '';
 }
 
+/** 学院（可订阅学院公告）条目 */
+export interface CollegeEntry {
+  name: string;
+  domain: string;
+}
+
 export class NewsApi {
-  static readonly BASE: string = 'https://news.xjau.edu.cn';
-  /** 板块 → 列表页 URL（键 = NewsPage.tabs 标签短名；全称键已废弃——曾致全部栏目兜底到「要闻」） */
+  static readonly BASE: string = 'https://www.njmu.edu.cn';
+  /** 板块 → 列表页 URL（键 = NewsPage.tabs 标签短名；南医大官网真实栏目，2026-10 实测） */
   static readonly SECTION_URLS: Record<string, string> = {
-    '要闻': 'https://news.xjau.edu.cn/ndyw/list.htm',
-    '综合': 'https://news.xjau.edu.cn/xydt/list.htm',
-    '科研': 'https://news.xjau.edu.cn/kxyj/list.htm',
-    '媒体': 'https://news.xjau.edu.cn/mtnd/list.htm'
+    '要闻': 'https://www.njmu.edu.cn/606/list.htm',
+    '综合': 'https://www.njmu.edu.cn/11543/list.htm',
+    '科研': 'https://www.njmu.edu.cn/17575/list.htm',
+    '媒体': 'https://www.njmu.edu.cn/mtny/list.htm'
   };
+
+  /** 学院（可订阅学院公告）：名称 → 学院官网域名（2026-10 实测南医大各二级学院） */
+  static readonly COLLEGES: CollegeEntry[] = [
+    { name: '基础医学院', domain: 'jcyxy.njmu.edu.cn' },
+    { name: '第一临床医学院', domain: 'dylc.njmu.edu.cn' },
+    { name: '第二临床医学院', domain: 'erlin.njmu.edu.cn' },
+    { name: '第三临床医学院', domain: 'www.njsdyyy.com.cn' },
+    { name: '第四临床医学院', domain: 'silin.njmu.edu.cn' },
+    { name: '公共卫生学院', domain: 'gwxy.njmu.edu.cn' },
+    { name: '药学院', domain: 'yxy.njmu.edu.cn' },
+    { name: '护理学院', domain: 'hlxy.njmu.edu.cn' },
+    { name: '口腔医学院', domain: 'www.jsdental.cn' },
+    { name: '生物医学工程与信息学院', domain: 'bmei.njmu.edu.cn' },
+    { name: '康复医学院', domain: 'kfyxy.njmu.edu.cn' },
+    { name: '医政学院', domain: 'yz.njmu.edu.cn' },
+    { name: '医学影像学院', domain: 'yxyxxy.njmu.edu.cn' },
+    { name: '外国语学院', domain: 'wgy.njmu.edu.cn' },
+    { name: '儿科学院', domain: 'ekxy.njmu.edu.cn' },
+    { name: '马克思主义学院', domain: 'marx.njmu.edu.cn' },
+    { name: '康达学院', domain: 'kdx.njmu.edu.cn' },
+    { name: '国际教育学院', domain: 'sie.njmu.edu.cn' }
+  ];
+
+  /** 学院官网首页 URL（跳转 WebView 用） */
+  static collegeHome(domain: string): string {
+    if (domain.startsWith('http')) {
+      return domain;
+    }
+    return `https://${domain}/`;
+  }
   /** 已下载的图片（避免重复请求），退出时清空 */
   private static imgCache: Map<string, image.PixelMap> = new Map<string, image.PixelMap>();
 
@@ -77,7 +113,7 @@ export class NewsApi {
   }
 
   private static async fillThumb(item: NewsItem): Promise<void> {
-    // 外链（非本站）不抓缩略图/详情（媒体农大等外部转载）
+    // 外链（非本站）不抓缩略图/详情（媒体南医等外部转载）
     if (!item.url.startsWith(NewsApi.BASE)) { return; }
     try {
       const d: NewsDetail = await NewsApi.fetchDetailByUrl(item.url);
@@ -91,21 +127,48 @@ export class NewsApi {
 
   private static parseList(html: string): NewsItem[] {
     const items: NewsItem[] = [];
-    const itemRegex = /<a[^>]*class="[^"]*column-news-item[^"]*"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
-    let itMatch: RegExpExecArray | null;
-    while ((itMatch = itemRegex.exec(html)) !== null) {
-      const href: string = itMatch[1];
-      const body: string = itMatch[2];
-      const tMatch = /<span[^>]*class="[^"]*column-news-title[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(body);
-      const dMatch = /<span[^>]*class="[^"]*column-news-date[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(body);
-      // 媒体农大等板块的 href 可能是完整绝对 URL，不能盲目拼接 BASE
+    // 南医大官网真实 DOM（博达 CMS simpleList）：
+    // <li class="news n1 clearfix"><span class="news_title"><a href='...' target='_blank' title='标题'>标题</a></span>
+    // <span class="news_meta">2026-10-16</span></li>（注意 href/title 为单引号属性）
+    const liRegex = /<li[^>]*class="news[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
+    let liMatch: RegExpExecArray | null;
+    while ((liMatch = liRegex.exec(html)) !== null) {
+      const li: string = liMatch[1];
+      // 分支一：<a href='...' title='标题'>（博达 simpleList，title 属性为纯标题）
+      // 分支二：<a href='...'>内文标题</a>
+      const aTitled = /<a[^>]*href=['"]([^'"]+)['"][^>]*title=['"]([^'"]*)['"][^>]*>/i.exec(li);
+      const aInner = aTitled !== null ? null : /<a[^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/i.exec(li);
+      const href: string = aTitled !== null ? aTitled[1] : (aInner !== null ? aInner[1] : '');
+      let finalTitle: string = aTitled !== null
+        ? aTitled[2].trim()
+        : (aInner !== null ? aInner[2].replace(/<[^>]+>/g, '').trim() : '');
+      if (href.length === 0 || finalTitle.length <= 1) { continue; }
+      const dMatch = /<span[^>]*class="news_meta"[^>]*>([\s\S]*?)<\/span>/i.exec(li);
       const url: string = href.startsWith('http') ? href : NewsApi.BASE + href;
       items.push({
-        title: tMatch !== null ? tMatch[1].replace(/<[^>]+>/g, '').trim() : '',
+        title: finalTitle,
         url: url,
         date: dMatch !== null ? dMatch[1].replace(/<[^>]+>/g, '').trim() : '',
         thumb: ''
       });
+    }
+    // 兜底：旧版 column-news-item 结构（其他博达站点）
+    if (items.length === 0) {
+      const itemRegex = /<a[^>]*class="[^"]*column-news-item[^"]*"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+      let itMatch: RegExpExecArray | null;
+      while ((itMatch = itemRegex.exec(html)) !== null) {
+        const href: string = itMatch[1];
+        const body: string = itMatch[2];
+        const tMatch = /<span[^>]*class="[^"]*column-news-title[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(body);
+        const dMatch = /<span[^>]*class="[^"]*column-news-date[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(body);
+        const url: string = href.startsWith('http') ? href : NewsApi.BASE + href;
+        items.push({
+          title: tMatch !== null ? tMatch[1].replace(/<[^>]+>/g, '').trim() : '',
+          url: url,
+          date: dMatch !== null ? dMatch[1].replace(/<[^>]+>/g, '').trim() : '',
+          thumb: ''
+        });
+      }
     }
     return items;
   }
@@ -152,7 +215,7 @@ export class NewsApi {
 
   /** 是否本站链接（http/https 都算） */
   static isLocalUrl(url: string): boolean {
-    return url.startsWith('https://news.xjau.edu.cn') || url.startsWith('http://news.xjau.edu.cn');
+    return url.startsWith('https://www.njmu.edu.cn') || url.startsWith('http://www.njmu.edu.cn');
   }
 
   /** 退出应用时清理图片缓存 */
@@ -183,11 +246,11 @@ export class NewsApi {
     const searchInfo: string = b64.encodeToStringSync(bytes);
 
     const resp = await http.createHttp().request(
-      'https://news.xjau.edu.cn/_web/_search/api/searchCon/create.rst?_p=YXM9NjEmdD04NjcmZD0yNzI1JnA9MSZtPVNOJg__&tt=' + Math.random(),
+      'https://www.njmu.edu.cn/_web/_search/api/searchCon/create.rst?_p=YXM9NjEmdD04NjcmZD0yNzI1JnA9MSZtPVNOJg__&tt=' + Math.random(),
       {
         method: http.RequestMethod.POST,
         header: {
-          'Referer': 'https://news.xjau.edu.cn/main.htm',
+          'Referer': 'https://www.njmu.edu.cn/main.htm',
           'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36'
         },
@@ -230,17 +293,20 @@ export class NewsApi {
 
   private static parseDetail(html: string): NewsDetail {
     const d: NewsDetail = new NewsDetail();
-    // 标题（双引号或单引号都兼容）
-    const tMatch = /<h1[^>]*class=['"][^'"]*arti-title[^'"]*['"][^>]*>([\s\S]*?)<\/h1>/i.exec(html);
+    // 标题（兼容 arti_title 下划线（南医大官网）与 arti-title 连字符两种写法）
+    const tMatch = /<h1[^>]*class=['"][^'"]*arti[_-]title[^'"]*['"][^>]*>([\s\S]*?)<\/h1>/i.exec(html);
     d.title = tMatch !== null ? tMatch[1].replace(/<[^>]+>/g, '').trim() : '';
-    // 元信息
-    const mMatch = /<p[^>]*class=['"][^'"]*arti-metas[^'"]*['"][^>]*>([\s\S]*?)<\/p>/i.exec(html);
+    // 元信息（南医大官网：<p class="arti_metas"><span class="arti_publisher">发布者：xxx</span>
+    // <span class="arti_update">发布时间：2026-10-16</span>…；兼容旧 arti-metas 写法）
+    const mMatch = /<p[^>]*class=['"][^'"]*arti[_-]metas[^'"]*['"][^>]*>([\s\S]*?)<\/p>/i.exec(html);
     if (mMatch !== null) {
       const meta: string = mMatch[1];
-      const dm = /发布时间[：:]\s*(\d{4}-\d{2}-\d{2})/.exec(meta);
+      const dm = /发布时间[：:]\s*(\d{4}-\d{2}-\d{2})/.exec(meta)
+        ?? /发布日期[：:]\s*(\d{4}-\d{2}-\d{2})/.exec(meta);
       d.date = dm !== null ? dm[1] : '';
       const sm = /来源[：:]\s*(.+?)(?:<\/span>|$)/i.exec(meta);
-      d.source = sm !== null ? sm[1].replace(/<[^>]+>/g, '').trim() : '';
+      const pm = /发布者[：:]\s*(.+?)(?:<\/span>|$)/i.exec(meta);
+      d.source = (sm !== null ? sm[1] : (pm !== null ? pm[1] : '')).replace(/<[^>]+>/g, '').trim();
       const am = /作者[：:]\s*(.+?)(?:摄影|<\/span>|$)/i.exec(meta);
       d.author = am !== null ? am[1].replace(/<[^>]+>/g, '').trim() : '';
       // 浏览量：浏览次数:<span class="WP_VisitCount">1513</span>

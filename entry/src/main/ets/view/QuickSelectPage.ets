@@ -736,7 +736,7 @@ export struct QuickSelectPage {
           Column() {
             MaterialButton({
               btnRadius: 21,
-              btnBg: '#079841',
+              btnBg: '#005BAC',
               btnBlur: GlassMaterial.bgBlur(this.immersiveEffect),
               btnBorderW: GlassMaterial.borderWidth(),
               btnBorderC: GlassMaterial.borderColor(),
@@ -1104,7 +1104,7 @@ export struct QuickSelectPage {
                   btnRadius: 21,
                   // 手动添加课程改绿色实底（同弹窗内「添加」按钮）；文字随系统深浅色自动黑白
                   // （Theme.onColor 是按背景亮度算的恒定深色，深色模式下黑字不合理，2026-09-25 全仓整改）
-                  btnBg: '#079841',
+                  btnBg: '#005BAC',
                   btnBlur: GlassMaterial.bgBlur(this.immersiveEffect),
                   btnBorderW: GlassMaterial.borderWidth(),
                   btnBorderC: GlassMaterial.borderColor(),

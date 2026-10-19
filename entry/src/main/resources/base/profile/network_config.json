@@ -1,0 +1,17 @@
+{
+  "network-security-config": {
+    "base-config": {
+      "cleartextTrafficPermitted": false
+    },
+    "domain-config": [
+      {
+        "cleartextTrafficPermitted": true,
+        "domains": [
+          {
+            "name": "jwpt.njmu.edu.cn"
+          }
+        ]
+      }
+    ]
+  }
+}

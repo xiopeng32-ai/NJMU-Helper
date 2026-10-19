@@ -1,5 +1,5 @@
 /**
- * 主框架：Navigation（承载二级页面）+ HdsTabs 底栏（首页 / 课程表 / 成绩 / 农大新闻 / 我的）
+ * 主框架：Navigation（承载二级页面）+ HdsTabs 底栏（首页 / 课程表 / 成绩 / 南医新闻 / 我的）
  * 悬浮底栏移植自 HarmonyOS Spatialization 示例
  * （https://gitcode.com/HarmonyOS_Samples/Spatialization）：
  *   - HdsTabs.barFloatingStyle：胶囊悬浮栏（两侧留白 + 底部留白 + 左右手自适应）
@@ -27,6 +27,7 @@ import { KxjsPage } from './KxjsPage';
 import { MineView } from './MineView';
 import { NewsDetailPage } from './NewsDetailPage';
 import { NewsFavPage } from './NewsFavPage';
+import { CollegeNoticePage } from './CollegeNoticePage';
 import { NewsPage } from './NewsPage';
 import { LogPage } from './LogPage';
 import { SearchResultPage } from './SearchResultPage';
@@ -39,7 +40,8 @@ import { NoticeDetailPage, NoticePage } from './NoticePage';
 import { PrivacyPage } from './PrivacyPage';
 import { TermsPage } from './TermsPage';
 import { ScheduleView } from './ScheduleView';
-import { ScoreView } from './ScoreView';
+import { ScorePage } from './ScorePage';
+import { CloudClassPage } from './CloudClassPage';
 import { ChangelogPage } from './ChangelogPage';
 import { CourseRawPage } from './CourseRawPage';
 import { QuickSelectPage } from './QuickSelectPage';
@@ -177,6 +179,8 @@ export struct MainView {
       NoticeDetailPage()
     } else if (name === Const.ROUTE_ACADEMIC) {
       AcademicPage()
+    } else if (name === Const.ROUTE_SCORE) {
+      ScorePage()
     } else if (name === Const.ROUTE_PRIVACY) {
       PrivacyPage()
     } else if (name === Const.ROUTE_TERMS) {
@@ -209,6 +213,10 @@ export struct MainView {
       FontManagePage()
     } else if (name === Const.ROUTE_WECHAT_OA) {
       WechatOAPage()
+    } else if (name === Const.ROUTE_COLLEGE_NOTICE) {
+      CollegeNoticePage()
+    } else if (name === Const.ROUTE_CLOUD_CLASS) {
+      CloudClassPage()
     }
   }
 
@@ -283,15 +291,15 @@ export struct MainView {
           .tabBar(this.tabItem('课程表', $r('app.media.calendar'), 1))
 
           TabContent() {
-            ScoreView()
+            AcademicPage({ isTab: true })
           }
-          .tabBar(this.tabItem('成绩', $r('app.media.doc_text_badge_magnifyingglass'), 2))
+          .tabBar(this.tabItem('学业情况', $r('app.media.data_icon'), 2))
 
-          // 农大新闻（占位页）：位于"成绩"和"我的"之间
+          // 南医新闻（占位页）：位于"成绩"和"我的"之间
           TabContent() {
             NewsPage()
           }
-          .tabBar(this.tabItem('农大新闻', $r('app.media.list_square_bill'), 3))
+          .tabBar(this.tabItem('南医新闻', $r('app.media.list_square_bill'), 3))
 
           TabContent() {
             MineView({

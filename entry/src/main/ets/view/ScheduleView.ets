@@ -28,6 +28,8 @@ import { CourseItem, TermInfo } from '../model/Models';
 import { EMPTY_COURSE } from '../model/Empty';
 import { LoadingTip } from './common/UiKit';
 import { ScheduleSettingsPanel } from './ScheduleSettingsPanel';
+import { CalendarExport } from '../common/CalendarExport';
+import { common } from '@kit.AbilityKit';
 import { CourseDetailPanel } from './CourseDetailPanel';
 // 沉浸光感：顶栏按钮走 MaterialButton（常驻材质），半模态弹窗内容走 MaterialSheetPanel，
 // 日期条/时间条改用 MaterialCardLayer 承载层（移除挂在 Row/Column 上的 systemMaterial 旧写法）
@@ -73,6 +75,8 @@ export struct ScheduleView {
   @State showWeekSheet: boolean = false;
   @State showTermSheet: boolean = false;
   @State showSettingsSheet: boolean = false;
+  /** 日历导出执行中（防重复点击） */
+  @State exportingCalendar: boolean = false;
   @State sheetWidth: Dimension = '100%'; // 平板加宽半模态面板（≥600vp 视为平板）
   @State selected: CourseItem = EMPTY_COURSE;
   // 课程表设置
@@ -314,6 +318,69 @@ export struct ScheduleView {
     }
   }
 
+  /** 导出日历前确认：整学期逐周写入会产生较多事件，且重复导出会重复写入 */
+  private confirmExportCalendar(): void {
+    if (this.exportingCalendar) {
+      return;
+    }
+    if (this.courses.length === 0) {
+      this.getUIContext().getPromptAction().showToast({ message: '暂无课表数据，先刷新课表' });
+      return;
+    }
+    AlertDialog.show({
+      title: '导出到系统日历',
+      message: `将把「${this.currentTerm().label}」的 ${this.courses.length} 门课按周次逐条写入系统日历（共约 ${this.estimateEventCount()} 条日程）。\n\n注意：重复导出会产生重复日程，请勿多次导出同一学期。`,
+      autoCancel: true,
+      alignment: DialogAlignment.Center,
+      primaryButton: {
+        value: '取消',
+        action: () => {
+        }
+      },
+      secondaryButton: {
+        value: '导出',
+        fontColor: $r('app.color.brand'),
+        action: () => {
+          this.doExportCalendar();
+        }
+      }
+    });
+  }
+
+  /** 预估写入事件条数（排除无时段课程与越界周次） */
+  private estimateEventCount(): number {
+    let n: number = 0;
+    for (const c of this.courses) {
+      if (c.noSchedule) {
+        continue;
+      }
+      for (const w of c.weeks) {
+        if (w >= 1 && w <= this.currentTerm().totalWeeks) {
+          n++;
+        }
+      }
+    }
+    return n;
+  }
+
+  /** 执行导出：逐门课 × 周次写入系统日历 */
+  private async doExportCalendar(): Promise<void> {
+    if (this.exportingCalendar) {
+      return;
+    }
+    this.exportingCalendar = true;
+    this.getUIContext().getPromptAction().showToast({ message: '正在写入系统日历…' });
+    try {
+      const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+      const n: number = await CalendarExport.exportSchedule(ctx, this.currentTerm(), this.courses);
+      this.getUIContext().getPromptAction().showToast({ message: `已写入 ${n} 条日程，打开「日历」即可查看` });
+    } catch (e) {
+      this.getUIContext().getPromptAction().showToast({ message: '导出失败，请确认已授予日历权限后重试' });
+    } finally {
+      this.exportingCalendar = false;
+    }
+  }
+
   /** 课程详情 sheet 中的"上课时间"行内容 */
   private selectedTimeText(): string {
     const startSec: number = this.selected.startSection;
@@ -326,8 +393,13 @@ export struct ScheduleView {
   /** 取某星期几当天（当前周）的课程列表 */
   private coursesOfDay(weekday: number): CourseItem[] {
     const list: CourseItem[] = [];
+    const maxSec: number = SectionUtil.count(this.cfg);
     for (const c of this.courses) {
       if (c.weekday === weekday && c.weeks.includes(this.viewWeek)) {
+        // 过滤超出课表节数范围的课程（如数据里出现第 16+ 节，画到网格外导致下方卡位）
+        if (c.startSection > maxSec || c.endSection > maxSec) {
+          continue;
+        }
         list.push(c);
       }
     }
@@ -341,8 +413,12 @@ export struct ScheduleView {
     if (nextW > this.currentTerm().totalWeeks) {
       return list;
     }
+    const maxSec: number = SectionUtil.count(this.cfg);
     for (const c of this.courses) {
       if (c.weekday === weekday && c.weeks.includes(nextW) && !c.weeks.includes(this.viewWeek)) {
+        if (c.startSection > maxSec || c.endSection > maxSec) {
+          continue;
+        }
         list.push(c);
       }
     }
@@ -523,15 +599,33 @@ export struct ScheduleView {
     return HorizontalAlign.Start;
   }
 
-  /** 本周总课程节数 */
+  /** 本周总课程节数（排除无固定时间地点的线上选修课，以及超出课表节数范围的课程） */
   private weekCourseCount(): number {
     let count: number = 0;
+    const maxSec: number = SectionUtil.count(this.cfg);
     for (const c of this.courses) {
+      if (c.noSchedule) {
+        continue;
+      }
+      if (c.startSection > maxSec || c.endSection > maxSec) {
+        continue;
+      }
       if (c.weeks.includes(this.viewWeek)) {
         count += c.endSection - c.startSection + 1;
       }
     }
     return count;
+  }
+
+  /** 无固定时间地点的课程（线上选修课，来自 sjkList，不画到周课表格子） */
+  private noScheduleCourses(): CourseItem[] {
+    const out: CourseItem[] = [];
+    for (const c of this.courses) {
+      if (c.noSchedule) {
+        out.push(c);
+      }
+    }
+    return out;
   }
 
   /** 周次前/后切换（delta=±1，越界钳制） */
@@ -661,6 +755,26 @@ export struct ScheduleView {
                 .fillColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
                 .opacity(0.9)
                 .rotate({ angle: this.refreshAngle })
+                .margin(5)
+            }
+            // 导出日历按钮：把当前学期课表逐周写入系统日历（先确认）
+            MaterialButton({
+              btnRadius: 14,
+              btnPersistent: true,
+              btnBg: this.isDarkMode ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.24)',
+              btnBlur: Immersive.blur(BlurStyle.Thin, this.immersiveEffect),
+              btnBorderW: 1,
+              btnBorderC: 'rgba(255,255,255,0.28)',
+              btnMargin: { left: 6 },
+              btnOnClick: () => {
+                this.confirmExportCalendar();
+              }
+            }) {
+              Image($r('app.media.calendar'))
+                .width(18)
+                .height(18)
+                .fillColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
+                .opacity(0.9)
                 .margin(5)
             }
           }
@@ -1487,6 +1601,52 @@ export struct ScheduleView {
           // bottom 100 是"悬浮底栏"预留（课程表页无悬浮底栏），正是课程表与点阵之间大间隙的来源；
           // 改小后（8vp）课程表与点阵间隙 = 8 + 点阵 margin 8 ≈ 16vp
           .padding({ left: 16, right: 16, top: 14, bottom: 8 })
+
+          // 无时间课程（未安排具体时间地点的课程：含 sjkList 线上选修课 + kbList 中节次为空/0 的课，
+          // 均不画到周课表格子）：单独列在课表下方，避免"我选了课但课表里没有"的困惑。
+          if (this.noScheduleCourses().length > 0) {
+            Column() {
+              Row() {
+                Text('无时间课程')
+                  .fontSize(12)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(this.schedTextSec())
+                Text(`（${this.noScheduleCourses().length} 门，未安排具体时间）`)
+                  .fontSize(11)
+                  .fontColor(this.schedTextSec())
+              }
+              .width('100%')
+              ForEach(this.noScheduleCourses(), (c: CourseItem) => {
+                Row() {
+                  Circle()
+                    .width(6)
+                    .height(6)
+                    .fill(Const.COURSE_FG[c.colorIndex])
+                    .margin({ right: 8 })
+                  Text(c.name)
+                    .fontSize(13)
+                    .fontColor($r('app.color.text_primary'))
+                    .layoutWeight(1)
+                    .maxLines(1)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text(c.credit > 0 ? `${c.credit.toFixed(1)}学分` : '')
+                    .fontSize(11)
+                    .fontColor(this.schedTextSec())
+                    .margin({ left: 8 })
+                  Text(c.weeksText.length > 0 ? c.weeksText : '')
+                    .fontSize(11)
+                    .fontColor(this.schedTextSec())
+                    .margin({ left: 8 })
+                }
+                .width('100%')
+                .padding({ top: 6, bottom: 6 })
+              }, (c: CourseItem) => `ns-${c.id}`)
+            }
+            .width('100%')
+            .alignItems(HorizontalAlign.Start)
+            .padding({ left: 16, right: 16, bottom: 8 })
+          }
+
           // 平板（大屏）竖屏：点阵周次与课程表在同一滚动区域内一体滑动（手机竖屏不显示；横屏走左列）
           if (this.isTablet && !this.isLandscape) {
             Column() {

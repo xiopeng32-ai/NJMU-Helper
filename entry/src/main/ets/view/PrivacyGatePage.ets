@@ -183,7 +183,7 @@ export struct PrivacyGatePage {
         MaterialButton({
           btnRadius: 21,
           btnBg: $r('app.color.brand'),
-          btnTint: '#079841',
+          btnTint: '#005BAC',
           btnTintRatio: 0.8,
           btnOnClick: () => {
             onPrimary();
@@ -259,7 +259,7 @@ export struct PrivacyGatePage {
       if (this.step === 0) {
         // ── 第 1 步：隐私协议全文 ──
         Column() {
-          Text('在你使用「新农助手」前，请阅读并同意以下隐私保护指引：')
+          Text('在你使用「南医助手」前，请阅读并同意以下隐私保护指引：')
             .fontSize(13)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
@@ -342,7 +342,7 @@ export struct PrivacyGatePage {
                   btnRadius: 21,
                   btnEnabled: this.agreeTerms && this.agreePrivacy,
                   btnBg: this.agreeTerms && this.agreePrivacy ? $r('app.color.brand') : $r('app.color.bg_chip'),
-                  btnTint: this.agreeTerms && this.agreePrivacy ? '#079841' : '',
+                  btnTint: this.agreeTerms && this.agreePrivacy ? '#005BAC' : '',
                   btnTintRatio: 0.8,
                   btnOnClick: () => {
                     this.onAgreePrivacy();

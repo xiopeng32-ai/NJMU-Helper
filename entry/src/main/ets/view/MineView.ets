@@ -28,7 +28,7 @@ import { ChevronRight } from './common/ChevronRight';
 import { BackButton } from './common/BackButton';
 import { WallpaperTone } from '../common/WallpaperTone';
 import { Immersive } from './common/Immersive';
-import { AcademicReport, UserProfile } from '../model/Models';
+import { AcademicReport, OverallGradeStats, OverallGrades, UserProfile } from '../model/Models';
 import { EMPTY_REPORT } from '../model/Empty';
 import { BarTitle, SettingRow } from './common/UiKit';
 // 沉浸光感：卡片统一走 MaterialCard（材质承载层在卡片内容之下，材质生效时卡片底色/磨砂/亮边/阴影一并让出，
@@ -65,6 +65,8 @@ export struct MineView {
   /** 全局壁纸 id（我的页入口显示当前状态） */
   @StorageProp('wallpaperId') wallpaperId: string = 'none';
   @State report: AcademicReport = EMPTY_REPORT;
+  /** 总体成绩统计（学业总评成绩/累计绩点回退来源；xsxyqk 学业情况接口本校未部署，report 常缺数据） */
+  @State ovrStats: OverallGradeStats | null = null;
   @State loaded: boolean = false;
   @State syncing: boolean = false;
   @State photo: string = '';
@@ -108,7 +110,7 @@ export struct MineView {
     if (t === 'purple') {
       return '紫罗兰';
     }
-    return '农大绿';
+    return '南医蓝';
   }
 
   /** 壁纸摘要（跟随全局 wallpaperId 实时刷新） */
@@ -305,7 +307,7 @@ export struct MineView {
       const d2: Date = new Date();
       const exportTs: string = `${d2.getFullYear()}-${(d2.getMonth() + 1).toString().padStart(2, '0')}-${d2.getDate().toString().padStart(2, '0')} ${d2.getHours().toString().padStart(2, '0')}:${d2.getMinutes().toString().padStart(2, '0')}`;
       const data: Record<string, string> = {
-        'app': 'xjau-helper',
+        'app': 'njmu-helper',
         'type': 'full-backup',
         'version': '2',
         'exportedAt': exportTs,
@@ -328,7 +330,7 @@ export struct MineView {
       }
       // 用户选位置保存 .zip
       const options: picker.DocumentSaveOptions = new picker.DocumentSaveOptions();
-      options.newFileNames = [`xjau-helper_backup_${stamp}.xnd`];
+      options.newFileNames = [`njmu-helper_backup_${stamp}.xnd`];
       options.fileSuffixChoices = ['.xnd'];
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(ctx);
       docPicker.save(options).then((uris: string[]) => {
@@ -449,7 +451,7 @@ export struct MineView {
       const obj: Record<string, string> = JSON.parse(content) as Record<string, string>;
       const btype: string = obj['type'] ?? '';
       // 校验备份格式（v2 全量备份 / v1 旧版课表备份）
-      if (obj['app'] !== 'xjau-helper' || (btype !== 'full-backup' && btype !== 'schedule-backup')) {
+      if (obj['app'] !== 'njmu-helper' || (btype !== 'full-backup' && btype !== 'schedule-backup')) {
         this.getUIContext().getPromptAction().showToast({ message: '不是有效的备份文件' });
         return;
       }
@@ -541,6 +543,11 @@ export struct MineView {
       this.report = cached;
       this.loaded = true;
     }
+    // 总体成绩统计：先缓存秒开（学业总评成绩 / 累计绩点来源）
+    const cachedOvr: OverallGrades | null = JwApi.loadCachedOverallGrades();
+    if (cachedOvr !== null) {
+      this.ovrStats = cachedOvr.stats;
+    }
     // 头像：先读缓存（与首页一致；功能浏览模式不读真实缓存，避免泄露）
     const cachedPhoto: string = JwApi.loadCachedPhoto();
     if (cachedPhoto.length > 0) {
@@ -548,6 +555,12 @@ export struct MineView {
     }
     try {
       this.report = await JwApi.getAcademic();
+      // 总体成绩统计（学业总评成绩用），失败不影响其它数据
+      try {
+        const ovr: OverallGrades = await JwApi.getOverallGrades();
+        this.ovrStats = ovr.stats;
+      } catch (err) {
+      }
       // 拉取头像（与首页一致）
       const p: string = await JwApi.getPhoto();
       if (p.length > 0) {
@@ -605,7 +618,7 @@ export struct MineView {
       message: `当前登录方式：${this.loginMethodText()}\n\n退出后需要重新使用学号密码登录，确定退出吗？`,
       buttons: [
         { text: '取消', color: '#888888' },
-        { text: '前往登录页', color: '#079841' },
+        { text: '前往登录页', color: '#005BAC' },
         { text: '退出', color: '#F0524D' }
       ]
     }).then((result: promptAction.ShowDialogSuccessResponse) => {
@@ -700,7 +713,7 @@ export struct MineView {
       if (this.showAvatar) {
         // 头像出现/消失过渡：淡入+从 0.8 缩放放大（配合 Toggle onChange 的 animateTo 生效）
         if (this.photo.length > 0) {
-          Image('data:image/jpeg;base64,' + this.photo)
+          Image(AppState.photoDataUrl(this.photo))
             .width(52)
             .height(52)
             .borderRadius(26)
@@ -799,9 +812,33 @@ export struct MineView {
     }
   }
 
+  /** 学业总评成绩文案：官方体检单直出优先（officialOverall），其次计算值 overallScore，无则 '--' */
+  private overallScoreText(): string {
+    if (this.ovrStats === null) {
+      return '--';
+    }
+    if (this.ovrStats.officialOverall.length > 0) {
+      return this.ovrStats.officialOverall;
+    }
+    return this.ovrStats.overallScore >= 0 ? this.ovrStats.overallScore.toFixed(2) : '--';
+  }
+
+  /** 平均绩点文案：report.gpa（xsxyqk）为 0 时回退总体成绩统计的累计绩点（成绩明细加权计算） */
+  private avgGpaText(): string {
+    if (this.report.gpa > 0) {
+      return this.report.gpa.toFixed(2);
+    }
+    if (this.ovrStats !== null) {
+      const g: number = Number(this.ovrStats.gpa);
+      if (!Number.isNaN(g) && g > 0) {
+        return g.toFixed(2);
+      }
+    }
+    return '--';
+  }
+
   /** 学号 · 学院 · 班级 */
-  private identityLine(): string {
-    const p: UserProfile | null = AppState.profile;
+  private identityLine(): string {    const p: UserProfile | null = AppState.profile;
     const parts: string[] = [];
     if (AppState.studentId().length > 0) {
       parts.push(AppState.studentId());
@@ -832,11 +869,11 @@ export struct MineView {
     }) {
     Row() {
       Column() {
-        Text(this.loaded ? `${this.report.totalEarned}` : '--')
+        Text(this.loaded ? this.overallScoreText() : '--')
           .fontSize(18)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor(Theme.colorOf(this.themeColor))
-        Text('已修学分')
+        Text('学业总评成绩')
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ top: 3 })
@@ -844,7 +881,7 @@ export struct MineView {
       .layoutWeight(1)
 
       Column() {
-        Text(this.loaded ? this.report.gpa.toFixed(2) : '--')
+        Text(this.loaded ? this.avgGpaText() : '--')
           .fontSize(18)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.accent_blue'))
@@ -912,7 +949,7 @@ export struct MineView {
         Column() {
           MaterialButton({
             btnRadius: 21,
-            btnBg: '#079841',
+            btnBg: '#005BAC',
             btnBlur: GlassMaterial.bgBlur(this.immersiveEffect),
             btnBorderW: GlassMaterial.borderWidth(),
             btnBorderC: GlassMaterial.borderColor(),
@@ -969,7 +1006,7 @@ export struct MineView {
       Column() {
         MaterialButton({
           btnRadius: 21,
-          btnBg: '#079841',
+          btnBg: '#005BAC',
           btnBlur: GlassMaterial.bgBlur(this.immersiveEffect),
           btnBorderW: GlassMaterial.borderWidth(),
           btnBorderC: GlassMaterial.borderColor(),
@@ -1135,6 +1172,13 @@ export struct MineView {
               }
             })
             Divider().color($r('app.color.divider'))
+            // 1.1 云课堂（智教云：我的课程 / 课堂实录 / 通知）
+            SettingRow({
+              icon: '', title: '云课堂', value: '', onTap: () => {
+                AppState.stack.pushPath({ name: Const.ROUTE_CLOUD_CLASS });
+              }
+            })
+            Divider().color($r('app.color.divider'))
             // 2. 服务大厅（外部链接页打开，注入 SSO 会话保持登录态）
             SettingRow({
               icon: '', title: '服务大厅', value: '', onTap: () => {
@@ -1168,7 +1212,7 @@ export struct MineView {
                   this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
                   return;
                 }
-                AppState.webUrl = 'https://www.xjau.edu.cn/';
+                AppState.webUrl = 'https://www.njmu.edu.cn/';
                 AppState.webTitle = '学校官网';
                 AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
               }
@@ -1307,12 +1351,12 @@ export struct MineView {
 
         // 数据来源（Scroll 大 Column 内部）
         Column() {
-          Text('数据来源: 新疆农业大学教务系统').fontSize(11)
+          Text('数据来源: 南京医科大学教务系统').fontSize(11)
             .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
-          Text('新疆农业大学新闻网').fontSize(11)
+          Text('南京医科大学新闻网').fontSize(11)
             .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
             .margin({ top: 3 })
-          Text('新疆农业大学教务处').fontSize(11)
+          Text('南京医科大学教务处').fontSize(11)
             .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
             .margin({ top: 3 })
         }
@@ -1560,7 +1604,7 @@ export struct MineView {
             this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
             return;
           }
-          AppState.webUrl = 'https://www.xjau.edu.cn/';
+          AppState.webUrl = 'https://www.njmu.edu.cn/';
           AppState.webTitle = '学校官网';
           AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
         }

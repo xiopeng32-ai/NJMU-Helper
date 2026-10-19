@@ -11,28 +11,33 @@ export interface SectionTime {
 }
 
 export class Const {
-  /** 课表总节次（新疆高校常见的 10 节作息） */
-  static readonly SECTION_COUNT: number = 10;
+  /** 课表总节次（南京医科大学作息，15 节） */
+  static readonly SECTION_COUNT: number = 15;
 
-  /** 节次时间表（新疆农业大学官方作息，按老满城/亚心/塔城校区，10 节） */
+  /** 节次时间表（南京医科大学官方作息，15 节） */
   static readonly SECTIONS: SectionTime[] = [
-    { index: 1, start: '10:00', end: '10:50' },
-    { index: 2, start: '11:00', end: '11:50' },
-    { index: 3, start: '12:10', end: '13:00' },
-    { index: 4, start: '13:10', end: '14:00' },
-    { index: 5, start: '15:30', end: '16:20' },
-    { index: 6, start: '16:30', end: '17:20' },
-    { index: 7, start: '17:40', end: '18:30' },
-    { index: 8, start: '18:40', end: '19:30' },
-    { index: 9, start: '20:30', end: '21:15' },
-    { index: 10, start: '21:25', end: '22:10' }
+    { index: 1, start: '08:00', end: '08:40' },
+    { index: 2, start: '08:50', end: '09:30' },
+    { index: 3, start: '09:40', end: '10:20' },
+    { index: 4, start: '10:30', end: '11:10' },
+    { index: 5, start: '11:20', end: '12:00' },
+    { index: 6, start: '12:10', end: '12:20' },
+    { index: 7, start: '14:00', end: '14:40' },
+    { index: 8, start: '14:50', end: '15:30' },
+    { index: 9, start: '15:40', end: '16:20' },
+    { index: 10, start: '16:30', end: '17:10' },
+    { index: 11, start: '17:20', end: '18:00' },
+    { index: 12, start: '18:10', end: '18:20' },
+    { index: 13, start: '19:00', end: '19:40' },
+    { index: 14, start: '19:50', end: '20:30' },
+    { index: 15, start: '20:40', end: '21:20' }
   ];
 
   /** 节次所属的时段（上午 / 下午 / 晚上） */
   static readonly SECTION_PERIODS: string[] = [
-    '上午', '上午', '上午', '上午',
-    '下午', '下午', '下午', '下午',
-    '晚上', '晚上'
+    '上午', '上午', '上午', '上午', '上午', '上午',
+    '下午', '下午', '下午', '下午', '下午', '下午',
+    '晚上', '晚上', '晚上'
   ];
 
   static readonly WEEK_LABELS: string[] = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
@@ -53,7 +58,9 @@ export class Const {
   /** 首页快捷入口（通知/校历已下放到右上角"消息"入口与日历组件） */
   static readonly QUICK_ENTRIES: QuickEntry[] = [
     { key: 'exam', title: '考试查询', icon: '考试查询', color: $r('app.color.accent_orange') },
-    { key: 'academic', title: '学业情况', icon: '学业情况', color: $r('app.color.accent_purple') }
+    { key: 'score', title: '成绩查询', icon: '成绩查询', color: $r('app.color.accent_purple') },
+    { key: 'room', title: '教室查询', icon: '教室查询', color: $r('app.color.accent_blue') },
+    { key: 'jw', title: '教务系统', icon: '教务系统', color: $r('app.color.brand') }
   ];
 
   /** 页面路由名 */
@@ -61,6 +68,8 @@ export class Const {
   static readonly ROUTE_NOTICE: string = 'NoticePage';
   static readonly ROUTE_NOTICE_DETAIL: string = 'NoticeDetailPage';
   static readonly ROUTE_ACADEMIC: string = 'AcademicPage';
+  /** 成绩查询页（学业情况页内的二级入口；首页快捷入口"成绩查询"直达） */
+  static readonly ROUTE_SCORE: string = 'ScorePage';
   static readonly ROUTE_PRIVACY: string = 'PrivacyPage';
   /** 用户协议页（关于页底部卡片入口） */
   static readonly ROUTE_TERMS: string = 'TermsPage';
@@ -84,40 +93,90 @@ export class Const {
   static readonly ROUTE_FONT_MANAGE: string = 'FontManagePage';
   /** 校公众号页（我的 → 校园服务 → 校公众号，展示学校各微信公众号并引导关注） */
   static readonly ROUTE_WECHAT_OA: string = 'WechatOAPage';
+  /** 学院公告订阅页（南医新闻 → 官网直达 → 学院公告） */
+  static readonly ROUTE_COLLEGE_NOTICE: string = 'CollegeNoticePage';
+  /** 云课堂页（智教云：我的课程 / 课堂实录 / 通知） */
+  static readonly ROUTE_CLOUD_CLASS: string = 'CloudClassPage';
 
-  /** 教务系统网址（应用内 WebView 打开） */
-  static readonly WEB_PORTAL_URL: string = 'https://jwxt.xjau.edu.cn/jwglxt/xtgl/index_initMenu.html';
+  /** 教务系统网址（应用内 WebView 打开）。南医大教务系统域名 jwpt.njmu.edu.cn（2026-10 抓包实测，非旧 IP 202.195.176.76）。 */
+  static readonly WEB_PORTAL_URL: string = 'https://jwpt.njmu.edu.cn/jwglxt/xtgl/index_initMenu.html';
   /** 教务系统登录页（应用内 WebView 打开，"网页版登录"切换到「教务系统」时使用） */
-  static readonly WEB_LOGIN_URL: string = 'https://jwxt.xjau.edu.cn/jwglxt/xtgl/login_slogin.html';
-  /** 服务大厅首页（rhmh）—— WebSurface 捕获 rhmh 会话 Cookie 时使用的查询地址 */
-  static readonly SERVICE_HALL_URL: string = 'https://rhmh.xjau.edu.cn/default/index.html#/';
+  static readonly WEB_LOGIN_URL: string = 'https://jwpt.njmu.edu.cn/jwglxt/xtgl/login_slogin.html';
+
+  /** ── 南医大统一身份认证（authserver.njmu.edu.cn，金智 IDS） ── */
+  /** 统一认证平台根域名（用于 Cookie 的 host 匹配） */
+  static readonly AUTH_HOST: string = 'authserver.njmu.edu.cn';
+  /** 统一认证登录页（金智 IDS，AES 加密密码） */
+  static readonly CAS_LOGIN_URL: string =
+    'https://authserver.njmu.edu.cn/authserver/login';
+  /** 统一认证平台主页（根域） */
+  static readonly AUTH_HOME_URL: string = 'https://authserver.njmu.edu.cn/';
+  /** 找回密码页（南医大统一身份认证平台，应用内 WebView 打开） */
+  static readonly FORGOT_PASSWORD_URL: string =
+    'https://authserver.njmu.edu.cn/authserver/getBackPasswordMainPage.do';
+
+  /** ── 教务系统 SSO 桥接 ── */
+  /** 教务系统主机名（2026-10 抓包实测：jwpt.njmu.edu.cn，非旧 IP 202.195.176.76） */
+  static readonly JW_HOST: string = 'jwpt.njmu.edu.cn';
+  /** 教务系统根地址（HTTPS） */
+  static readonly JW_BASE_URL: string = 'https://jwpt.njmu.edu.cn';
   /**
-   * 智慧学工（我的页入口）：服务大厅「智慧学工系统」应用入口
-   * （ServiceShow?wid=1238430490178043904，用户确认），登录后 SSO 到 xgxt 智慧学工系统。
+   * 教务系统 SSO 回调端点。2026-10 抓包实测：南医大教务系统真实域名是
+   * jwpt.njmu.edu.cn，统一认证桥接端点是 /sso/jzlogin（非旧的 /jwglxt/sso/jziotlogin）。
+   * 流程：authserver 登录拿 CASTGC → 带 service=https://jwpt.njmu.edu.cn/sso/jzlogin 换 ST(ticket)
+   * → 带 ticket 访问 /sso/jzlogin → 302 到 /jwglxt/ticketlogin?uid&timestamp&verify
+   * → 拿到 jwglxt 的 JSESSIONID + MOD_AUTH_CAS。
+   */
+  static readonly JW_SSO_BRIDGE_URL: string =
+    'https://jwpt.njmu.edu.cn/sso/jzlogin';
+  /**
+   * 教务系统「统一身份认证登录」跳转地址（服务大厅/门户里教务应用入口的 pcAccessUrl）。
+   * 与 JW_SSO_BRIDGE_URL 同端点（门户「教务系统」应用的 pcAccessUrl 即 https://jwpt.njmu.edu.cn/sso/jzlogin）。
+   */
+  static readonly JW_BRIDGE_FROM_HALL_URL: string =
+    'https://jwpt.njmu.edu.cn/sso/jzlogin';
+  /** 服务大厅首页 —— 南医大融合门户为 i.njmu.edu.cn，教务系统主页为 jwpt.njmu.edu.cn */
+  static readonly SERVICE_HALL_URL: string = 'https://i.njmu.edu.cn/';
+  /**
+   * 智慧学工（我的页入口）：南医大暂无独立智慧学工 SSO，指向教务系统主页占位。
    */
   static readonly ZHIHUI_XUEGONG_URL: string =
-    'https://rhmh.xjau.edu.cn/index.html#/ServiceShow?isMobile=0&wid=1238430490178043904';
-  /** 服务大厅→新教务系统 跳转地址（authserver CAS，service=jziotlogin?gid_=...；用户 2026-08-19 提供，服务大厅点开新教务系统的真实地址） */
-  static readonly JW_BRIDGE_FROM_HALL_URL: string =
-    'https://authserver.xjau.edu.cn/authserver/login?service=http%3A%2F%2Fjwxt.xjau.edu.cn%2Fsso%2Fjziotlogin%3Fgid_%3DTWdOQ25Nbm5POW9pQ0NQQzVUZ3kzc2hxRlNHSFhrY3dvRnZqQ3liMVc0eEJjRERUWk84Sy9wS0ZZYTRwVUZxVkxKSGZEVTlHZ2xOak9veERKQktmSUE9PQ%26amp_sec_version_%3D1%26EMAP_LANG%3Dzh%26THEME%3D';
-  /** 【已废弃·勿用】服务大厅→教务系统桥接地址（裸 /sso/jziotlogin，无 gid_/ticket）
-   *  真机不可靠（项目已验证），网页版登录与冷启动重登统一改用 JW_BRIDGE_FROM_HALL_URL。 */
-  static readonly JW_SSO_BRIDGE_URL: string = 'https://jwxt.xjau.edu.cn/sso/jziotlogin';
+    'https://jwpt.njmu.edu.cn/jwglxt/xtgl/index_initMenu.html';
   /**
-   * 服务大厅登录入口（authserver CAS 登录页，service 指向 rhmh）——
-   *  "网页版登录"切换到「服务大厅」的目标 URL + 我的页"服务大厅"入口 URL。
-   *  登录成功后由 authserver 302 跳到 rhmh.xjau.edu.cn 服务大厅，
-   *  再由 WebSurface 自动跳 /sso/jziotlogin 桥接出 jwglxt 会话。
+   * 首页「官网通知」数据源：南医大官网「通知公告」栏目（2026-10 实测 URL）。
    */
-  static readonly CAS_LOGIN_URL: string =
-    'https://authserver.xjau.edu.cn/authserver/login?service=https%3A%2F%2Frhmh.xjau.edu.cn%2Flogin';
-  /** 找回密码页（学校统一身份认证平台，应用内 WebView 打开） */
-  static readonly FORGOT_PASSWORD_URL: string = 'https://authserver.xjau.edu.cn/retrieve-password/retrievePassword/index.html#/';
+  static readonly JWC_LIST_URL: string = 'https://www.njmu.edu.cn/607/list.htm';
+  /** 教务处官网「课程及学分」：绩点计算方法（南医大暂无公开栏目，留空占位） */
+  static readonly JWC_KJXF_URL: string = '';
   /**
-   * 教务处官网「学期校历」栏目列表（通知取最新两条；校历取最新一条校历文章的 PDF 转换）。
-   * 无需登录，页面文章标题形如「2026年秋季学期校历」，链接 /yyyy/MMdd/c3318aXXXXX/page.htm。
+   * 校历（日历）数据源：南医大教学管理处官网「下载专区」栏目（2026-10 实测 URL）。
+   * 校历文章在此栏目发布（如「2026-2027学年校历」，含 .xlsx / .jpg 附件）。
+   * 注意：不是教务处 jwc.njmu.edu.cn，也不是 www.njmu.edu.cn/607（那是通知公告）。
    */
-  static readonly JWC_LIST_URL: string = 'https://jwc.xjau.edu.cn/jxrl_3318/list.htm';
-  /** 教务处官网「课程及学分」：绩点计算方法（成绩页入口 + GPA/平均分计算依据） */
-  static readonly JWC_KJXF_URL: string = 'https://jwc.xjau.edu.cn/kcjxf/list.htm';
+  static readonly JXRL_LIST_URL: string = 'https://jxglc.njmu.edu.cn/20004/list.htm';
+
+  /** ── 南医大官网直达入口（新闻页「官网直达」快捷栏） ── */
+  /** 医药实验动物中心（iacuc.njmu.edu.cn，2026-10 实测） */
+  static readonly ANIMAL_CENTER_URL: string = 'https://iacuc.njmu.edu.cn/';
+  /** 大型仪器创新部（创新器械管理，dycx.njmu.edu.cn，2026-10 实测） */
+  static readonly INSTRUMENT_URL: string = 'https://dycx.njmu.edu.cn/';
+
+  /** ── 云课堂（智教云 TeachingCenterStudentWeb） ── */
+  /** 云课堂根地址 */
+  static readonly CC_BASE_URL: string = 'https://zjy.njmu.edu.cn';
+  /** 云课堂教学中心学生端入口（SSO 登录起始） */
+  static readonly CC_LOGIN_URL: string =
+    'https://zjy.njmu.edu.cn/ssoserver/login?platformNumber=002&platformType=4&parentPlatformNum=010';
+  /** 云课堂 SSO 回调（CAS service，带 platform 参数） */
+  static readonly CC_SSO_SERVICE: string =
+    'https://zjy.njmu.edu.cn/ssoserver/login/singleSignOnSchool?platform=002,4,010';
+  /** 云课堂业务请求 Referer（网关强校验，缺即 401） */
+  static readonly CC_REFERER: string =
+    'https://zjy.njmu.edu.cn/TeachingCenterStudentWeb/index.html';
+  /** 云课堂鉴权 API 前缀 */
+  static readonly CC_API_AUTH: string = 'https://zjy.njmu.edu.cn/authoritycontrolplatformapi';
+  /** 云课堂课程 API 前缀 */
+  static readonly CC_API_COURSE: string = 'https://zjy.njmu.edu.cn/courseApi';
+  /** 云课堂教学业务 API 前缀 */
+  static readonly CC_API_TEACH: string = 'https://zjy.njmu.edu.cn/teachingApi';
 }

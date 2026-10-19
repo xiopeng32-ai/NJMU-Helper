@@ -1,5 +1,5 @@
 /**
- * 农大新闻收藏页（Navigation 二级页）——展示收藏的新闻（纯文字行），点击进详情，支持取消收藏
+ * 南医新闻收藏页（Navigation 二级页）——展示收藏的新闻（纯文字行），点击进详情，支持取消收藏
  */
 import { NewsApi, NewsItem } from '../api/NewsApi';
 import { AppState } from '../common/AppState';

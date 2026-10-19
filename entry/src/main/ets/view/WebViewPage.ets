@@ -391,7 +391,7 @@ export struct WebViewPage {
   /** 是否服务大厅主页（仅此页面内部自带滚动容器，需页面级留白；其它外部链接保持穿透效果） */
   static isSpaPortal(url: string): boolean {
     // 服务大厅相关地址（rhmh 域名，含智慧学工等应用）→ 固定顶栏（页面级留白）
-    return url.indexOf('rhmh.xjau.edu.cn') >= 0 || url.indexOf('/default/index.html') >= 0;
+    return url.indexOf('jwpt.njmu.edu.cn') >= 0 || url.indexOf('/default/index.html') >= 0;
   }
 
   /** 是否智慧学工页面（默认使用电脑端 UA） */

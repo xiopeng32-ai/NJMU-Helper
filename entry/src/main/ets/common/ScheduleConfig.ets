@@ -38,8 +38,8 @@ export class ScheduleConfig {
   showNextWeek: boolean = false;
 
   // ===== 节次与作息时间（可在课程表设置中调整）=====
-  /** 课程表总节数（默认 10，可调 1~15） */
-  sectionCount: number = 10;
+  /** 课程表总节数（默认 15，南医大每天 15 节课，可调 1~15） */
+  sectionCount: number = 15;
   /** 每节课时间："HH:MM-HH:MM" 以逗号分隔（空 = 使用内置默认作息） */
   sectionTimeText: string = '';
 
@@ -145,6 +145,11 @@ export class ScheduleConfig {
       if (typeof o['showWeekend'] === 'boolean') { c.showWeekend = o['showWeekend'] as boolean; }
       if (typeof o['showNextWeek'] === 'boolean') { c.showNextWeek = o['showNextWeek'] as boolean; }
       if (typeof o['sectionCount'] === 'number') { c.sectionCount = o['sectionCount'] as number; }
+      // 一次性迁移：旧默认节数 10 → 南医大 15 节（仅当存量是旧默认值且未迁移过时）
+      if (c.sectionCount === 10 && DataStore.get(DataStore.KEY_SECTION_COUNT_MIGRATED) !== '1') {
+        c.sectionCount = 15;
+        DataStore.put(DataStore.KEY_SECTION_COUNT_MIGRATED, '1');
+      }
       if (typeof o['sectionTimeText'] === 'string') { c.sectionTimeText = o['sectionTimeText'] as string; }
       if (typeof o['textColor'] === 'string') { c.textColor = o['textColor'] as string; }
       if (typeof o['textMixWithBg'] === 'boolean') { c.textMixWithBg = o['textMixWithBg'] as boolean; }

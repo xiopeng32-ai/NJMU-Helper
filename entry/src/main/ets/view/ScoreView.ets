@@ -25,6 +25,7 @@ import { GlassMaterial } from '../common/GlassMaterial';
 import { Immersive } from './common/Immersive';
 import { ScoreItem, TermInfo, TermScore } from '../model/Models';
 import { BarTitle, EmptyTip, LoadingTip, TagChip } from './common/UiKit';
+import { BackButton } from './common/BackButton';
 import { AntiPeepOverlay } from './common/AntiPeepOverlay';
 import { AntiPeepManager } from '../common/AntiPeepManager';
 import { WebSurface } from './WebSurface';
@@ -35,9 +36,14 @@ import { ResponsiveUtil } from '../common/ResponsiveUtil';
 import { MaterialCard, MaterialSheetPanel } from './common/MaterialCard';
 import { MaterialButton } from './common/MaterialButton';
 import { sheetBlurStyle } from '../common/SystemMaterial';
+import { ImageExport, ExportResult } from '../common/ScoreImageExport';
+import { WallpaperTone } from '../common/WallpaperTone';
+import { common } from '@kit.AbilityKit';
 
 @Component
 export struct ScoreView {
+  /** 二级页面模式：显示返回按钮（tab 内嵌时不显示） */
+  @Prop showBack: boolean = false;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   @StorageProp('bottomInsetPx') bottomInsetPx: number = 0;
   @StorageProp('themeColor') themeColor: string = 'green';
@@ -69,6 +75,13 @@ export struct ScoreView {
   @State isLandscape: boolean = false;
   @State refreshing: boolean = false;
   @State isPeeped: boolean = false;
+  @State exportingImage: boolean = false;
+  /** 导出选择面板：是否显示 */
+  @State showExportSheet: boolean = false;
+  /** 导出选中课程 id 集合（ScoreItem.id）；空=导出全部 */
+  @State exportSelectedIds: string[] = [];
+  /** 导出面板"全选"状态 */
+  @State exportSelectAll: boolean = true;
   private landscapeListener: mediaquery.MediaQueryListener | null = null;
   /** 窗口宽度断点监听（PC 窗口缩放时切换布局） */
   private wideListener: mediaquery.MediaQueryListener | null = null;
@@ -413,6 +426,93 @@ export struct ScoreView {
     return list;
   }
 
+  /** 当前要导出的课程列表（按导出选择面板的勾选结果） */
+  private exportItems(): ScoreItem[] {
+    const all: ScoreItem[] = this.sortedItems();
+    if (this.exportSelectAll || this.exportSelectedIds.length === 0) {
+      return all;
+    }
+    const out: ScoreItem[] = [];
+    for (const it of all) {
+      if (this.exportSelectedIds.indexOf(it.id) >= 0) {
+        out.push(it);
+      }
+    }
+    return out;
+  }
+
+  /** 点击导出：先弹选择面板，选完再生成图片 */
+  private openExportSheet(): void {
+    const items: ScoreItem[] = this.sortedItems();
+    if (items.length === 0) {
+      this.getUIContext().getPromptAction().showToast({ message: '暂无成绩数据，无法导出' });
+      return;
+    }
+    // 默认全选
+    this.exportSelectAll = true;
+    this.exportSelectedIds = [];
+    this.showExportSheet = true;
+  }
+
+  /** 切换导出选择面板里的单门课程勾选 */
+  private toggleExportItem(id: string): void {
+    const idx: number = this.exportSelectedIds.indexOf(id);
+    if (idx >= 0) {
+      this.exportSelectedIds.splice(idx, 1);
+    } else {
+      this.exportSelectedIds.push(id);
+    }
+    this.exportSelectedIds = this.exportSelectedIds.slice(0);
+    this.exportSelectAll = this.exportSelectedIds.length === 0 || this.exportSelectedIds.length >= this.sortedItems().length;
+  }
+
+  /** 全选/取消全选 */
+  private toggleExportAll(): void {
+    this.exportSelectAll = !this.exportSelectAll;
+    if (this.exportSelectAll) {
+      this.exportSelectedIds = [];
+    } else {
+      const ids: string[] = [];
+      for (const it of this.sortedItems()) {
+        ids.push(it.id);
+      }
+      this.exportSelectedIds = ids;
+    }
+  }
+
+  /** 导出成绩为优美图片（离屏渲染成绩卡片 → 快照 → 存相册） */
+  private async exportScoreImage(): Promise<void> {
+    if (this.exportingImage) {
+      return;
+    }
+    this.showExportSheet = false;
+    const items: ScoreItem[] = this.exportItems();
+    if (items.length === 0) {
+      this.getUIContext().getPromptAction().showToast({ message: '请至少选择一门课程' });
+      return;
+    }
+    this.exportingImage = true;
+    this.getUIContext().getPromptAction().showToast({ message: '正在生成成绩图片…' });
+    try {
+      const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+      // 用离屏 Builder 完整渲染：课程多时卡片高度可超屏幕，组件快照会截断
+      const result: ExportResult = await ImageExport.exportBuilder(
+        ctx, this.getUIContext(), (): void => { this.scoreExportCard(); }, 'score',
+        `成绩单_${this.currentTermLabel()}`);
+      this.getUIContext().getPromptAction().showToast({ message: result.message });
+    } finally {
+      this.exportingImage = false;
+    }
+  }
+
+  /** 学生信息副标题（学号 · 姓名） */
+  private studentSubtitle(): string {
+    if (AppState.profile !== null && AppState.profile.name.length > 0) {
+      return `${AppState.profile.name} · ${AppState.profile.studentId}`;
+    }
+    return AppState.studentId();
+  }
+
   /** 成绩文本颜色（及格绿/不及格红） */
   private scoreColor(item: ScoreItem): Resource {
     if (item.score < 0) {
@@ -457,6 +557,13 @@ export struct ScoreView {
         })
         .backgroundBlurStyle(Immersive.blur(BlurStyle.Thin, this.barStyle === 'legacy'))
       Row() {
+        if (this.showBack) {
+          BackButton({
+            onBack: () => {
+              AppState.stack.pop();
+            }
+          })
+        }
         Column() {
           // 统一标题组件（大标题固定高 28，副标题独立行）
           BarTitle({
@@ -472,6 +579,16 @@ export struct ScoreView {
         })
 
         Blank()
+        // 导出成绩图片按钮
+        Text('导出')
+          .fontSize(13)
+          .fontColor(this.subtitleColor.length > 0 ? this.subtitleColor : WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
+          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+          .border({ width: 1, color: 'rgba(255,255,255,0.5)' })
+          .borderRadius(12)
+          .onClick(() => {
+            this.openExportSheet();
+          })
       }
       .width('100%')
       .height(this.getUIContext().px2vp(this.topInsetPx) + 60)
@@ -632,10 +749,10 @@ export struct ScoreView {
     }
   }
 
-  /** 课程属性配色（互不冲突）：必修=农大绿 / 选修=天空蓝 / 实践=橙 / 其他=灰 */
+  /** 课程属性配色（互不冲突）：必修=南医蓝 / 选修=天空蓝 / 实践=橙 / 其他=灰 */
   private courseAttrColor(courseType: string): string {
     if (courseType === '必修') {
-      return '#079841';
+      return '#005BAC';
     }
     if (courseType === '选修') {
       return '#3B82F6';
@@ -722,6 +839,108 @@ export struct ScoreView {
     .width('100%')
     .padding({ left: 20, right: 20, top: 8, bottom: 24 })
     }
+  }
+
+  /** 导出选择面板：全选/逐门勾选要导出的课程，点底部「导出」生成图片 */
+  @Builder
+  exportSheet() {
+    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false,
+      panelTitle: '选择要导出的课程', panelShowClose: true, panelOnClose: (): void => { this.showExportSheet = false; } }) {
+    Column() {
+      // 顶部：全选开关 + 已选计数
+      Row() {
+        Text(this.exportSelectAll ? '全选' : '取消全选')
+          .fontSize(12)
+          .fontColor($r('app.color.brand'))
+          .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+          .border({ width: 1, color: $r('app.color.brand') })
+          .borderRadius(12)
+          .onClick(() => { this.toggleExportAll(); })
+        Blank()
+        Text(this.exportSelectAll
+          ? `已选 ${this.sortedItems().length} 门`
+          : `已选 ${this.exportSelectedIds.length} 门 / 共 ${this.sortedItems().length} 门`)
+          .fontSize(12)
+          .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+      .padding({ left: 20, right: 20, top: 4, bottom: 8 })
+
+      List() {
+        ForEach(this.sortedItems(), (item: ScoreItem) => {
+          ListItem() {
+            Row() {
+              Column() {
+                Text(item.courseName)
+                  .fontSize(14)
+                  .fontColor($r('app.color.text_primary'))
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                Text(`${item.credit.toFixed(1)}学分${item.courseType.length > 0 ? ` · ${item.courseType}` : ''}`)
+                  .fontSize(11)
+                  .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
+                  .margin({ top: 2 })
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start)
+              Text(item.scoreText)
+                .fontSize(14)
+                .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+                .fontColor(this.scoreColor(item))
+                .margin({ left: 10, right: 10 })
+              // 勾选圆圈：全选时全部选中；否则按 exportSelectedIds
+              Row()
+                .width(20)
+                .height(20)
+                .borderRadius(10)
+                .border({ width: 1.5, color: this.isExportChecked(item.id) ? $r('app.color.brand') : $r('app.color.divider') })
+                .backgroundColor(this.isExportChecked(item.id) ? $r('app.color.brand') : Color.Transparent)
+                .justifyContent(FlexAlign.Center)
+                .alignItems(VerticalAlign.Center)
+            }
+            .width('100%')
+            .alignItems(VerticalAlign.Center)
+            .padding({ top: 10, bottom: 10 })
+            .onClick(() => { this.toggleExportItem(item.id); })
+          }
+        }, (item: ScoreItem) => item.id)
+      }
+      .width('100%')
+      .height(320)
+      .scrollBar(BarState.Off)
+      .divider({ strokeWidth: 0.5, color: $r('app.color.divider') })
+      .padding({ left: 20, right: 20, bottom: 8 })
+
+      // 底部导出按钮
+      MaterialButton({
+        btnRadius: 12,
+        btnBg: '#1B3A63',
+        btnBlur: this.immersiveEffect ? BlurStyle.Thin : BlurStyle.NONE,
+        btnBorderW: 1,
+        btnBorderC: 'rgba(255,255,255,0.28)',
+        btnMargin: { top: 12, left: 20, right: 20, bottom: 24 },
+        btnOnClick: () => { this.exportScoreImage(); }
+      }) {
+        Text(this.exportingImage ? '生成中…' : '导出图片')
+          .fontSize(15)
+          .fontColor('#FFFFFF')
+          .width('100%')
+          .height(44)
+          .textAlign(TextAlign.Center)
+      }
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Start)
+    }
+  }
+
+  /** 某门课程是否在导出勾选中（全选时视为已选） */
+  private isExportChecked(id: string): boolean {
+    if (this.exportSelectAll) {
+      return true;
+    }
+    return this.exportSelectedIds.indexOf(id) >= 0;
   }
 
   build() {
@@ -909,11 +1128,93 @@ export struct ScoreView {
     })
 
       AntiPeepOverlay({ isPeeped: this.isPeeped })
+
+      // 导出选择面板锚点：ArkUI 同一组件多次 bindSheet 只有最后一个生效，
+      // 故导出面板挂到独立零尺寸锚点上，避免挤掉学期/详情面板。
+      Column()
+        .width(0)
+        .height(0)
+        .bindSheet($$this.showExportSheet, this.exportSheet(), {
+          width: SheetUtil.sheetWidth(),
+          preferType: SheetType.BOTTOM,
+          height: SheetSize.FIT_CONTENT,
+          dragBar: true,
+          showClose: false,
+          backgroundColor: Color.Transparent,
+          blurStyle: sheetBlurStyle()
+        })
     }
     .width('100%')
     .height('100%')
     // 灰字广播依赖登记：grayTick 变化触发整页重算 graySecondary/grayTertiary 文本色（恒真不改变视觉）
     .opacity(this.grayTick >= 0 ? 1 : 1)
+  }
+
+  /** 成绩导出卡片（挂载但离屏，供 getComponentSnapshot 快照生成图片）
+   *  内容按导出选择面板勾选的课程渲染（默认全部）。 */
+  @Builder
+  scoreExportCard() {
+    Column() {
+      Text(this.currentTermLabel())
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#FFFFFF')
+      Text(this.studentSubtitle())
+        .fontSize(12)
+        .fontColor('#E8F0F8')
+        .margin({ top: 4 })
+      Text(`平均分 ${this.calcAvgScore(this.exportItems()).toFixed(2)} · GPA ${this.calcGpa(this.exportItems()).toFixed(2)}`)
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .fontColor('#BBD8FF')
+        .margin({ top: 12 })
+
+      Divider()
+        .color('#3A5B8C')
+        .margin({ top: 14, bottom: 10 })
+
+      Column() {
+        ForEach(this.exportItems(), (it: ScoreItem, idx: number) => {
+          Row() {
+            Text(it.courseName)
+              .fontSize(13)
+              .fontColor('#FFFFFF')
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .layoutWeight(1)
+            Text(`${it.credit.toFixed(1)}学分`)
+              .fontSize(11)
+              .fontColor('#AFC6E4')
+              .margin({ left: 8, right: 8 })
+            Text(this.scoreDisplayText(it))
+              .fontSize(13)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(it.score >= 0 && it.score < 60 ? '#FF9A9A' : '#8FF0C0')
+          }
+          .width('100%')
+          .padding({ top: 6, bottom: 6 })
+        }, (it: ScoreItem, idx: number) => `se${idx}_${it.id}`)
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+
+      Text('南医助手 · 成绩单')
+        .fontSize(10)
+        .fontColor('#7F9BC4')
+        .margin({ top: 14 })
+    }
+    .width(360)
+    .padding(20)
+    .backgroundColor('#1B3A63')
+    .borderRadius(16)
+  }
+
+  /** 成绩单展示文本（百分制取整，等级取原值） */
+  private scoreDisplayText(it: ScoreItem): string {
+    if (it.score >= 0) {
+      return `${it.score.toFixed(0)}`;
+    }
+    return it.scoreText.length > 0 ? it.scoreText : '--';
   }
 
   @Builder

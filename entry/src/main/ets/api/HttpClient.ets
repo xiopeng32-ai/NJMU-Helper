@@ -27,8 +27,8 @@ export interface BinaryResult {
 }
 
 export class HttpClient {
-  /** 教务系统根地址（不含 /jwglxt，各接口路径已自带）。接入学校真实教务系统时改这里。 */
-  static baseUrl: string = 'https://jwxt.xjau.edu.cn';
+  /** 教务系统根地址（不含 /jwglxt，各接口路径已自带）。南医大正方 V9 教务系统真实域名 jwpt.njmu.edu.cn（2026-10 抓包实测）。 */
+  static baseUrl: string = 'https://jwpt.njmu.edu.cn';
   /** 会话 Cookie */
   private static cookie: string = '';
   /** 功能浏览模式（USE_MOCK）下短路所有网络请求，避免意外访问真实接口 */
@@ -239,6 +239,12 @@ export class HttpClient {
   static get(path: string): Promise<HttpResult> {
     const url: string = path.startsWith('http') ? path : `${HttpClient.baseUrl}${path}`;
     return HttpClient.request(url, http.RequestMethod.GET, '', {});
+  }
+
+  /** 发送 GET 请求（可附加自定义请求头，如校历等外部站点用桌面 UA） */
+  static getExtra(path: string, extraHeader: Record<string, string>): Promise<HttpResult> {
+    const url: string = path.startsWith('http') ? path : `${HttpClient.baseUrl}${path}`;
+    return HttpClient.request(url, http.RequestMethod.GET, '', extraHeader);
   }
 
   /**

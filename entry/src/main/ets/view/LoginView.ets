@@ -17,7 +17,7 @@ import { fileIo } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import { HttpClient } from '../api/HttpClient';
 import { JwApi } from '../api/JwApi';
-import { CasCaptchaRequiredError } from '../api/CasApi';
+import { CasCaptchaRequiredError, CasApi } from '../api/CasApi';
 import { AppState } from '../common/AppState';
 import { Const } from '../common/Constants';
 import { DataStore } from '../common/DataStore';
@@ -74,7 +74,7 @@ export struct LoginView {
   @State privacyAgreedAt: string = ''; // 隐私协议同意时间（右下角展示用）
   @State showRiskTip: boolean = false; // 账号风控提醒弹窗（开发者声明之后首次展示）
   @State loginMode: string = 'auto'; // 重登方式（auto=自动重登 / legacy=手动重登），切换后实时刷新显示
-  @State loginSystem: string = 'service'; // 登录系统（service=服务大厅登录（新版）CAS / original=教务登录（原版）RSA 直登），默认服务大厅登录
+  @State loginSystem: string = 'service'; // 登录系统（默认：service=统一身份认证 CAS；original=教务系统 RSA 直登）
   @State sheetWidth: Dimension = '100%'; // 半模态面板宽度（≥600vp 视为平板，与课程表页面一致）
   /** 日志调试模式（AppStorage 响应式）：登录页连点图标 5 次 + 密码可开启；功能浏览模式同样生效 */
   @StorageProp('logEnabled') logEnabled: boolean = false;
@@ -135,12 +135,17 @@ export struct LoginView {
     this.privacyAgreedAt = DataStore.getPrivacyAgreedAt();
     // 重登方式：读取本地配置（未设置默认自动重登）
     this.loginMode = DataStore.getLoginMode().length > 0 ? DataStore.getLoginMode() : 'auto';
-    // 登录系统：恢复上次登录方式（"重新登录"时沿用教务登录/服务大厅登录，避免用错方式）
+    // 登录系统：默认走南医大统一身份认证（service，CAS），用户可手动切换为教务 RSA 直登（original）。
+    // 读取持久化选择；未保存过则默认统一身份认证。
     const savedSystem: string = DataStore.get(DataStore.KEY_LOGIN_SYSTEM);
-    if (savedSystem === 'service' || savedSystem === 'original') {
-      this.loginSystem = savedSystem;
+    if (savedSystem === 'original') {
+      this.loginSystem = 'original';
+    } else {
+      this.loginSystem = 'service';
     }
-    // 自动重登模式：用保存的凭据静默登录（显示加载、禁用交互），不再让用户手动输入
+    // 自动重登模式：用保存的凭据静默登录（显示加载、禁用交互），不再让用户手动输入。
+    // 南医大原生 CAS 换 ST 已失效，唯一可靠入口是网页登录（WebView 自动填号 + 自动点登录），
+    // 故自动重登直接打开网页登录，不再走必然失败的原生 doLogin()。
     if (this.autoRelogin) {
       const autoAcct: string = DataStore.get(DataStore.KEY_AUTO_ACCOUNT);
       const autoPwd: string = DataStore.decodePwd(DataStore.get(DataStore.KEY_AUTO_PWD));
@@ -149,11 +154,15 @@ export struct LoginView {
         this.password = autoPwd;
         this.accountController.addText(autoAcct);
         this.passwordController.addText(autoPwd);
+        // 直接打开网页登录：WebSurface 会自动预填账号密码 + 自动勾选记住我 + 自动点登录
         this.loading = true;
-        // 延迟一帧让 loading 先渲染，再发起自动登录
         setTimeout(() => {
-          this.doLogin();
+          this.openWebLogin();
         }, 150);
+      } else {
+        // 无保存凭据：无法自动重登，退回手动登录页
+        this.loading = false;
+        this.autoRelogin = false;
       }
       return;
     }
@@ -167,6 +176,14 @@ export struct LoginView {
       if (this.remember) {
         this.password = DataStore.decodePwd(this.historyList[0]['password'] ?? '');
       }
+    }
+    // 通过 controller 把账号/密码真正写入输入框（TextInput 的 text 参数构造后不响应 @State，
+    // 仅设置 this.account/this.password 变量不会刷新输入框，导致"记住密码"视觉上仍是空的）
+    if (this.account.length > 0) {
+      this.accountController.addText(this.account);
+    }
+    if (this.password.length > 0) {
+      this.passwordController.addText(this.password);
     }
     this.listenLandscape();
   }
@@ -233,6 +250,17 @@ export struct LoginView {
       return;
     }
     this.captchaInput = '';
+    // 统一身份认证（CAS）链路：验证码与会话绑定，从挂起的 CAS 登录会话刷新；
+    // 教务系统直登：走教务验证码接口。
+    if (this.loginSystem === 'service') {
+      CasApi.refreshCaptcha().then((b64: string) => {
+        this.captchaImage = b64;
+        this.saveCaptchaAttachment(b64);
+      }).catch(() => {
+        this.captchaImage = '';
+      });
+      return;
+    }
     JwApi.getCaptcha().then((b64: string) => {
       this.captchaImage = b64;
       this.saveCaptchaAttachment(b64);
@@ -334,11 +362,19 @@ export struct LoginView {
         return;
       }
       this.loading = false;
-      // 该账号被要求图形验证码：原生登录无法处理，自动打开网页版（WebView）CAS 页兜底，
-      // 不作为可选登录模式暴露给用户（用户明确要求不要「网页登录」选项）。
+      // 服务端要求图形验证码：展示验证码图片让用户输入后重试（原生 CAS 链路已支持验证码）；
+      // 无法拉取到验证码图片时，自动打开网页版（WebView）CAS 页兜底。
       if (e instanceof CasCaptchaRequiredError) {
-        this.getUIContext().getPromptAction().showToast({ message: '该账号需要验证码，正在打开网页登录…', duration: 2000 });
-        this.openWebLogin();
+        if (e.captchaImage.length > 0) {
+          this.showCaptcha = true;
+          this.captchaImage = e.captchaImage;
+          this.captchaInput = '';
+          this.saveCaptchaAttachment(e.captchaImage);
+          this.getUIContext().getPromptAction().showToast({ message: '请输入图形验证码后重试', duration: 2000 });
+        } else {
+          this.getUIContext().getPromptAction().showToast({ message: '该账号需要验证码，正在打开网页登录…', duration: 2000 });
+          this.openWebLogin();
+        }
       } else {
         this.getUIContext().getPromptAction().showToast({ message: '登录失败，请检查账号密码或网络', duration: 2500 });
       }
@@ -385,19 +421,43 @@ export struct LoginView {
 
   /** 打开网页版登录（WebView）：标题栏可切换"教务系统 / 服务大厅"两个登录网址，
    *  登录成功后按目标类型取 Cookie 并自动登录教务系统（服务大厅模式由 WebSurface 桥接 jwglxt）。
-   *  网页登录是**真实登录入口**，mock/功能浏览模式下也必须可用（首次使用无会话时尤其依赖它）。 */
+   *  网页登录是**真实登录入口**，mock/功能浏览模式下也必须可用（首次使用无会话时尤其依赖它）。
+   *  南医大统一认证强制验证码 + 原生 ST 交换不可用，网页登录是唯一可靠入口，故作为主登录方式。 */
   private openWebLogin(): void {
+    // 待预填账号密码：用户在登录页已输入的学号+密码，网页登录打开后注入到 authserver 对应输入框
+    AppState.webPrefillAccount = this.account.trim();
+    AppState.webPrefillPassword = this.password;
     AppState.webLoginMode = true;
+    // 打开网页登录后复位 loading（自动重登模式此前置 true，避免一直转圈）
+    this.loading = false;
+    // 记住本次登录账号+密码（供网页登录成功后写入历史账号与自动重登凭据）
+    const loginAcct: string = this.account.trim();
+    const loginPwd: string = this.password;
     AppState.onWebLogin = () => {
       // 网页登录成功＝真实登录：退出 mock/离线模式，让真实会话立即生效
       JwApi.USE_MOCK = false;
       HttpClient.setOfflineMode(false);
+      // 记录登录账号 + 密码（网页登录成功后，密码可信，供历史账号自动填充）
+      if (loginAcct.length > 0) {
+        DataStore.addAccount(loginAcct, loginPwd.length > 0 ?
+          loginPwd : this.savedPasswordOf(loginAcct));
+        this.historyList = DataStore.getAccountList();
+        // 保存自动重登凭据（冷启动静默重新登录用）：此前网页登录遗漏了这步，
+        // 导致关闭 App 后自动重登拿不到密码、被迫回到手动登录。
+        if (loginPwd.length > 0) {
+          DataStore.put(DataStore.KEY_AUTO_ACCOUNT, loginAcct);
+          DataStore.put(DataStore.KEY_AUTO_PWD, DataStore.encodePwd(loginPwd));
+        }
+      }
+      // 用后即清：密码不留内存
+      AppState.webPrefillPassword = '';
       this.showWeb = false;
       this.onSuccess();
     };
     this.webLoginTarget = AppState.webLoginTarget;
-    // 服务大厅 = authserver CAS 登录页（service=rhmh）；教务系统 = jwxt 登录页
-    AppState.webUrl = this.webLoginTarget === 'hall' ? Const.CAS_LOGIN_URL : Const.WEB_LOGIN_URL;
+    // 南医大统一身份认证：打开 authserver 登录页，service 指向教务 SSO 端点
+    AppState.webUrl = Const.CAS_LOGIN_URL +
+      '?service=' + encodeURIComponent(Const.JW_SSO_BRIDGE_URL);
     AppState.webTitle = '网页登录';
     this.showWeb = true;
   }
@@ -411,7 +471,9 @@ export struct LoginView {
     }
     this.webLoginTarget = target;
     AppState.webLoginTarget = target;
-    AppState.webUrl = target === 'hall' ? Const.CAS_LOGIN_URL : Const.WEB_LOGIN_URL;
+    // 南医大统一身份认证：打开 authserver 登录页，service 指向教务 SSO 端点
+    AppState.webUrl = Const.CAS_LOGIN_URL +
+      '?service=' + encodeURIComponent(Const.JW_SSO_BRIDGE_URL);
   }
 
   /** 当前重登方式文案（自动重登 / 手动重登） */
@@ -419,16 +481,23 @@ export struct LoginView {
     return this.loginMode === 'auto' ? '自动重登' : '手动重登';
   }
 
-  /** 切换登录系统（service=服务大厅登录（新版）CAS / original=教务登录（原版）RSA 直登），切换后实时刷新显示
-   *  重登方式联动：教务登录默认自动重登；服务大厅登录为手动重登（教务会话不可持久化，靠 CASTGC 静默桥接）。 */
+  /** 当前登录系统文案（统一身份认证 / 教务系统直登） */
+  private loginSystemText(): string {
+    return this.loginSystem === 'service' ? '统一身份认证' : '教务系统直登';
+  }
+
+  /** 切换登录系统（service=统一身份认证 CAS / original=教务系统 RSA 直登），切换后实时刷新显示
+   *  重登方式联动：统一认证（service）默认手动重登（教务会话不可持久化，靠 CASTGC 静默桥接）；
+   *  教务直登（original）默认自动重登（保存的账号密码自动登录）。 */
   private setLoginSystem(system: string): void {
     this.loginSystem = system;
+    DataStore.put(DataStore.KEY_LOGIN_SYSTEM, system);
     if (system === 'service') {
-      // 服务大厅登录：手动重登（冷启动用 CASTGC 从服务大厅重新打开教务系统，不依赖账号密码自动重登）
+      // 统一身份认证登录：手动重登（冷启动用 CASTGC 从统一认证重新桥接教务系统）
       DataStore.setLoginMode('legacy');
       this.loginMode = 'legacy';
     } else {
-      // 教务登录：自动重登（保存的账号密码自动登录教务系统）
+      // 教务直登：自动重登（保存的账号密码自动登录教务系统）
       DataStore.setLoginMode('auto');
       this.loginMode = 'auto';
     }
@@ -440,7 +509,7 @@ export struct LoginView {
     this.getUIContext().getPromptAction().showActionMenu({
       title: `选择重登方式（当前：${current}）`,
       buttons: [
-        { text: '自动重登', color: '#079841' },
+        { text: '自动重登', color: '#005BAC' },
         { text: '手动重登', color: '#888888' }
       ]
     }).then((res: promptAction.ActionMenuSuccessResponse) => {
@@ -458,13 +527,35 @@ export struct LoginView {
     });
   }
 
+  /** 切换登录系统（统一身份认证 ↔ 教务系统直登） */
+  private changeLoginSystem(): void {
+    const current: string = this.loginSystemText();
+    this.getUIContext().getPromptAction().showActionMenu({
+      title: `选择登录方式（当前：${current}）`,
+      buttons: [
+        { text: '统一身份认证', color: '#005BAC' },
+        { text: '教务系统直登', color: '#888888' }
+      ]
+    }).then((res: promptAction.ActionMenuSuccessResponse) => {
+      if (res.index === 0) {
+        this.setLoginSystem('service');
+        this.getUIContext().getPromptAction().showToast({ message: '已切换为统一身份认证' });
+      } else if (res.index === 1) {
+        this.setLoginSystem('original');
+        this.getUIContext().getPromptAction().showToast({ message: '已切换为教务系统直登' });
+      }
+    }).catch(() => {
+      // 取消选择
+    });
+  }
+
   /** 弹窗说明两种重登方式的区别（问号图标点击） */
   private showLoginModeInfo(): void {
     this.getUIContext().getPromptAction().showDialog({
       title: '重登方式说明',
       message: '「教务登录」默认自动重登：每次重新打开应用用保存的账号密码自动登录教务系统，免去手动点击。\n\n「服务大厅登录」为手动重登：教务系统会话不可持久化，重新打开应用会自动从服务大厅重新打开教务系统刷新（无需重新输入密码）；仅当该刷新失败时才需在首页点击「重登」按钮。\n\n重登方式可在下方随时手动更改。',
       buttons: [
-        { text: '我知道了', color: '#079841', primary: true }
+        { text: '我知道了', color: '#005BAC', primary: true }
       ]
     });
   }
@@ -1036,7 +1127,7 @@ export struct LoginView {
         // 前往登录页模式：登录按钮左侧显示灰色返回按钮（见登录按钮区域）
         Scroll() {
           Column() {
-            // 顶部 XJAU Helper 圆角 logo（连点 5 次开启日志调试：登录页亦可收集登录数据定位登录失败）
+            // 顶部 南医助手 圆角 logo（连点 5 次开启日志调试：登录页亦可收集登录数据定位登录失败）
             Column() {
               Image($r('app.media.startIcon'))
                 .width(this.isLandscape ? 96 : 120)
@@ -1046,7 +1137,7 @@ export struct LoginView {
                 .onClick(() => {
                   this.onLogoTapped();
                 })
-              Text('新农助手')
+              Text('南医助手')
                 .fontSize(22)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor('#FFFFFF')
@@ -1064,13 +1155,13 @@ export struct LoginView {
                 MaterialCardLayer({ layerRadius: 20, layerShadow: true, layerForce: true })
               }
               Column() {
-              Text(this.loginSystem === 'service' ? '服务大厅登录' : '教务登录')
+              Text('教务系统登录')
                 .fontSize(17)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor($r('app.color.text_primary'))
                 .width('100%')
                 .margin({ bottom: 4 })
-              Text(this.loginSystem === 'service' ? '通过统一身份认证登录，登录后自动打开教务系统' : '使用教务系统学号与密码登录')
+              Text('南医大统一身份认证需验证码，请在网页中登录（学号已自动预填）')
                 .fontSize(12)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 .width('100%')
@@ -1179,18 +1270,13 @@ export struct LoginView {
                     btnTintRatio: 0.55,
                     btnEnabled: !this.loading,
                     btnOnClick: (): void => {
-                      this.doLogin();
+                      // 南医大统一认证强制验证码 + 原生 ST 交换不可用：主登录直接走网页登录（WebView），
+                      // 账号已在登录页预填、网页端自动勾选"7天免登录"保持登录态。
+                      this.openWebLogin();
                     }
                   }) {
                     Row() {
-                      if (this.loading) {
-                        LoadingProgress()
-                          .width(18)
-                          .height(18)
-                          .color(Color.White)
-                          .margin({ right: 8 })
-                      }
-                      Text(this.loading ? '正在登录' : '登  录')
+                      Text('网页登录（推荐）')
                         .fontSize(16)
                         .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                         // 按钮底为主题色（彩色玻璃/实底），深浅色模式下都用白色保证对比
@@ -1204,6 +1290,19 @@ export struct LoginView {
                 .layoutWeight(1)
               }
               .width('100%')
+
+              // 原生登录兜底入口（次要）：南医大原生 CAS 登录已废弃（ST 交换失败），保留供诊断/回退
+              Row() {
+                Text('使用账号密码原生登录（可能失败）')
+                  .fontSize(12)
+                  .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.Center)
+              .margin({ top: 10 })
+              .onClick(() => {
+                this.doLogin();
+              })
 
               // 历史账号入口（登录按钮下方，点击才展开）
               if (this.historyList.length > 0) {
@@ -1281,36 +1380,36 @@ export struct LoginView {
                 this.changeLoginMode();
               })
 
-              // 登录系统切换按钮：显示要切换到的目标模式（当前服务大厅登录 → 点按切教务登录，反之亦然）
-              // → MaterialButton（Toggle 承载层，btnPersistent 常驻：登录页强制默认玻璃的延续）
+              // 登录方式（统一身份认证 ↔ 教务系统直登），可随时切换
               Row() {
-                MaterialButton({
-                  btnRadius: 22,
-                  btnPersistent: true,
-                  btnBg: GlassMaterial.cardSurface(AppStorage.get<boolean>('isDarkMode') ?? false),
-                  btnBlur: BlurStyle.Thin,
-                  btnBorderW: 1,
-                  btnBorderC: GlassMaterial.borderColor(),
-                  btnEnabled: !this.loading,
-                  btnOnClick: (): void => {
-                    this.setLoginSystem(this.loginSystem === 'service' ? 'original' : 'service');
-                  }
-                }) {
-                  Row() {
-                    Text(this.loginSystem === 'service' ? '教务登录' : '服务大厅登录')
-                      .fontSize(15)
-                      .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
-                      .fontColor($r('app.color.brand'))
-                  }
-                  .justifyContent(FlexAlign.Center)
-                  .width('100%')
-                  .height(44)
-                }
+                Image($r('app.media.question'))
+                  .width(14)
+                  .height(14)
+                  .margin({ right: 4 })
+                  .fillColor($r('app.color.text_tertiary'))
+                  .onClick(() => {
+                    this.showLoginModeInfo();
+                  })
+                Text('登录方式')
+                  .fontSize(13)
+                  .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
+                Blank()
+                Text(this.loginSystemText())
+                  .fontSize(13)
+                  .fontColor($r('app.color.brand'))
+                ChevronRight({ iconSize: 10 }).margin({ left: 2 })
               }
               .width('72%')
+              .padding({ left: 18, right: 14, top: 10, bottom: 10 })
+              .backgroundColor(GlassMaterial.cardSurface(AppStorage.get<boolean>('isDarkMode') ?? false)).backgroundBlurStyle(BlurStyle.Thin).border({ width: 1, color: GlassMaterial.borderColor() }).shadow(GlassMaterial.capsuleShadow()).clip(true)
+              .borderRadius(22)
               .margin({ bottom: 10 })
+              .enabled(!this.loading)
+              .onClick(() => {
+                this.changeLoginSystem();
+              })
 
-              // 网页登录：在 WebView 打开统一身份认证（CAS）登录页（验证码等场景兜底）
+              // 网页登录：在 WebView 打开统一身份认证登录页（验证码等场景兜底）
               // → MaterialButton（Toggle 承载层，btnPersistent 常驻）
               Row() {
                 MaterialButton({

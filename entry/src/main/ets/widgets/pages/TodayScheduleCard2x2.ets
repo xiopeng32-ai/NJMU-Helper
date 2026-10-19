@@ -184,7 +184,7 @@ struct TodayScheduleCard2x2 {
   }
 
   private bgColor(idx: number): string {
-    const arr: string[] = ['#079841', '#26C485', '#2C5FA8', '#7B5FC9', '#E76FA1', '#FF9800', '#F4C724', '#5DADE2'];
+    const arr: string[] = ['#005BAC', '#26C485', '#2C5FA8', '#7B5FC9', '#E76FA1', '#FF9800', '#F4C724', '#5DADE2'];
     return arr[idx % 8];
   }
 }

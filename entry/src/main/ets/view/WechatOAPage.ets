@@ -39,41 +39,24 @@ function homeUrlOf(biz: string): string {
     : '';
 }
 
-/** 学校官方公众号清单（名称/biz 抓取自公众号文章页 var biz 与 nickname，2026-09-25 核实）；
- *  group 为自动分类：校级部门/公共服务/学生组织归「通用」，各学院官方号归「学院」 */
+/** 学校官方公众号清单（名称/biz 抓取自公众号文章页 var biz 与 nickname）；
+ *  group 为自动分类：校级部门/公共服务/学生组织归「通用」，各学院官方号归「学院」。
+ *  注：南医大官方公众号 biz 编码待接入（需从南医大公众号文章页抓取），当前 homeUrl 置空，
+ *  点击「去关注」走「复制名称 → 微信搜索」兜底路径。 */
 const OA_LIST: OAItem[] = [
   // ── 通用 ──
-  { name: '新疆农业大学', homeUrl: homeUrlOf('MjM5MTY3OTEwNQ=='), group: '通用' },
-  { name: '新农大小薇', homeUrl: homeUrlOf('MzA5MjM5MzgyMw=='), group: '通用' },
-  { name: '新疆农业大学图书馆', homeUrl: homeUrlOf('MzA5ODg4NTA5Mg=='), group: '通用' },
-  { name: '新疆农业大学学生会', homeUrl: homeUrlOf('MzAwMzQ3MzEzNw=='), group: '通用' },
-  { name: '新农大研究生', homeUrl: homeUrlOf('MzI0ODExODIwNg=='), group: '通用' },
-  { name: '新农暖阳心理', homeUrl: homeUrlOf('Mzk0NjU2OTk5OA=='), group: '通用' },
-  { name: '新疆农业大学校友会', homeUrl: homeUrlOf('MzU5OTEzMTIxNw=='), group: '通用' },
-  { name: '新疆农业大学网信中心', homeUrl: homeUrlOf('MzkwNDU5NTEzNA=='), group: '通用' },
-  { name: '新疆农业大学塔城校区', homeUrl: homeUrlOf('MzY5NjQ1MTI4Mg=='), group: '通用' },
-  { name: '新疆农业大学学报', homeUrl: homeUrlOf('MzE5ODE1Mjk5MA=='), group: '通用' },
-  { name: '平安新农大', homeUrl: homeUrlOf('MzkzMjU2MjQzNw=='), group: '通用' },
-  { name: '农大科研', homeUrl: homeUrlOf('Mzg5Mjg4MjU3NQ=='), group: '通用' },
-  { name: '新疆农业大学动物中心医院', homeUrl: homeUrlOf('Mzg4OTQ1MzY5NQ=='), group: '通用' },
-  // 智慧新农大：用户提供二维码，解码链接为学校 App 统一认证页——直接以该链接出码/复制
-  { name: '智慧新农大', homeUrl: 'https://app.xjau.edu.cn/site/publicsso/index', group: '通用' },
-  // ── 学院 ──
-  { name: '新疆农业大学农学院', homeUrl: homeUrlOf('MzAxMTA5NDIzNg=='), group: '学院' },
-  { name: '新疆农业大学化学化工学院', homeUrl: homeUrlOf('MzA3MDQ1NzUwOQ=='), group: '学院' },
-  { name: '新疆农业大学外国语学院', homeUrl: homeUrlOf('MjM5Nzc5ODk4MQ=='), group: '学院' },
-  { name: '新疆农业大学国际教育学院', homeUrl: homeUrlOf('MzA4OTAxMDQxMw=='), group: '学院' },
-  { name: '新疆农业大学动物科学学院', homeUrl: homeUrlOf('MzA3NzY0MDQxNA=='), group: '学院' },
-  { name: '新疆农业大学园艺学院', homeUrl: homeUrlOf('MzkwOTI3NzU5NQ=='), group: '学院' },
-  { name: '新农资环', homeUrl: homeUrlOf('MzI4MDI3MTAxNw=='), group: '学院' },
-  { name: '阳光中语', homeUrl: homeUrlOf('MzA4NTAwODU5MQ=='), group: '学院' },
-  { name: '新疆农业大学生命科学学院', homeUrl: homeUrlOf('Mzg5NTY3NjkyMQ=='), group: '学院' },
-  { name: '新农大动医', homeUrl: homeUrlOf('MzA5MDc0MjcyNg=='), group: '学院' },
-  { name: '新农ITShow', homeUrl: homeUrlOf('MzI1MzE1MDM0Mw=='), group: '学院' },
-  { name: '新疆农业大学机电工程学院', homeUrl: homeUrlOf('Mzg3NjE3MDI0Mg=='), group: '学院' },
-  { name: '新农大淼垚之声', homeUrl: homeUrlOf('MzA4Mzk1OTQ5OQ=='), group: '学院' },
-  // 文章页未暴露 __biz（仅 gh_ 原始 id，无法拼主页链接）→ 复制名称搜索
-  { name: '公共管理学院（法学院）', homeUrl: '', group: '学院' }
+  { name: '南京医科大学', homeUrl: '', group: '通用' },
+  { name: '南京医科大学研究生院', homeUrl: '', group: '通用' },
+  { name: '南京医科大学教务处', homeUrl: '', group: '通用' },
+  { name: '南京医科大学图书馆', homeUrl: '', group: '通用' },
+  { name: '南京医科大学学生会', homeUrl: '', group: '通用' },
+  // ── 学院（南医大各学院官方号 biz 待接入，暂列名称）──
+  { name: '南京医科大学基础医学院', homeUrl: '', group: '学院' },
+  { name: '南京医科大学第一临床医学院', homeUrl: '', group: '学院' },
+  { name: '南京医科大学第二临床医学院', homeUrl: '', group: '学院' },
+  { name: '南京医科大学公共卫生学院', homeUrl: '', group: '学院' },
+  { name: '南京医科大学护理学院', homeUrl: '', group: '学院' },
+  { name: '南京医科大学药学院', homeUrl: '', group: '学院' }
 ];
 
 @Component
@@ -160,7 +143,7 @@ export struct WechatOAPage {
         : `已复制「${copyText}」。是否打开微信？在微信搜索粘贴即可关注`,
       buttons: [
         { text: '取消', color: '#888888' },
-        { text: '打开微信', color: '#079841', primary: true }
+        { text: '打开微信', color: '#005BAC', primary: true }
       ]
     }).then((res) => {
       if (res.index === 1) {
@@ -242,7 +225,7 @@ export struct WechatOAPage {
           MaterialButton({
             btnRadius: 21,
             btnMargin: { top: 14 },
-            btnBg: '#079841',
+            btnBg: '#005BAC',
             btnBlur: GlassMaterial.bgBlur(this.immersiveEffect),
             btnBorderW: GlassMaterial.borderWidth(),
             btnBorderC: GlassMaterial.borderColor(),
@@ -320,7 +303,7 @@ export struct WechatOAPage {
               // 右：去关注（绿色实底，文字黑白自动对比度）
               MaterialButton({
                 btnRadius: 15,
-                btnBg: '#079841',
+                btnBg: '#005BAC',
                 btnBlur: GlassMaterial.bgBlur(this.immersiveEffect),
                 btnBorderW: GlassMaterial.borderWidth(),
                 btnBorderC: GlassMaterial.borderColor(),

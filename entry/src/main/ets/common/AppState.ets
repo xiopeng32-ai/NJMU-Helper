@@ -146,11 +146,15 @@ export class AppState {
   }
   /** 是否以"网页版登录"方式打开 WebView（登录成功需自动进入主页） */
   static webLoginMode: boolean = false;
-  /** 网页版登录目标：'hall'=服务大厅（authserver CAS 登录，登录后后台自动打开教务系统）
-   *                  / 'jw'=教务系统直登（jwxt login_slogin）。默认服务大厅（用户 2026-08-19 明确要求）。 */
-  static webLoginTarget: string = 'hall';
+  /** 网页版登录目标：'hall'=服务大厅（已废弃，南医大无 CAS）
+   *                  / 'jw'=教务系统直登（jwxt login_slogin）。默认教务系统直登。 */
+  static webLoginTarget: string = 'jw';
   /** 网页版登录成功后的回调（由 LoginView 注入） */
   static onWebLogin: (() => void) | null = null;
+  /** 网页登录打开前用户在登录页输入的账号：WebSurface 打开 authserver 后注入预填（不预填密码） */
+  static webPrefillAccount: string = '';
+  /** 网页登录打开前用户在登录页输入的密码：WebSurface 打开 authserver 后注入预填（明文，仅存内存不落盘） */
+  static webPrefillPassword: string = '';
   /** 冷启动会话就绪标记：首页数据加载前必须为 true（false = 正在从服务大厅重新桥接新教务系统）。
    *  由 Index 冷启动流程置 false/true，HomeView.loadData 等待其就绪后再取数。 */
   static sessionReady: boolean = true;
@@ -184,6 +188,32 @@ export class AppState {
   static avatarText(): string {
     const name: string = AppState.displayName();
     return name.length > 0 ? name.substring(name.length - 2) : '同学';
+  }
+
+  /**
+   * 把证件照 base64 拼成可直接渲染的 data URL。
+   * 教务返回的照片格式不定（jpg/png），通过 base64 头部魔数探测 MIME，
+   * 避免硬编码 jpeg 前缀拼到 png 数据导致解码失败（头像显示空白）。
+   */
+  static photoDataUrl(base64: string): string {
+    if (base64.length === 0) {
+      return '';
+    }
+    const head: string = base64.substring(0, 12);
+    if (head.indexOf('/9j/') >= 0) {
+      return 'data:image/jpeg;base64,' + base64;
+    }
+    if (head.indexOf('iVBOR') >= 0) {
+      return 'data:image/png;base64,' + base64;
+    }
+    if (head.indexOf('R0lGOD') >= 0 || head.indexOf('R0lGO') >= 0) {
+      return 'data:image/gif;base64,' + base64;
+    }
+    if (head.indexOf('UklGR') >= 0) {
+      return 'data:image/webp;base64,' + base64;
+    }
+    // 无法识别时默认按 jpeg（教务照片绝大多数为 jpeg）
+    return 'data:image/jpeg;base64,' + base64;
   }
 
   /** 当前登录学号，未登录返回空串 */

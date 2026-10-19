@@ -84,7 +84,7 @@ struct UpdateContentDialog {
       Button('知道了')
         .fontSize(14)
         .fontColor(Color.White)
-        .backgroundColor('#079841')
+        .backgroundColor('#005BAC')
         .width('100%')
         .height(38)
         .borderRadius(10)
@@ -320,6 +320,11 @@ export struct HomeView {
       this.notices = JwApi.loadCachedNotices().slice(0, 3);
       this.loading = false;
     }
+    // 校历：首屏立即用内置校历秒开（官方 xlsx 数据已内置），绝不因网络空转；
+    // 随后在下方独立分支后台刷新覆盖。
+    if (this.teachingCal === null) {
+      this.teachingCal = JwApi.builtinCal();
+    }
     // 头像：先读缓存，再独立拉取（不依赖课表/考试成功，避免被前面接口失败跳过）
     const cachedPhoto: string = JwApi.loadCachedPhoto();
     if (cachedPhoto.length > 0) {
@@ -338,18 +343,29 @@ export struct HomeView {
       this.exams = this.pickComingExams(exams);
       const notices: NoticeItem[] = await JwApi.getNotices();
       this.notices = notices.slice(0, 3);
+      LogStore.log('首页', '消息加载', '完成',
+        `网络课表${courses.length}节 考试${exams.length}门 通知${notices.length}条`);
+    } catch (e) {
+      // 网络异常时保持缓存数据
+      LogStore.log('首页', '消息加载', '网络异常', LogStore.errorOf(e as Object));
+    }
+    // 校历独立分支：不阻塞主链路，失败回退内置校历（JwApi 已保证不返回 null），绝不空转
+    try {
       const cal: TeachingCalendar | null = await JwApi.getTeachingCalendar();
-      this.teachingCal = cal;
-      // 通知卡：教务处官网「学期校历」最新两条（独立于消息）
+      if (cal !== null) {
+        this.teachingCal = cal;
+      }
+    } catch (e) {
+      LogStore.log('首页', '校历', '加载失败', LogStore.errorOf(e as Object));
+    }
+    // 通知卡：教务处官网「学期校历」最新两条（独立于消息，失败不阻塞）
+    try {
       const jn: NoticeItem[] = await JwApi.getJwcNotices();
       if (jn.length > 0) {
         this.jwcNotices = jn;
       }
-      LogStore.log('首页', '消息加载', '完成',
-        `网络课表${courses.length}节 考试${exams.length}门 通知${notices.length}条 校历${cal !== null ? '有' : '无'} 官网通知${jn.length}条`);
     } catch (e) {
-      // 网络异常时保持缓存数据
-      LogStore.log('首页', '消息加载', '网络异常', LogStore.errorOf(e as Object));
+      LogStore.log('首页', '官网通知', '加载失败', LogStore.errorOf(e as Object));
     }
     // 独立拉取头像（真实模式，不与上面共用一个 try）
     if (!JwApi.USE_MOCK) {
@@ -553,14 +569,37 @@ export struct HomeView {
     return '晚上好';
   }
 
+  /** 快捷入口图标（按 key 分配，单色 SVG 随主题色渲染） */
+  private quickEntryIcon(key: string): Resource {
+    if (key === 'exam') {
+      return $r('app.media.exam_arrange');
+    }
+    if (key === 'score') {
+      return $r('app.media.doc_text_badge_magnifyingglass');
+    }
+    if (key === 'room') {
+      return $r('app.media.map_badge_local');
+    }
+    return $r('app.media.data_icon');
+  }
+
   /** 首页功能入口点击分发（跳转对应页面） */
   private onEntryTap(key: string): void {
     if (key === 'schedule') {
       this.onSwitchTab(1);
     } else if (key === 'score') {
-      this.onSwitchTab(2);
+      // 成绩查询：学业情况页内的二级页面，直接推入
+      AppState.stack.pushPath({ name: Const.ROUTE_SCORE });
     } else if (key === 'exam') {
       AppState.stack.pushPath({ name: Const.ROUTE_EXAM });
+    } else if (key === 'room') {
+      // 教室查询（空教室/空闲教室）
+      AppState.stack.pushPath({ name: Const.ROUTE_EMPTY_ROOM });
+    } else if (key === 'jw') {
+      // 教务系统：应用内 WebView 打开（复用全局会话 Cookie）
+      AppState.webUrl = Const.WEB_PORTAL_URL;
+      AppState.webTitle = '教务系统';
+      AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
     } else if (key === 'academic') {
       AppState.stack.pushPath({ name: Const.ROUTE_ACADEMIC });
     } else {
@@ -713,7 +752,7 @@ export struct HomeView {
       Row() {
         if (this.showAvatar) {
         if (this.photo.length > 0) {
-          Image('data:image/jpeg;base64,' + this.photo)
+          Image(AppState.photoDataUrl(this.photo))
             .width(52)
             .height(52)
             .borderRadius(26)
@@ -1053,7 +1092,7 @@ export struct HomeView {
             .width('100%')
 
             Row() {
-              // 上课地点：地图定位图标（农大绿）
+              // 上课地点：地图定位图标（南医蓝）
               Image($r('app.media.map_badge_local'))
                 .width(13)
                 .height(13)
@@ -1061,7 +1100,7 @@ export struct HomeView {
                 .fontSize(12)
                 .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 .margin({ left: 4 })
-              // 授课教师：人像图标（农大绿）
+              // 授课教师：人像图标（南医蓝）
               Image($r('app.media.portrait'))
                 .width(13)
                 .height(13)
@@ -1117,7 +1156,7 @@ export struct HomeView {
         cardBorderC: GlassMaterial.borderColor()
       }) {
       Column() {
-        Grid() {
+      Grid() {
         ForEach(Const.QUICK_ENTRIES, (item: QuickEntry) => {
           GridItem() {
             Column() {
@@ -1138,8 +1177,8 @@ export struct HomeView {
                 }
               }) {
                 Row() {
-                  // 考试查询/学业情况图标（单色 SVG，随主题色渲染）
-                  Image(item.key === 'exam' ? $r('app.media.exam_arrange') : $r('app.media.data_icon'))
+                  // 快捷入口图标（单色 SVG，随主题色渲染）：按 key 分配
+                  Image(this.quickEntryIcon(item.key))
                     .width(22)
                     .height(22)
                     .objectFit(ImageFit.Contain)
@@ -1159,12 +1198,12 @@ export struct HomeView {
         }, (item: QuickEntry) => item.key)
       }
         .columnsTemplate('1fr 1fr')
-        .rowsTemplate('1fr')
+        .rowsTemplate('1fr 1fr')
         .width('100%')
         .padding({ top: 6, bottom: 6 })
       }
       .width('100%')
-      .height(64) // 固定卡高（原液态玻璃容器高度），避免 Grid 内容撑高导致卡片拉长
+      .height(118) // 两行入口卡高（原 64 单行；4 项改为 2×2 布局后加高）
       .padding({ left: 16, right: 16 })
       }
     }
@@ -1345,10 +1384,10 @@ export struct HomeView {
   @Builder
   noticeSection() {
     Column() {
-      SectionHeader({ title: '校历信息', action: '查看校历', onAction: () => {
-        // 打开教务处官网学期校历列表（外部链接页）
+      SectionHeader({ title: '官网公告', action: '查看更多', onAction: () => {
+        // 打开南医大官网「通知公告」栏目（外部链接页）
         AppState.webUrl = Const.JWC_LIST_URL;
-        AppState.webTitle = '学期校历';
+        AppState.webTitle = '官网公告';
         AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
       } })
       if (this.jwcNotices.length === 0) {
@@ -1415,9 +1454,9 @@ export struct HomeView {
                   this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
                   return;
                 }
-                // 有文章链接：在"外部链接"页面打开教务处官网文章页
+                // 有文章链接：在"外部链接"页面打开南医大官网文章页
                 AppState.webUrl = item.url;
-                AppState.webTitle = '教务处通知';
+                AppState.webTitle = '官网公告';
                 AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
               } else {
                 this.sheetNotice = item;
@@ -1615,13 +1654,53 @@ export struct HomeView {
     return rows;
   }
 
-  /** 日期是否属于校历中的节假日（中秋节/国庆节/元旦/春节） */
-  private isCalHoliday(date: string): boolean {
-    if (date === '2026-09-25' || date === '2026-10-01' || date === '2027-01-01' || date === '2027-02-06') {
-      return true;
+  /** 日期类型：用于日历格子的工作日/节假日/调休标注 */
+  private dayType(day: string): string {
+    // 调休补班（周末上班）——蓝/棕标注"班"
+    if (HomeView.WORKDAYS.indexOf(day) >= 0) {
+      return 'workday';
     }
-    return false;
+    // 法定节假日（放假）——橙红标注"休"
+    if (HomeView.HOLIDAYS.indexOf(day) >= 0) {
+      return 'holiday';
+    }
+    // 周末（自然休息日）
+    const d: Date = DateUtil.parse(day);
+    const wd: number = d.getDay();
+    if (wd === 0 || wd === 6) {
+      return 'weekend';
+    }
+    return 'normal';
   }
+
+  /** 日期是否属于校历中的节假日（法定放假日，非周末） */
+  private isCalHoliday(date: string): boolean {
+    return HomeView.HOLIDAYS.indexOf(date) >= 0;
+  }
+
+  /** 日期是否为调休补班（周末上班日） */
+  private isMakeupWorkday(date: string): boolean {
+    return HomeView.WORKDAYS.indexOf(date) >= 0;
+  }
+
+  /** 法定节假日（放假，不含周末）——2026 国办通知，覆盖 2026 秋季学期 + 2027 春季学期常见假期 */
+  private static readonly HOLIDAYS: string[] = [
+    // 中秋节 2026（9.25-9.27）
+    '2026-09-25', '2026-09-26', '2026-09-27',
+    // 国庆节 2026（10.1-10.7）
+    '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07',
+    // 元旦 2027（1.1-1.3）
+    '2027-01-01', '2027-01-02', '2027-01-03',
+    // 春节 2027（2.15-2.23，落在寒假）
+    '2027-02-15', '2027-02-16', '2027-02-17', '2027-02-18', '2027-02-19', '2027-02-20', '2027-02-21', '2027-02-22', '2027-02-23'
+  ];
+
+  /** 调休补班（周末上班日）——2026 国办通知 */
+  private static readonly WORKDAYS: string[] = [
+    '2026-09-20', // 国庆调休：周日上班
+    '2026-10-10', // 国庆调休：周六上班
+    '2027-01-04'  // 元旦调休：周日上班
+  ];
 
   /** 某日期所属教学周（1 起；不在学期内返回 0，按有效开学日推算） */
   private weekIndex(day: string): number {
@@ -2039,23 +2118,37 @@ export struct HomeView {
                   ForEach(row, (day: string, di: number) => {
                     Column() {
                       if (day.length > 0) {
+                        // 日期数字：今日白字高亮；节假日橙红；调休补班蓝；周末灰；普通按学期内/过去判断
                         Text(day.slice(-2))
                           .fontSize(11)
                           .fontColor(
                             day === this.effectiveToday()
                               ? Color.White
-                              : (this.isCalHoliday(day)
+                              : (this.dayType(day) === 'holiday'
                                 ? $r('app.color.accent_orange')
-                                : (this.isInTerm(day)
-                                  ? (day < this.effectiveToday()
+                                : (this.dayType(day) === 'workday'
+                                  ? $r('app.color.accent_blue')
+                                  : (this.dayType(day) === 'weekend'
                                     ? GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))
-                                    : $r('app.color.text_primary'))
-                                  : GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))))
+                                    : (this.isInTerm(day)
+                                      ? (day < this.effectiveToday()
+                                        ? GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))
+                                        : $r('app.color.text_primary'))
+                                      : GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))))))
                           )
                           .fontWeight(this.fwMode === 'follow' ? (day === this.effectiveToday() ? FontWeight.Bold : FontWeight.Normal) : AppearanceStore.fontWeight(day === this.effectiveToday() ? FontWeight.Bold : FontWeight.Normal))
                           .width('100%')
-                          .height(28)
+                          .height(20)
                           .textAlign(TextAlign.Center)
+                        // 节假日/调休角标：休=橙红小字，班=蓝小字，普通日期留空
+                        if (this.dayType(day) === 'holiday' || this.dayType(day) === 'workday') {
+                          Text(this.dayType(day) === 'holiday' ? '休' : '班')
+                            .fontSize(7)
+                            .fontColor(this.dayType(day) === 'holiday' ? $r('app.color.accent_orange') : $r('app.color.accent_blue'))
+                            .width('100%')
+                            .height(8)
+                            .textAlign(TextAlign.Center)
+                        }
                       }
                     }
                     .layoutWeight(1)
@@ -2126,12 +2219,18 @@ export struct HomeView {
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
-          Text('第 1~20 周为秋季学期教学活动，第 21 周起放寒假。中秋节(9月25日)、国庆节(10月1日)、元旦(1月1日)、春节(2月6日)等节假日放假安排按照国家及自治区规定执行，详见校办通知。')
+          Text('第一学期 2026年9月7日至2027年1月15日，共19周，寒假5周。2026年9月5日报到注册，9月7日上课，新生另定。')
             .fontSize(11)
             .lineHeight(18)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
             .margin({ top: 6 })
+          Text('节假日：中秋 9.25-9.27、国庆 10.1-10.7（9.20/10.10 补班）、元旦 1.1-1.3（1.4 补班）。日历中「休」为放假日，「班」为调休上班日。')
+            .fontSize(11)
+            .lineHeight(18)
+            .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
+            .width('100%')
+            .margin({ top: 4 })
         }
         .width('100%')
         .padding(12)
@@ -2193,9 +2292,9 @@ export struct HomeView {
             this.messageSection()
             this.noticeSection()
             Column() {
-              Text('数据来源: 新疆农业大学教务系统').fontSize(11)
+              Text('数据来源: 南京医科大学教务系统').fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
-              Text('新疆农业大学教务处').fontSize(11)
+              Text('南京医科大学教务处').fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 3 })
               Text('"功能浏览"模式为本地模拟数据').fontSize(11)
@@ -2324,9 +2423,9 @@ export struct HomeView {
             this.messageSection()
             this.noticeSection()
             Column() {
-              Text('数据来源: 新疆农业大学教务系统').fontSize(11)
+              Text('数据来源: 南京医科大学教务系统').fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
-              Text('新疆农业大学教务处').fontSize(11)
+              Text('南京医科大学教务处').fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 3 })
               Text('"功能浏览"模式为本地模拟数据').fontSize(11)

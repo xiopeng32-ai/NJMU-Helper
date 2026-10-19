@@ -2,7 +2,7 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "新农大教务微服务客户端"
+      "value": "南医大教务微服务客户端"
     },
     {
       "name": "EntryAbility_desc",
@@ -10,7 +10,7 @@
     },
     {
       "name": "EntryAbility_label",
-      "value": "新农助手"
+      "value": "南医助手"
     },
     {
       "name": "reason_internet",

@@ -342,7 +342,7 @@ export struct KxjsPage {
    */
   private syncWebCookie(): boolean {
     try {
-      const ck: string = webview.WebCookieManager.getCookie('https://jwxt.xjau.edu.cn');
+      const ck: string = webview.WebCookieManager.getCookie('https://jwpt.njmu.edu.cn');
       if (ck !== null && ck.length > 0) {
         HttpClient.setCookie(ck);
         DataStore.put(DataStore.KEY_SESSION_COOKIE, ck);
@@ -398,12 +398,12 @@ export struct KxjsPage {
           weekdays: params.weekdays,
           sections: params.sections
         };
-        const res0: EmptyRoomResult = await JwApi.exportEmptyRooms(exportP);
+        const res0: EmptyRoomResult = await JwApi.queryEmptyRooms(exportP);
         let res: EmptyRoomResult = res0;
         // 会话类失败 → 同步网页版登录 cookie 后重试一次（网关 502 多为会话无效）
         if (res0.rooms.length === 0 && (res0.message.indexOf('会话') >= 0 || res0.message.indexOf('code=502') >= 0)) {
           if (this.syncWebCookie()) {
-            res = await JwApi.exportEmptyRooms(exportP);
+            res = await JwApi.queryEmptyRooms(exportP);
           }
         }
         if (res.rooms.length > 0) {
@@ -415,11 +415,11 @@ export struct KxjsPage {
             this.resultMessage = '当前条件下无匹配的教室，可尝试调整条件';
           }
         } else {
-          // 导出失败/无数据：只提示，不再回退网页查询数据（用户明确要求结果只用导出的 Excel 数据）
+          // 查询失败/无数据：只提示
           this.hasExported = false;
           this.exportedRooms = [];
           this.rooms = [];
-          this.resultMessage = res.message.length > 0 ? res.message : '导出空闲教室数据失败，请检查网络后重试';
+          this.resultMessage = res.message.length > 0 ? res.message : '查询空闲教室数据失败，请检查网络后重试';
         }
       }
     } catch (e) {
@@ -482,7 +482,7 @@ export struct KxjsPage {
       return;
     }
     AppState.webUrl =
-      `https://jwxt.xjau.edu.cn/jwglxt/cdjy/cdjy_cxKxcdlb.html?gnmkdm=N2155&layout=default&su=${AppState.account}`;
+      `https://jwpt.njmu.edu.cn/jwglxt/cdjy/cdjy_cxKxcdlb.html?gnmkdm=N2155&layout=default&su=${AppState.account}`;
     AppState.webTitle = '空教室查询（网页端）';
     // 关键：开启网页登录模式，用户在网页端登录成功后 WebSurface 会把 WebView 的会话 Cookie
     // 同步回 HttpClient，导出/查询才能带上有效会话（否则一直用旧 cookie 导致网关 502）
@@ -1437,7 +1437,7 @@ export struct KxjsPage {
         .width('100%')
         .margin({ bottom: 16 })
 
-        this.detailRow('场地编号', this.selectedRoom.cdbh, '#079841')
+        this.detailRow('场地编号', this.selectedRoom.cdbh, '#005BAC')
         this.detailRow('校区', this.selectedRoom.xqmc, '#3B82F6')
         this.detailRow('场地类别', this.selectedRoom.cdlbmc, '#FF9800')
         this.detailRow('楼号', this.selectedRoom.jxlmc, '#8B5CF6')
@@ -1446,7 +1446,7 @@ export struct KxjsPage {
         this.detailRow('场地备注', this.selectedRoom.bz, '#9E9E9E')
         this.detailRow('使用部门', this.selectedRoom.sybmmc, '#14B8A6')
         this.detailRow('使用班级', this.selectedRoom.sybj, '#A16207')
-        this.detailRow('空闲时间', this.selectedRoom.time, '#079841')
+        this.detailRow('空闲时间', this.selectedRoom.time, '#005BAC')
 
         Button('关闭')
           .fontSize(15)

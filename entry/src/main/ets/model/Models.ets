@@ -39,6 +39,7 @@ export interface CourseItem {
   courseType: string; // 必修 / 选修 / 实践
   credit: number;
   colorIndex: number; // 0-7，用于取色板
+  noSchedule: boolean; // true=无固定时间地点（实践课/公共选修，来自 sjkList，不画到周课表格子）
 }
 
 /** 考试安排 */
@@ -66,6 +67,7 @@ export interface ScoreItem {
   teacher: string; // 任课教师
   termId: string;
   kclbmc: string; // 课程类别名称（用于学业页分类映射）
+  isCore: boolean; // 是否核心课程（CC，用于学业总评成绩计算）
 }
 
 /** 某学期成绩汇总 */
@@ -92,7 +94,7 @@ export interface NoticeItem {
   read: boolean;
   summary: string;
   content: string;
-  url: string; // 文章链接（教务处官网 jwc.xjau.edu.cn），空表示无外部链接
+  url: string; // 文章链接（南医大教务处官网），空表示无外部链接
 }
 
 /** 学分类别完成情况 */
@@ -100,6 +102,34 @@ export interface CreditCategory {
   name: string;
   required: number;
   earned: number;
+}
+
+/**
+ * 培养方案完成情况（教学执行计划 N153540 接口计算）。
+ * 南医大无「培养方案完成情况」页面，也无现成统计字段，全部由
+ * 67 门课程池 ∩ 成绩 ∩ 本学期课表 自己算出来。
+ */
+export interface PlanProgress {
+  /** 是否有可用培养方案（jxzxjhxx_id 取不到时为 false） */
+  available: boolean;
+  /** 计划总课程门数（课程池按 kch 去重） */
+  totalRequired: number;
+  /** 已通过门数（课程池 ∩ 已通过成绩） */
+  totalEarned: number;
+  /** 在读门数（课程池 ∩ 本学期课表 − 已通过） */
+  studyingCount: number;
+  /** 未修门数（totalRequired − totalEarned − studyingCount） */
+  unearnedCount: number;
+  /** 计划外通过门数（已通过成绩 − 课程池） */
+  outsideCount: number;
+  /** 计划内未通过门数（课程池 ∩ 不及格成绩） */
+  failedCount: number;
+  /** 学分类别完成情况（应修=计划总学分 jdkcxf，已修=成绩学分） */
+  categories: CreditCategory[];
+  /** 计算用的课程池课程名列表（供弹窗展示「未修」课程明细） */
+  unearnedNames: string[];
+  /** 在读课程名列表 */
+  studyingNames: string[];
 }
 
 /** 学业情况总览 */
@@ -128,6 +158,8 @@ export interface TermGpa {
 /**
  * 总体成绩统计（移植自参考项目 zhengfang-apk 的「成绩-总体」）：
  * 累计绩点 / 已修学分 / 总课程数 + 成绩分布（优 ≥90、良 ≥80、中 ≥70、及 ≥60 门数）。
+ * 学业总评成绩（南医大 2023 级起重要指标）：
+ *   = (∑核心课程(CC)初修成绩×学分 / ∑CC学分) × 70% + (∑非核心必修(NC)初修成绩×学分 / ∑NC学分) × 30%
  */
 export interface OverallGradeStats {
   /** 累计绩点（索引页提取值优先，缺失时按学分加权计算，保留 2 位） */
@@ -140,12 +172,86 @@ export interface OverallGradeStats {
   good: number;
   medium: number;
   pass: number;
+  /** 核心课程（CC）加权平均分（初修，百分制），无则 -1 */
+  coreAvg: number;
+  /** 非核心必修（NC）加权平均分（初修，百分制），无则 -1 */
+  ncAvg: number;
+  /** 学业总评成绩（CC×70% + NC×30%，保留 2 位），无数据则 -1 */
+  overallScore: number;
+  /** 核心课程平均学分绩点（GPA），官方体检单直出，无则 -1 */
+  coreGpa: number;
+  /** 必修课程平均学分绩点，官方体检单直出，无则 -1 */
+  requiredGpa: number;
+  /** 官方学业总评成绩（体检单直出，如 86.72），字符串保留原样，无则 '' */
+  officialOverall: string;
+  /** CET4 成绩（体检单直出），无则 -1 */
+  cet4: number;
+  /** 已获任选课学分（体检单直出），无则 -1 */
+  electiveCredit: number;
+  /** 必修不及格门数（体检单直出），无则 -1 */
+  failedCount: number;
 }
 
 /** 总体成绩结果：统计 + 课程明细 */
 export interface OverallGrades {
   stats: OverallGradeStats;
   courses: ScoreItem[];
+}
+
+/** 官方学业总评体检单汇总值（服务端直出 HTML，正则提取） */
+export interface OfficialOverall {
+  /** 核心课程平均学分绩点（GPA），无则 -1 */
+  coreGpa: number;
+  /** 必修课程平均学分绩点，无则 -1 */
+  requiredGpa: number;
+  /** 官方学业总评成绩（如 86.72），无则 '' */
+  officialOverall: string;
+  /** CET4 成绩，无则 -1 */
+  cet4: number;
+  /** 已获任选课学分，无则 -1 */
+  electiveCredit: number;
+  /** 必修不及格门数，无则 -1 */
+  failedCount: number;
+}
+
+/** 等级考试记录（考级项目报名接口 kjbm_cxXskjbm 单条，含四六级/计算机等级） */
+export interface LevelExamItem {
+  /** 报名记录主键 xsbmqk_id */
+  id: string;
+  /** 项目类别代码 xmlbdm：05=CET、08=全国计算机、03=火车票优惠卡 */
+  categoryCode: string;
+  /** 项目类别名称 xmlbmc：CET / 全国计算机 / 火车票优惠卡 */
+  categoryName: string;
+  /** 项目名称（科目）xmmc：CET4 / CET6 / 全国计算机三级 */
+  name: string;
+  /** 项目成绩 xmcj（数字字符串如"368.00"，或中文如"合格"，可能为 null→''） */
+  score: string;
+  /** 考试开始时间 kssj */
+  examTime: string;
+  /** 报名学年 xnmc 如 2025-2026 */
+  schoolYear: string;
+  /** 证书编号 zsbh（仅计算机等级有，CET 为 null→''） */
+  certNo: string;
+}
+
+/** 等级考试汇总（按类别取最优成绩 + 通过判定） */
+export interface LevelExamSummary {
+  /** 是否有等级考试数据（接口成功且非空） */
+  hasData: boolean;
+  /** CET4 最优成绩（无则 -1） */
+  cet4: number;
+  /** CET4 是否通过（≥425） */
+  cet4Passed: boolean;
+  /** CET6 最优成绩（无则 -1） */
+  cet6: number;
+  /** CET6 是否通过（≥425） */
+  cet6Passed: boolean;
+  /** 计算机等级最优科目名（如"全国计算机三级"，无则 ''） */
+  computerName: string;
+  /** 计算机等级是否通过（任一条 xmcj 为"合格"档） */
+  computerPassed: boolean;
+  /** 全部等级考试记录（去火车票优惠卡） */
+  items: LevelExamItem[];
 }
 
 /** 可选教学班（快捷选课列表项） */

@@ -2,7 +2,7 @@ import { DataStore } from './DataStore';
 import { AppearanceStore } from './AppearanceStore';
 
 /**
- * 主题工具：顶栏主题色（中国红 / 天空蓝 / 农大绿 / 自定义 #RRGGBB）
+ * 主题工具：顶栏主题色（中国红 / 天空蓝 / 南医蓝 / 自定义 #RRGGBB）
  * AppStorage key: themeColor（'green' | 'red' | 'blue' | 'orange' | 'purple' | '#RRGGBB'，默认 'green'）
  * 顶栏样式 barStyle：'new'=主题色透明渐变 / 'legacy'=1.3.1 旧版实色
  */
@@ -42,7 +42,7 @@ export class Theme {
     if (theme === 'purple') {
       return '#7C5CE0'; // 紫罗兰（冷紫，2026-09-19 新增）
     }
-    return '#079841'; // 农大绿 RGB(7,152,65)
+    return '#005BAC'; // 南医蓝 RGB(0,91,172)
   }
 
   /** 内置主题键列表（用于校验/遍历） */
@@ -55,11 +55,11 @@ export class Theme {
     return Theme.builtinKeys().indexOf(t) >= 0;
   }
 
-  /** #RRGGBB → rgba(r,g,b,a)，供主题色渐隐渐变用（非法值回落农大绿） */
+  /** #RRGGBB → rgba(r,g,b,a)，供主题色渐隐渐变用（非法值回落南医蓝） */
   static rgba(color: string, alpha: number): string {
     let hex = color;
     if (!/^#([0-9a-fA-F]{6})$/.test(hex)) {
-      hex = '#079841';
+      hex = '#005BAC';
     }
     const r = parseInt(hex.substring(1, 3), 16);
     const g = parseInt(hex.substring(3, 5), 16);
@@ -89,7 +89,7 @@ export class Theme {
   static onColor(bg: string): string {
     let hex: string = bg;
     if (!/^#([0-9a-fA-F]{6})$/.test(hex)) {
-      hex = '#079841';
+      hex = '#005BAC';
     }
     const r: number = parseInt(hex.substring(1, 3), 16);
     const g: number = parseInt(hex.substring(3, 5), 16);
@@ -103,9 +103,9 @@ export class Theme {
     return lum > 0.179 ? '#101413' : '#FFFFFF';
   }
 
-  /** 品牌色按钮上的文字色（浅色 #079841 / 深色 #3FBF92 两档品牌色均适用 → 深色文字） */
+  /** 品牌色按钮上的文字色（浅色 #005BAC / 深色 #5B9AE8 两档品牌色均适用 → 深色文字） */
   static onBrand(): string {
-    return Theme.onColor('#079841');
+    return Theme.onColor('#005BAC');
   }
 
   /** 主题显示名（自定义 hex 原样大写返回） */
@@ -126,7 +126,7 @@ export class Theme {
     if (t === 'purple') {
       return '紫罗兰';
     }
-    return '农大绿';
+    return '南医蓝';
   }
 
   /** 切换主题并写入 AppStorage + 持久化 */

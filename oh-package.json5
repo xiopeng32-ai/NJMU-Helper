@@ -1,11 +1,14 @@
 {
-  "modelVersion": "26.0.0",
-  "description": "Please describe the basic information.",
-  "dependencies": {
-  },
+  "modelVersion": "6.0.0",
+  "name": "njmu_helper",
+  "version": "1.0.0",
+  "description": "南医助手 - 南京医科大学校园服务鸿蒙应用",
+  "main": "",
+  "author": "NJMU-Helper",
+  "license": "MIT",
+  "dependencies": {},
   "devDependencies": {
     "@ohos/hypium": "1.0.25",
     "@ohos/hamock": "1.0.0"
-  },
-  "dynamicDependencies": {}
+  }
 }

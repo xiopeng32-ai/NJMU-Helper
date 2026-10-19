@@ -123,12 +123,12 @@ export class CourseHtml {
 </style></head>
 <body>
   <h1>${CourseHtml.esc(term.label)} · 第 ${week} 周课表</h1>
-  <div class="sub">本周共 ${weekCourses} 节课 · 导出时间 ${CourseHtml.nowText()} · 新农助手</div>
+  <div class="sub">本周共 ${weekCourses} 节课 · 导出时间 ${CourseHtml.nowText()} · 南医助手</div>
   <table>
     <thead><tr><th class="sec">节次</th>${head}</tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <div class="foot">说明：周六 / 周日的课程会一并显示；本文件由「新农助手」依据教务系统课表数据生成，仅供个人查看。</div>
+  <div class="foot">说明：周六 / 周日的课程会一并显示；本文件由「南医助手」依据教务系统课表数据生成，仅供个人查看。</div>
 </body></html>`;
   }
 }

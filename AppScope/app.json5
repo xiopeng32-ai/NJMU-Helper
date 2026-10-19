@@ -1,9 +1,9 @@
 {
   "app": {
-    "bundleName": "com.xndhelper.lzb",
+    "bundleName": "com.njmu.helper",
     "vendor": "example",
-    "versionCode": 1004001,
-    "versionName": "1.4.1",
+    "versionCode": 1009009,
+    "versionName": "1.9.9",
     "buildVersion": "1",
     "icon": "$media:layered_image",
     "label": "$string:app_name"

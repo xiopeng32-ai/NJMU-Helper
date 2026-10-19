@@ -1122,7 +1122,7 @@ export struct ScheduleSettingsPanel {
         MaterialButton({
           btnRadius: 12,
           btnMargin: { top: 10 },
-          btnBg: '#079841',
+          btnBg: '#005BAC',
           btnTint: '',
           btnOnClick: () => { this.onClose(); }
         }) {

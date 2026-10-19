@@ -198,7 +198,7 @@ export struct NoticePage {
           Scroll() {
             Column() {
               EmptyTip({ text: '暂无消息' })
-              Text('消息来源: 教务系统 /jwglxt/xtgl/index_cxDbsy.html?flag=1')
+              Text('消息来源: 教务系统消息中心（下拉可重新加载）')
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 .margin({ top: 16, bottom: 24 })
@@ -255,7 +255,7 @@ export struct NoticeDetailPage {
   @StorageProp('subtitleColor') subtitleColor: string = '';
   @StorageProp('isDarkMode') isDarkMode: boolean = false;
   @State notice: NoticeItem = AppState.currentNotice !== null ? AppState.currentNotice : EMPTY_NOTICE;
-  // 内容背景玻璃大卡片（用户要求，同农大新闻页）：实测根 Stack 宽高 + 每帧同步滚动偏移（渲染级 translate 平移）
+  // 内容背景玻璃大卡片（用户要求，同南医新闻页）：实测根 Stack 宽高 + 每帧同步滚动偏移（渲染级 translate 平移）
   @State bgCardW: number = 0;
   @State bgCardH: number = 0;
   @State bgCardOffset: number = 0;
@@ -276,7 +276,7 @@ export struct NoticeDetailPage {
       // 二级页壁纸底层（无壁纸回 bg_page，不透下层）
       Stack({ alignContent: Alignment.TopStart }) {
         WallpaperFill()
-        // 内容背景玻璃大卡片（用户要求，同农大新闻页）：出血宽 + 材质常驻 + 跟随正文滚动平移；
+        // 内容背景玻璃大卡片（用户要求，同南医新闻页）：出血宽 + 材质常驻 + 跟随正文滚动平移；
         // hitTestBehavior(None) 纯背景不拦截滚动/点击；恒定高度（屏幕高+顶栏让位）滚动零重排。
         // 层级：壁纸0(默认) < 大卡片 zIndex1 < 内容 zIndex2
         Column() {

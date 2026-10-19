@@ -25,11 +25,15 @@ export interface CustomFontItem {
 
 export class DataStore {
   private static pref: preferences.Preferences | null = null;
+  /** flush 防抖：高频写入合并成一次落盘，降低 IO 开销（setTimeout 句柄） */
+  private static flushTimer: number = -1;
+  /** flush 防抖延迟（毫秒）：窗口内多次 put/remove 只落盘一次 */
+  private static readonly FLUSH_DEBOUNCE_MS: number = 120;
 
   /** 需在 Ability onCreate 后调用一次，注入 context */
   static init(context: common.Context): void {
     try {
-      const options: preferences.Options = { name: 'xjau_helper' };
+      const options: preferences.Options = { name: 'njmu_helper' };
       DataStore.pref = preferences.getPreferencesSync(context, options);
     } catch (e) {
       DataStore.pref = null;
@@ -43,11 +47,39 @@ export class DataStore {
     return DataStore.pref;
   }
 
-  /** 写入本地键值缓存（string） */
+  /** 防抖落盘：多次写入合并为一次 flush（避免高频 put 反复同步 IO） */
+  private static scheduleFlush(): void {
+    if (DataStore.flushTimer >= 0) {
+      return; // 已有待执行的落盘任务
+    }
+    DataStore.flushTimer = setTimeout(() => {
+      DataStore.flushTimer = -1;
+      try {
+        DataStore.store().flush();
+      } catch (e) {
+        // ignore
+      }
+    }, DataStore.FLUSH_DEBOUNCE_MS);
+  }
+
+  /** 立即落盘（用于退出/登出等必须立刻持久化的场景） */
+  static flushNow(): void {
+    if (DataStore.flushTimer >= 0) {
+      clearTimeout(DataStore.flushTimer);
+      DataStore.flushTimer = -1;
+    }
+    try {
+      DataStore.store().flush();
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  /** 写入本地键值缓存（string）。putSync 已写内存，落盘由防抖合并完成。 */
   static put(key: string, value: string): void {
     try {
       DataStore.store().putSync(key, value);
-      DataStore.store().flush();
+      DataStore.scheduleFlush();
     } catch (e) {
       // 忽略持久化失败
     }
@@ -62,11 +94,11 @@ export class DataStore {
     }
   }
 
-  /** 删除单个缓存键并落盘 */
+  /** 删除单个缓存键并落盘（防抖） */
   static remove(key: string): void {
     try {
       DataStore.store().deleteSync(key);
-      DataStore.store().flush();
+      DataStore.scheduleFlush();
     } catch (e) {
       // ignore
     }
@@ -128,6 +160,11 @@ export class DataStore {
   }
 
   static clearAll(): void {
+    // 先取消防抖队列（避免 clear 后又触发一次无意义 flush），再清空并立即落盘
+    if (DataStore.flushTimer >= 0) {
+      clearTimeout(DataStore.flushTimer);
+      DataStore.flushTimer = -1;
+    }
     try {
       DataStore.store().clearSync();
       DataStore.store().flush();
@@ -401,6 +438,13 @@ export class DataStore {
 
   // 用户在桌面卡片主动选择的"要倒计时的考试"id（持久化，供 EntryFormAbility 读取）
   static readonly KEY_PICKED_EXAM: string = 'picked_exam_id';
+
+  // 学业总评成绩展示开关（南医大 2023 级起重要指标，用户可自定义是否显示）
+  static readonly KEY_SHOW_OVERALL_SCORE: string = 'show_overall_score';
+  /** 课表节数默认值迁移标记（旧默认 10 → 15 一次性迁移） */
+  static readonly KEY_SECTION_COUNT_MIGRATED: string = 'section_count_migrated';
+  /** 学业页顶部 GPA 卡片显示内容：'gpa'=平均绩点（默认） / 'overall'=学业总评成绩 */
+  static readonly KEY_GPA_CARD_MODE: string = 'gpa_card_mode';
 
   /** 用户主动选定的考试 id（空串表示用最近一场未开始的考试） */
   static setPickedExamId(id: string): void {
@@ -814,6 +858,12 @@ export class DataStore {
   static readonly KEY_ACADEMIC: string = 'cache_academic';
   /** 总体成绩（累计统计 + 课程明细）缓存，移植自参考项目的成绩「总体」 */
   static readonly KEY_OVERALL_GRADES: string = 'cache_overall_grades';
+  /** 等级考试成绩缓存（LevelExamSummary JSON：CET4/CET6/计算机等级最优成绩与通过判定） */
+  static readonly KEY_LEVEL_EXAMS: string = 'cache_level_exams';
+  /** 培养方案完成情况缓存（PlanProgress JSON：在读/未修/应修学分，教学执行计划 N153540 计算） */
+  static readonly KEY_PLAN_PROGRESS: string = 'cache_plan_progress';
+  /** 培养方案课程「手动已修」白名单（课程名数组 JSON，用户自定义，持久化） */
+  static readonly KEY_PLAN_PASS_WHITELIST: string = 'plan_pass_whitelist';
   /** 抢课目标队列（GrabTarget[] JSON），对应参考项目 AcademicGrabQueueStore */
   static readonly KEY_GRAB_QUEUE: string = 'grab_queue';
   /** 抢课定时策略（GrabPolicy JSON）：间隔/最大轮次/成功后是否继续 */
@@ -821,7 +871,7 @@ export class DataStore {
   static readonly KEY_NOTICES: string = 'cache_notices';
   static readonly KEY_NOTICES_JWC: string = 'cache_notices_jwc'; // 教务处官网通知（最新两条）
   static readonly KEY_TEACHING_CAL: string = 'cache_teaching_cal'; // 校历缓存 key（清理缓存时一并清除）
-  static readonly KEY_JWC_CAL: string = 'cache_jwc_cal'; // 校历转换结果（含来源标记，变化才更新）
+  static readonly KEY_JWC_CAL: string = 'cache_jwc_cal_v2'; // 校历转换结果 v2（v1 内置数据开学日期有误，换键强制刷新）
   static readonly KEY_PHOTO: string = 'cache_photo';
   static readonly KEY_CACHE_TIME: string = 'cache_time';
   /**
@@ -853,7 +903,7 @@ export class DataStore {
     }
   }
 
-  // 农大新闻收藏（title/url/date/thumb 的 JSON 数组，按收藏时间倒序）
+  // 南医新闻收藏（title/url/date/thumb 的 JSON 数组，按收藏时间倒序）
   static readonly KEY_NEWS_FAVS: string = 'news_favs';
   /** 收藏变化信号（AppStorage）：收藏/取消收藏后写入时间戳，新闻页「收藏」板块据此即时刷新 */
   static readonly KEY_NEWS_FAV_VERSION: string = 'newsFavVersion';
@@ -955,6 +1005,44 @@ export class DataStore {
     return DataStore.get(key);
   }
 
+  /** 读取培养方案「手动已修」白名单（课程名数组），无则空数组 */
+  static planPassWhitelist(): string[] {
+    const raw: string = DataStore.get(DataStore.KEY_PLAN_PASS_WHITELIST);
+    if (raw.length === 0) {
+      return [];
+    }
+    try {
+      const arr: string[] = JSON.parse(raw) as string[];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /** 添加课程到「手动已修」白名单（去重），返回最新白名单 */
+  static addPlanPassCourse(name: string): string[] {
+    const list: string[] = DataStore.planPassWhitelist();
+    if (name.length === 0 || list.indexOf(name) >= 0) {
+      return list;
+    }
+    list.push(name);
+    DataStore.put(DataStore.KEY_PLAN_PASS_WHITELIST, JSON.stringify(list));
+    return list;
+  }
+
+  /** 从「手动已修」白名单移除课程，返回最新白名单 */
+  static removePlanPassCourse(name: string): string[] {
+    const list: string[] = DataStore.planPassWhitelist();
+    const next: string[] = [];
+    for (const n of list) {
+      if (n !== name) {
+        next.push(n);
+      }
+    }
+    DataStore.put(DataStore.KEY_PLAN_PASS_WHITELIST, JSON.stringify(next));
+    return next;
+  }
+
   // 应用级共享网页浏览历史（持久化：重启后保留）
   static readonly KEY_WEB_HISTORY: string = 'web_history';
   /** 新闻页：是否获取封面缩略图（'1'=开（默认） / '0'=关） */
@@ -967,6 +1055,46 @@ export class DataStore {
 
   static setNewsThumb(on: boolean): void {
     DataStore.put(DataStore.KEY_NEWS_THUMB, on ? '1' : '0');
+  }
+
+  // 学院公告订阅：订阅的学院域名列表（如 ["jcyxy.njmu.edu.cn","gwxy.njmu.edu.cn"]）
+  static readonly KEY_COLLEGE_SUBS: string = 'college_subs';
+
+  /** 读取已订阅的学院域名列表 */
+  static loadCollegeSubs(): string[] {
+    const raw: string = DataStore.get(DataStore.KEY_COLLEGE_SUBS);
+    if (raw.length === 0) {
+      return [];
+    }
+    try {
+      const parsed: string[] = JSON.parse(raw) as string[];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /** 是否已订阅某学院（按域名判断） */
+  static isCollegeSub(domain: string): boolean {
+    const list: string[] = DataStore.loadCollegeSubs();
+    return list.indexOf(domain) >= 0;
+  }
+
+  /** 订阅/取消订阅学院（返回是否新增） */
+  static toggleCollegeSub(domain: string): boolean {
+    if (domain.length === 0) {
+      return false;
+    }
+    const list: string[] = DataStore.loadCollegeSubs();
+    const idx: number = list.indexOf(domain);
+    if (idx >= 0) {
+      list.splice(idx, 1);
+      DataStore.put(DataStore.KEY_COLLEGE_SUBS, JSON.stringify(list));
+      return false;
+    }
+    list.push(domain);
+    DataStore.put(DataStore.KEY_COLLEGE_SUBS, JSON.stringify(list));
+    return true;
   }
 
   /** 新闻页：内容背景大卡片（'1'=开（默认） / '0'=关） */

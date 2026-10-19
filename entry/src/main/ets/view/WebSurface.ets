@@ -18,6 +18,7 @@ import { DataStore } from '../common/DataStore';
 import { HttpClient } from '../api/HttpClient';
 import { JwApi } from '../api/JwApi';
 import { UserProfile } from '../model/Models';
+import { LogStore } from '../common/LogStore';
 
 @Component
 export struct WebSurface {
@@ -64,6 +65,8 @@ export struct WebSurface {
   private silentTried: boolean = false;
   /** 上次网页版登录目标（切换目标时重置 bridging） */
   private lastTarget: string = AppState.webLoginTarget;
+  /** 自动提交登录是否已触发过一次（防止三次重试重复提交导致账号被误判） */
+  private autoSubmitFired: boolean = false;
 
   /** 电脑端 UA（智慧学工等 PC 版页面） */
   private static readonly DESKTOP_UA: string =
@@ -75,11 +78,12 @@ export struct WebSurface {
     this.bridging = false;
     this.bridgeAttempts = 0;
     this.silentTried = false;
+    this.autoSubmitFired = false;
     this.lastTarget = AppState.webLoginTarget;
     // 初始 src 已是当前目标地址：记录 lastLoaded，避免 @Watch 首次触发重复加载
     this.lastLoaded = AppState.webUrl;
     // 校园 SSO 域名注入会话 Cookie（教务系统 + 统一认证/服务大厅；外部链接如 GitHub 不注入，避免隐私泄漏）
-    if (AppState.webUrl.indexOf('xjau.edu.cn') >= 0) {
+    if (AppState.webUrl.indexOf('jwpt.njmu.edu.cn') >= 0) {
       WebSurface.injectCookies(AppState.webUrl);
     }
     // 网页登录模式且有登录回调（仅"网页版登录"场景）：启动会话抓取轮询
@@ -124,10 +128,10 @@ export struct WebSurface {
   }
 
   /** 把 HttpClient 的教务系统会话 Cookie 写入 WebView 的域名 Cookie 存储，保持登录态；
-   *  校园 SSO 域名（authserver/rhmh/xgxt 等）同时注入统一认证/服务大厅会话，使各 SSO 页面保持登录态 */
+   *  统一认证域名（authserver.njmu.edu.cn）同时注入 CASTGC，使 SSO 页面保持登录态 */
   private static injectCookies(url: string): void {
     // 教务系统会话（仅教务系统域名注入）
-    if (url.indexOf('jwxt.xjau.edu.cn') >= 0) {
+    if (url.indexOf('jwpt.njmu.edu.cn') >= 0) {
       const cookie: string = HttpClient.getCookie();
       if (cookie.length > 0) {
         const pairs: string[] = cookie.split(';');
@@ -137,34 +141,33 @@ export struct WebSurface {
             continue;
           }
           try {
-            webview.WebCookieManager.setCookie(url, `${kv}; Domain=jwxt.xjau.edu.cn; Path=/`);
+            webview.WebCookieManager.setCookie(url, `${kv}; Domain=jwpt.njmu.edu.cn; Path=/`);
           } catch (e) {
             // 单条失败不影响其它
           }
         }
       }
     }
-    // 校园 SSO 会话（统一认证 CASTGC + 服务大厅等），各 SSO 页面保持登录态
-    if (url.indexOf('xjau.edu.cn') >= 0) {
+    // 统一认证会话（CASTGC 等），authserver 页面保持登录态
+    if (url.indexOf('authserver.njmu.edu.cn') >= 0) {
       WebSurface.injectSsoCookies();
     }
   }
 
-  /** 注入统一认证/服务大厅等 SSO 会话 Cookie（按域名写入 WebView Cookie 存储）：
-   *  CASTGC（authserver）→ 服务大厅/第二课堂等页面自动走 CAS 单点登录；
-   *  KEY_SSO_COOKIES（网页版服务大厅登录捕获的 host\ncookie 对）→ 直接恢复服务大厅登录态。 */
+  /** 注入统一认证 CASTGC 会话 Cookie（写入 authserver 域名 Cookie 存储）：
+   *  CASTGC（authserver）→ 教务系统 SSO 回调自动走 CAS 单点登录。 */
   private static injectSsoCookies(): void {
-    // 统一认证 TGT（原生 CAS / 网页版服务大厅登录均可能持久化）
+    // 统一认证 TGT（原生 CAS / 网页版登录均可能持久化）
     const tgc: string = DataStore.get(DataStore.KEY_CAS_TGC);
     if (tgc.length > 0) {
       try {
-        webview.WebCookieManager.setCookie('https://authserver.xjau.edu.cn/',
-          `CASTGC=${tgc}; Domain=authserver.xjau.edu.cn; Path=/`);
+        webview.WebCookieManager.setCookie('https://authserver.njmu.edu.cn/',
+          `CASTGC=${tgc}; Domain=authserver.njmu.edu.cn; Path=/`);
       } catch (e) {
         // ignore
       }
     }
-    // 网页版服务大厅登录捕获的会话 Cookie（host\ncookie 成对）
+    // 网页版登录捕获的会话 Cookie（host\ncookie 成对）
     const raw: string = DataStore.get(DataStore.KEY_SSO_COOKIES);
     if (raw.length === 0) {
       return;
@@ -192,34 +195,184 @@ export struct WebSurface {
     }
   }
 
-  /** 捕获统一认证/服务大厅/智慧学工等 SSO 会话 Cookie（网页版登录成功后 + 浏览校园 SSO 页面时调用），
-   *  供我的页「服务大厅/第二课堂」等 SSO 页面保持登录态。 */
+  /** 自动勾选「记住我/7天免登录」复选框（正方教务 login_slogin 有 Spring Security rememberMe；
+   *  金智 IDS authserver 登录页经实测**无**此复选框，CASTGC 恒为会话级 Cookie，故本函数在
+   *  authserver 场景是安全空操作）。找不到复选框时不做任何事，不影响登录。 */
+  private static autoCheckRememberMe(ctrl: webview.WebviewController): void {
+    const inject: string =
+      `(function(){` +
+      `var el=document.getElementById('rememberMe');` +
+      `if(!el){el=document.querySelector('input[name="rememberMe"]');}` +
+      `if(!el){el=document.querySelector('input[type="checkbox"]');}` +
+      `if(el&&!el.checked){el.checked=true;` +
+      `if(typeof el.dispatchEvent==='function'){` +
+      `el.dispatchEvent(new Event('change',{bubbles:true}));` +
+      `el.dispatchEvent(new Event('click',{bubbles:true}));}` +
+      `}return !!el;})()`;
+    try {
+      ctrl.runJavaScript(inject, () => {
+      });
+      // 延迟重试两次，覆盖异步渲染的复选框
+      setTimeout(() => {
+        try {
+          ctrl.runJavaScript(inject, () => {
+          });
+        } catch (e) {
+          // ignore
+        }
+      }, 800);
+      setTimeout(() => {
+        try {
+          ctrl.runJavaScript(inject, () => {
+          });
+        } catch (e) {
+          // ignore
+        }
+      }, 2000);
+    } catch (e) {
+      // ignore：注入失败不影响登录，仅失去"7天免登录"
+    }
+  }
+
+  /** 统一认证登录页预填账号+密码：用户在登录页已输入的内容注入到 authserver 输入框，减少手动输入。
+   *  金智 IDS 账号输入框 id=username；密码框 id=password（name=passwordText，明文），
+   *  前端 encrypt.js 会在提交时把 passwordText 加密写入隐藏的 saltPassword(name=password)，
+   *  故这里只需填 passwordText 并触发 input 事件，加密逻辑由页面 JS 自动完成。
+   *  密码仅存内存（AppState.webPrefillPassword），注入后即时清空，不落盘。 */
+  private static autoFillAccount(ctrl: webview.WebviewController): void {
+    const account: string = AppState.webPrefillAccount;
+    const password: string = AppState.webPrefillPassword;
+    if (account.length === 0 && password.length === 0) {
+      return;
+    }
+    const accountJson: string = JSON.stringify(account);
+    const passwordJson: string = JSON.stringify(password);
+    const inject: string =
+      `(function(){` +
+      `var ok=false;` +
+      // 限定在「账号密码登录」tab（#pwdLoginDiv）内，避免命中手机动态码登录 tab 的同名输入框
+      `var scope=document.getElementById('pwdLoginDiv');` +
+      `if(!scope){scope=document;}` +
+      `if(${accountJson}.length>0){` +
+      `var u=scope.querySelector('#username, input[name="username"]');` +
+      `if(u&&u.value.length===0){u.value=${accountJson};` +
+      `u.dispatchEvent(new Event('input',{bubbles:true}));` +
+      `u.dispatchEvent(new Event('change',{bubbles:true}));ok=true;}` +
+      `}` +
+      `if(${passwordJson}.length>0){` +
+      `var p=scope.querySelector('#password, input[name="passwordText"], input[type="password"]');` +
+      `if(p&&p.value.length===0){p.value=${passwordJson};` +
+      `p.dispatchEvent(new Event('input',{bubbles:true}));` +
+      `p.dispatchEvent(new Event('change',{bubbles:true}));ok=true;}` +
+      `}` +
+      `return ok;})()`;
+    try {
+      ctrl.runJavaScript(inject, () => {
+      });
+      setTimeout(() => {
+        try {
+          ctrl.runJavaScript(inject, () => {
+          });
+        } catch (e) {
+          // ignore
+        }
+      }, 800);
+      // 预填完成后立即清空内存中的密码（账号保留，供登录成功后记录历史账号）
+      AppState.webPrefillPassword = '';
+    } catch (e) {
+      AppState.webPrefillPassword = '';
+      // ignore：预填失败不影响登录
+    }
+  }
+
+  /**
+   * 自动提交登录：账号密码预填完成后，模拟点击登录页的「登录」按钮，实现无感自动登录。
+   *
+   * 金智 IDS 登录按钮是 `<a id="login_submit" class="login-btn">登录</a>`（非 <button>），
+   * 点击事件由页面内联 JS 绑定：读取 #password（passwordText 明文）→ encrypt.js 加密写入
+   * 隐藏域 #saltPassword（name=password）→ 提交 #pwdFromId 表单。故只需触发 click，加密与提交
+   * 全由页面 JS 完成，无需我们在原生侧复刻加密。
+   *
+   * 自动提交的两个安全闸门（避免盲提交导致账号被误判/锁定）：
+   * 1. 验证码闸门：needCaptcha 非空、或验证码容器 #captchaDiv 可见（未带 hide）时，**不自动提交**，
+   *    只预填账号密码，留给用户手动输验证码后点击登录（此时无感登录客观不可行）；
+   * 2. 密码闸门：未预填到密码（password 为空）时不提交，避免空密码触发错误计数。
+   */
+  private autoSubmitLogin(ctrl: webview.WebviewController): void {
+    // 防重入：三次延迟重试里，一旦真正触发过提交（返回 ok），后续重试直接跳过，
+    // 避免重复 click 导致账号被服务端误判（连续失败计数/验证码）。
+    if (this.autoSubmitFired) {
+      return;
+    }
+    // 注入 JS 精确复刻 login.js 的登录触发链路（金智 IDS customThemez/static/dzjs/login.js）：
+    //   $(#login_submit).click() → checkForm()（校验 username/password 非空 + 按需校验验证码）
+    //   → $("#saltPassword").val(encryptPassword(#password, #pwdEncryptSalt)) → $(".loginFromClass").submit()
+    // 因此只需在预填账号密码后模拟 #login_submit 的 click，加密与提交由页面 JS 全权完成。
+    const inject: string =
+      `(function(){` +
+      // 验证码闸门（login.js reloadCaptcha 用 .show()/.hide() 改 display，class 可能仍是 hide，
+      // 故必须用 getComputedStyle 判断真实可见性，不能只看 className）：
+      `var cap=document.getElementById('captchaDiv');` +
+      `if(cap){var cs=null;try{cs=getComputedStyle(cap);}catch(e){}` +
+      `if(cs&&cs.display&&cs.display!=='none'){return 'captcha';}}` +
+      // needCaptcha 全局变量兜底（login.js checkNeedCaptcha 异步置 true，且 captchaSwitch==1 时提交需验证码）
+      `var need=0;try{need=(typeof needCaptcha!=='undefined'&&needCaptcha&&String(needCaptcha).length>0)?1:0;}catch(e){}` +
+      `if(need&&document.getElementById('captcha')&&document.getElementById('captcha').value.length===0){return 'captcha';}` +
+      // 找登录按钮（金智 IDS：<a id="login_submit" href="javascript:void(0)" class="login-btn">登录</a>）
+      `var btn=document.getElementById('login_submit');` +
+      `if(!btn){btn=document.querySelector('a.login-btn');}` +
+      `if(!btn){btn=document.querySelector('button[type="submit"]');}` +
+      `if(!btn){btn=document.querySelector('input[type="submit"]');}` +
+      `if(!btn){return 'no_btn';}` +
+      // 账号闸门：checkForm 校验 username 非空，账号空时不会提交
+      `var u=document.getElementById('username');` +
+      `if(!u||u.value.length===0){return 'no_account';}` +
+      // 密码闸门：checkForm 校验 password 非空，且 checkForm 靠读 #password 值来加密
+      `var p=document.getElementById('password');` +
+      `if(!p||p.value.length===0){return 'no_pwd';}` +
+      // 模拟点击登录按钮：click 触发 login.js 的处理器（checkForm → encryptPassword → submit）
+      `btn.click();` +
+      `return 'ok';})()`;
+    try {
+      ctrl.runJavaScript(inject, (err: Error, result: string) => {
+        if (err) {
+          LogStore.log('网页登录', '自动登录', '异常', LogStore.errorOf(err));
+          return;
+        }
+        if (result === 'captcha') {
+          // 需要验证码：无法无感登录，仅提示（账号密码已预填，用户输完验证码手动点登录）
+          LogStore.log('网页登录', '自动登录', '跳过', '检测到验证码');
+        } else if (result === 'no_pwd') {
+          LogStore.log('网页登录', '自动登录', '跳过', '未预填到密码');
+        } else if (result === 'no_account') {
+          LogStore.log('网页登录', '自动登录', '跳过', '未预填到账号');
+        } else if (result === 'no_btn') {
+          LogStore.log('网页登录', '自动登录', '跳过', '未找到登录按钮');
+        } else {
+          // 已真正触发提交：置防重入标志，后续重试直接跳过
+          this.autoSubmitFired = true;
+          LogStore.log('网页登录', '自动登录', '成功', '模拟点击登录按钮');
+        }
+      });
+    } catch (e) {
+      // ignore：自动提交失败不影响手动登录
+    }
+  }
+
+  /** 捕获统一认证 CASTGC 会话 Cookie（网页版登录成功后 + 浏览 authserver 页面时调用），
+   *  供冷启动自动重登（silentCasRelogin）复用 CASTGC。 */
   private static captureSsoCookies(): void {
-    const auth: string = webview.WebCookieManager.getCookie('https://authserver.xjau.edu.cn/');
-    const hall: string = webview.WebCookieManager.getCookie(Const.SERVICE_HALL_URL);
-    // 智慧学工系统（第二课堂 AnalogLogin 需要其会话）
-    const xgxt: string = webview.WebCookieManager.getCookie('https://xgxt.xjau.edu.cn/');
-    if (auth.length === 0 && hall.length === 0 && xgxt.length === 0) {
+    const auth: string = webview.WebCookieManager.getCookie('https://authserver.njmu.edu.cn/');
+    if (auth.length === 0) {
       return;
     }
     const parts: string[] = [];
-    if (auth.length > 0) {
-      parts.push('authserver.xjau.edu.cn');
-      parts.push(auth);
-      // CASTGC 同步到 KEY_CAS_TGC（服务大厅登录：冷启动重新从服务大厅打开"新教务系统"刷新用；
-      // rememberMe/7天免登录只影响服务端 TGT 有效期，本地持久化不依赖勾选）
-      const castgc: string = WebSurface.cookieValueOf(auth, 'CASTGC');
-      if (castgc.length > 0) {
-        DataStore.put(DataStore.KEY_CAS_TGC, castgc);
-      }
-    }
-    if (hall.length > 0) {
-      parts.push('rhmh.xjau.edu.cn');
-      parts.push(hall);
-    }
-    if (xgxt.length > 0) {
-      parts.push('xgxt.xjau.edu.cn');
-      parts.push(xgxt);
+    parts.push('authserver.njmu.edu.cn');
+    parts.push(auth);
+    // CASTGC 同步到 KEY_CAS_TGC（统一认证登录：冷启动静默重登刷新教务会话用）
+    const castgc: string = WebSurface.cookieValueOf(auth, 'CASTGC');
+    if (castgc.length > 0) {
+      DataStore.put(DataStore.KEY_CAS_TGC, castgc);
     }
     DataStore.put(DataStore.KEY_SSO_COOKIES, parts.join('\n'));
   }
@@ -301,7 +454,7 @@ export struct WebSurface {
       // 必须读取"教务系统域名"的会话 Cookie：用当前页面 URL（若为 jwxt）兜底到教务系统门户地址，
       // 不能用起始的 AppState.webUrl（可能是 rhmh/jwxt 登录页），否则取不到 jwxt 会话。
       const curUrl: string = this.controller.getUrl();
-      const cookieUrl: string = curUrl.indexOf('jwxt.xjau.edu.cn') >= 0 ? curUrl : Const.WEB_PORTAL_URL;
+      const cookieUrl: string = curUrl.indexOf('jwpt.njmu.edu.cn') >= 0 ? curUrl : Const.WEB_PORTAL_URL;
       // 优先读 WebView 的教务系统会话；若 WebView 尚无（如服务大厅网页登录后由原生静默桥接换取会话），
       // 回退读取 HttpClient 中已建立的会话，保证"已登录即自动进入主页"。
       let cookie: string = webview.WebCookieManager.getCookie(cookieUrl);
@@ -373,8 +526,9 @@ export struct WebSurface {
             this.controller.loadUrl('about:blank');
             return;
           }
-          // 校园 SSO 域名注入会话 Cookie（教务系统 + 统一认证/服务大厅；外部链接不注入，避免隐私泄漏）
-          if (AppState.webUrl.indexOf('xjau.edu.cn') >= 0) {
+          // 校园域名（教务系统 + 统一认证）注入会话 Cookie；外部链接不注入，避免隐私泄漏
+          if (AppState.webUrl.indexOf('jwpt.njmu.edu.cn') >= 0 ||
+              AppState.webUrl.indexOf('authserver.njmu.edu.cn') >= 0) {
             WebSurface.injectCookies(AppState.webUrl);
           }
           // 智慧学工等 PC 版页面：使用电脑端 UA
@@ -397,17 +551,35 @@ export struct WebSurface {
               this.lastTarget = AppState.webLoginTarget;
             }
             const onLoginPage: boolean = url.indexOf('login_slogin') >= 0 || url.indexOf('authserver') >= 0;
+            // 统一认证登录页：自动勾选「7天免登录/记住我」，确保 CASTGC 持久化（否则只是会话级 Cookie，
+            // 关闭 WebView 后失效，冷启动无法用 CASTGC 静默恢复登录态）。
+            if (url.indexOf('authserver') >= 0 && url.indexOf('/login') >= 0) {
+              WebSurface.autoCheckRememberMe(this.controller);
+              WebSurface.autoFillAccount(this.controller);
+              // 预填账号密码后自动提交登录（无感登录）。login.js 的 #login_submit click 处理器
+              // 在 window.onload 里才绑定，故分三次延迟重试（600/1400/2400ms），覆盖预填生效与
+              // 事件绑定完成两个时序，autoSubmitLogin 内部判定验证码/密码闸门决定是否真的提交。
+              const delays: number[] = [600, 1400, 2400];
+              for (let i = 0; i < delays.length; i++) {
+                setTimeout(() => {
+                  if (AppState.webLoginMode && !this.loggedIn) {
+                    this.autoSubmitLogin(this.controller);
+                  }
+                }, delays[i]);
+              }
+            }
             // 已到达教务系统（脱离登录页）→ 读取 jwglxt 会话 Cookie 并完成登录。
-            // 兼容桥接中间页（/sso/jziotlogin）：此时 jwglxt 会话可能已建立，先尝试读取。
+            // 兼容桥接中间页（/sso/jzlogin）：此时 jwglxt 会话可能已建立，先尝试读取。
             const reachedJw: boolean = !onLoginPage &&
-              (url.indexOf('jwglxt') >= 0 || url.indexOf('jziotlogin') >= 0);
-            const inHall: boolean = url.indexOf('rhmh.xjau.edu.cn') >= 0 && !onLoginPage;
+              (url.indexOf('jwglxt') >= 0 || url.indexOf('jzlogin') >= 0);
+            const inHall: boolean = url.indexOf('jwpt.njmu.edu.cn') >= 0 && !onLoginPage;
             if (reachedJw) {
               this.handleWebLoginSuccess();
             } else if (AppState.webLoginTarget === 'hall' && !onLoginPage &&
                        (inHall || this.bridging) && this.bridgeAttempts < 2) {
               // 服务大厅模式：由服务大厅打开"新教务系统"换取 jwglxt 会话。
-              // 必须用带 gid_ 的 JW_BRIDGE_FROM_HALL_URL（裸 /sso/jziotlogin 真机不可靠，项目已验证）；
+              // 2026-10 抓包实测：南医大门户到教务是标准 CAS ticket 握手（service=/sso/jzlogin），
+              // 无 gid_ 加密参数；直接用 JW_BRIDGE_FROM_HALL_URL（即 https://jwpt.njmu.edu.cn/sso/jzlogin）。
               // 最多尝试 2 次，避免停在服务大厅页导致"网页已登录却不自动登录"。
               this.bridging = true;
               this.bridgeAttempts++;
@@ -421,9 +593,8 @@ export struct WebSurface {
           }
           // 通知外层（外部链接页用它做初始滚动让位：网页顶部落到悬浮顶栏下方）
           this.onLoadEnd();
-          // 浏览校园 SSO 页面（服务大厅/智慧学工/第二课堂等）时刷新捕获的会话 Cookie，
-          // 保证下次「服务大厅/第二课堂」入口打开即是登录态
-          if (url.indexOf('xjau.edu.cn') >= 0) {
+          // 浏览统一认证页面（authserver）时刷新捕获的 CASTGC，保证下次冷启动可静默重登
+          if (url.indexOf('authserver.njmu.edu.cn') >= 0) {
             WebSurface.captureSsoCookies();
           }
           // 记录到应用级共享历史（所有网页场景互通：教务系统/新闻网页/外部链接）

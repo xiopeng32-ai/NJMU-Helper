@@ -1,5 +1,5 @@
 /**
- * 农大新闻 — 四大板块新闻列表（各自独立懒加载）
+ * 南医新闻 — 四大板块新闻列表（各自独立懒加载）
  * 点击 → NavPathStack 跳转 NewsDetailPage
  */
 import { SheetUtil } from '../common/SheetUtil';
@@ -25,13 +25,20 @@ import { MaterialCardLayer } from './common/MaterialCarrier';
 import { materialAvailable, sheetBlurStyle } from '../common/SystemMaterial';
 import { AppearanceStore } from '../common/AppearanceStore';
 
+/** 官网直达入口条目 */
+interface QuickLink {
+  key: string;
+  label: string;
+  url: string;
+}
+
 /** 功能浏览模式虚拟新闻条目（中性示例数据，不联网） */
 function mockNews(prefix: string, idx: number, title: string): NewsItem {
   const it: NewsItem = new NewsItem();
   it.title = title;
   it.date = idx <= 2 ? '2026-09-25' : (idx <= 5 ? '2026-09-24' : '2026-09-23');
   // 唯一假 URL 仅作 ForEach key 使用，详情入口已拦截不会真实打开
-  it.url = `mock://xjau-news/${prefix}/${idx}`;
+  it.url = `mock://njmu-news/${prefix}/${idx}`;
   return it;
 }
 
@@ -192,7 +199,7 @@ export struct NewsPage {
   @State showWeb: boolean = false;
   @State keyword: string = '';
   @State refreshing: boolean = false;
-  /** 顶栏板块（农大要闻等）是否收起：上滑浏览时隐藏、下滑回顶时展示 */
+  /** 顶栏板块（南医要闻等）是否收起：上滑浏览时隐藏、下滑回顶时展示 */
   @State tabsBarHidden: boolean = false;
   /** 板块栏视口宽 / 胶囊内容总宽（onAreaChange 实测 vp 值）：内容窄于视口时居中、超宽时左对齐可滚。
    *  不用 minWidth '100%'——横向 Scroll 滚动方向无确定约束，百分比 minWidth 解析不可靠 */
@@ -464,7 +471,7 @@ export struct NewsPage {
     if (this.favs.length === 0) {
       Column() {
         // 悬浮顶栏让位（与其它板块一致，避免内容被渐变顶栏遮挡）
-        Column().width('100%').height(this.getUIContext().px2vp(this.topInsetPx) + 60 + 44)
+        Column().width('100%').height(this.getUIContext().px2vp(this.topInsetPx) + 60 + 40 + 44)
         Text('暂无收藏')
           .fontSize(14)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
@@ -479,7 +486,7 @@ export struct NewsPage {
     } else {
       List({ scroller: this.listScrollers[4] }) {
         ListItem() {
-          Column().width('100%').height(this.getUIContext().px2vp(this.topInsetPx) + 60 + 44)
+          Column().width('100%').height(this.getUIContext().px2vp(this.topInsetPx) + 60 + 40 + 44)
         }
         ForEach(this.favs, (item: NewsItem) => {
           ListItem() {
@@ -603,6 +610,73 @@ export struct NewsPage {
       .width('100%').height('100%').javaScriptAccess(true).domStorageAccess(true)
   }
 
+  /** 官网直达入口列表（南医新闻页顶部快捷栏） */
+  private quickLinks: QuickLink[] = [
+    { key: 'notice', label: '官网公告', url: Const.JWC_LIST_URL },
+    { key: 'animal', label: '动物中心', url: Const.ANIMAL_CENTER_URL },
+    { key: 'instrument', label: '创新器械', url: Const.INSTRUMENT_URL }
+  ];
+
+  /** 打开官网直达入口：动物中心/创新器械/官网公告走 WebView */
+  private openQuickLink(link: QuickLink): void {
+    if (JwApi.USE_MOCK && !this.debugNetwork) {
+      this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+      return;
+    }
+    AppState.webUrl = link.url;
+    AppState.webTitle = link.label;
+    AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
+  }
+
+  /** 打开学院公告订阅页 */
+  private openCollegeNotice(): void {
+    if (JwApi.USE_MOCK && !this.debugNetwork) {
+      this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+      return;
+    }
+    AppState.stack.pushPath({ name: Const.ROUTE_COLLEGE_NOTICE });
+  }
+
+  /** 单个官网直达胶囊 */
+  @Builder
+  quickPill(label: string, onTap: () => void) {
+    Row() {
+      Text(label)
+        .fontSize(12)
+        .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+        .fontColor($r('app.color.text_primary'))
+    }
+    .height(30)
+    .padding({ left: 14, right: 14 })
+    .backgroundColor($r('app.color.bg_card'))
+    .border({ width: 1, color: GlassMaterial.borderColor() })
+    .borderRadius(15)
+    .onClick(() => { onTap(); })
+  }
+
+  /** 官网直达快捷栏（顶栏下方，横向滚动胶囊） */
+  @Builder
+  quickLinkBar() {
+    Scroll() {
+      Row() {
+        this.quickPill('官网公告', () => { this.openQuickLink(this.quickLinks[0]); })
+        Column().width(8)
+        this.quickPill('动物中心', () => { this.openQuickLink(this.quickLinks[1]); })
+        Column().width(8)
+        this.quickPill('创新器械', () => { this.openQuickLink(this.quickLinks[2]); })
+        Column().width(8)
+        this.quickPill('学院公告', () => { this.openCollegeNotice(); })
+      }
+      .alignItems(VerticalAlign.Top)
+      .padding({ left: 16, right: 16 })
+    }
+    .scrollable(ScrollDirection.Horizontal)
+    .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.None)
+    .width('100%')
+    .height(40)
+  }
+
   /** 新闻设置面板：封面缩略图开关 */
   @Builder newsSettingSheet() {
     // 弹窗内容套 MaterialSheetPanel：材质由 Toggle 承载层渲染；配套硬要求（见 build 的 bindSheet 选项）
@@ -696,7 +770,7 @@ export struct NewsPage {
         List({ scroller: this.listScrollers[index] }) {
           // 顶栏占位（随内容滚走）：列表初始从悬浮头（渐变顶栏+透明板块栏）下方开始，上滑后内容进入其下层
           ListItem() {
-            Column().width('100%').height(this.getUIContext().px2vp(this.topInsetPx) + 60 + 44)
+            Column().width('100%').height(this.getUIContext().px2vp(this.topInsetPx) + 60 + 40 + 44)
           }
           // 功能浏览模式：虚拟数据标识
           if (JwApi.USE_MOCK && !this.debugNetwork) {
@@ -742,7 +816,7 @@ export struct NewsPage {
             ForEach(this.lists[index], (item: NewsItem, i: number) => {
               ListItem() {
                 Column() {
-                  // 媒体农大（index=3）不显示缩略图
+                  // 媒体南医（index=3）不显示缩略图
                   NewsRow({
                     item: item,
                     showThumb: index !== 3 && this.newsThumb,
@@ -766,7 +840,7 @@ export struct NewsPage {
               } else {
                 Text('上拉加载更多').fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 14 })
               }
-              Text('数据来源: 新疆农业大学新闻网')
+              Text('数据来源: 南京医科大学新闻网')
                 .fontSize(11).fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 16 })
               Column().height(120)
@@ -874,7 +948,7 @@ export struct NewsPage {
           })
           .backgroundBlurStyle(Immersive.blur(BlurStyle.Thin, this.barStyle === 'legacy'))
       Row() {
-        BarTitle({ title: '农大新闻' })
+        BarTitle({ title: '南医新闻' })
         // 搜索框：输入框，回车跳转搜索结果页。
         // 含 TextInput 不能套 MaterialCard（onTouch 写组件态会打断输入焦点）→ Stack 兄弟结构：
         // MaterialCardLayer 纯视觉承载层画沉浸光感（受全局开关控制、layerShadow:false 防成排投影叠暗带），
@@ -953,8 +1027,8 @@ export struct NewsPage {
               this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
               return;
             }
-            AppState.webUrl = 'https://news.xjau.edu.cn/main.htm';
-            AppState.webTitle = '农大新闻 · 网页端';
+            AppState.webUrl = 'https://www.njmu.edu.cn/';
+            AppState.webTitle = '南医新闻 · 网页端';
             AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
           }
         }) {
@@ -975,7 +1049,11 @@ export struct NewsPage {
 
       // 板块栏（自绘于 Tabs 外）：收起/展开做「高度折叠 + 淡出」平滑动画；
       // 系统 Tabs bar 固定隐藏，切页由 TabsController 联动（点板块 / 左右滑动均可）。
+      // 结构：第一行「官网直达」快捷栏（官网公告/动物中心/创新器械/学院公告），第二行板块胶囊。
       Column() {
+        // 官网直达快捷栏
+        this.quickLinkBar()
+
         // 板块较多时横向滑动（右侧自动裁剪无遮拦），点击/滑动仍联动 TabsController
         Scroll() {
           Row() {
@@ -1010,7 +1088,7 @@ export struct NewsPage {
         })
       }
       .width('100%')
-      .height(this.tabsBarHidden ? 0 : 44)
+      .height(this.tabsBarHidden ? 0 : 84)
       .opacity(this.tabsBarHidden ? 0 : 1)
       // 板块栏全透明：直接透过显示底层（壁纸/滚动上来的内容），不加主题渐变
       .backgroundColor(Color.Transparent)
@@ -1051,7 +1129,7 @@ export struct NewsPage {
       width: SheetUtil.sheetWidth(),
       preferType: SheetType.BOTTOM,
       height: SheetSize.LARGE, dragBar: true,
-      backgroundColor: $r('app.color.bg_page'), title: { title: '农大新闻 · 网页端' }
+      backgroundColor: $r('app.color.bg_page'), title: { title: '南医新闻 · 网页端' }
     })
     // 灰字广播依赖登记：grayTick 变化触发整页重算 grayTertiary 文本色（恒真不改变视觉）
     .opacity(this.grayTick >= 0 ? 1 : 1)

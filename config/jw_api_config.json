@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "version": 2,
-  "updatedAt": "2026-08-10",
-  "baseUrl": "https://jwxt.xjau.edu.cn",
+  "updatedAt": "2026-10-17",
+  "baseUrl": "http://202.195.176.76",
   "endpoints": {
     "loginPage": "/jwglxt/xtgl/login_slogin.html",
     "loginPublicKey": "/jwglxt/xtgl/login_getPublicKey.html",
@@ -20,5 +20,5 @@
     "exportInit": "/jwglxt/zftal/drdc/export_exportInitDcpz.html",
     "exportData": "/jwglxt/cdjy/cdjy_cxDcKxcdlb.html"
   },
-  "jwcListUrl": "https://jwc.xjau.edu.cn/jxrl_3318/list.htm"
+  "jwcListUrl": ""
 }

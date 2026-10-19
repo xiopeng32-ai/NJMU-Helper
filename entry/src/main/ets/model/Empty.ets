@@ -31,7 +31,8 @@ export const EMPTY_COURSE: CourseItem = {
   weeksText: '',
   courseType: '',
   credit: 0,
-  colorIndex: 0
+  colorIndex: 0,
+  noSchedule: false
 };
 
 export const EMPTY_NOTICE: NoticeItem = {

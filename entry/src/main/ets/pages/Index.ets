@@ -29,18 +29,11 @@ struct Index {
   /** 全局字重响应式订阅：表达式读 this.fwMode 才登记依赖，fwValue 声明即订阅 */
   @StorageProp('fontWeightMode') fwMode: string = 'follow';
   @StorageProp('fontWeightValue') fwValue: number = 400;
-  /** 功能浏览水印（进入功能浏览模式 5 秒后强制显示） */
-  @State mockWatermark: boolean = false;
   /** 首启隐私引导页：未同意隐私协议时覆盖全屏，依次展示 隐私协议→开发者声明→账号风控 */
   @State privacyGate: boolean = false;
 
-  /** 进入功能浏览模式后：延迟 5 秒显示全屏水印 */
+  /** 功能浏览模式水印已移除（用户要求去除模拟数据预览水印），保留空实现避免调用点改动 */
   private scheduleMockWatermark(): void {
-    if (JwApi.USE_MOCK) {
-      setTimeout(() => {
-        this.mockWatermark = true;
-      }, 5000);
-    }
   }
 
   /** 页面出现：初始化 AppStorage 兜底值并加载主界面 */
@@ -76,17 +69,18 @@ struct Index {
         break;
       }
     }
-    JwApi.setTerm(picked !== null ? picked : (startTerms.length > 0 ? startTerms[0] : AppState.term));
+    // 兜底必须用"当前日期推算的学期"（如 2026-10 → 2026-2027-1），
+    // 不能取列表第一个（历史学期或未来学期都会错），否则所有接口用错误 xnm 查询返回空数据。
+    JwApi.setTerm(picked !== null ? picked : DateUtil.buildCurrentTerm());
 
     // ── 冷启动会话恢复策略（核心：服务大厅登录态在 → 必须先"从服务大厅重新打开新教务系统"再取数据）──
     //  有 CASTGC（服务大厅登录成功且保持登录态）：教务系统会话不可持久化 →
-    //    冷启动第一步总是用 CASTGC 桥接（GET /sso/jziotlogin）重新打开"新教务系统"换取全新 jwglxt 会话，
+    //    冷启动第一步总是用 CASTGC 桥接（GET /sso/jzlogin）重新打开"新教务系统"换取全新 jwglxt 会话，
     //    第二步才取数据（refreshAll）。TGC 过期时仅自动重登模式用账号密码走服务大厅补登；手动重登则保留缓存等"重登"。
     //  无 CASTGC（教务登录 RSA）：按重登方式 → 自动重登用账号密码 RSA 直登刷新；手动重登不自动刷新。
     const autoAcct: string = DataStore.get(DataStore.KEY_AUTO_ACCOUNT);
     const autoPwd: string = DataStore.get(DataStore.KEY_AUTO_PWD);
     const loginMode: string = DataStore.getLoginMode();
-    const casTgc: string = DataStore.get(DataStore.KEY_CAS_TGC);
     const sessionCookie: string = DataStore.get(DataStore.KEY_SESSION_COOKIE);
     const cachedProfile: UserProfile | null = JwApi.USE_MOCK ? null : DataStore.loadCachedProfile();
     const hasCache: boolean = cachedProfile !== null && cachedProfile.name.length > 0 && cachedProfile.studentId !== 'demo';
@@ -104,49 +98,56 @@ struct Index {
       };
       // 会话恢复中：首页数据加载须等待（防止用旧教务会话取数失败）
       AppState.sessionReady = false;
-      if (casTgc.length > 0) {
-        // 服务大厅登录态在 → 第一步：从服务大厅重新打开"新教务系统"（CASTGC 桥接），第二步：取数据
-        JwApi.silentCasRelogin()
-          .then((ok: boolean) => {
-            if (ok) {
-              JwApi.refreshAll().catch(() => {});
-            } else if (loginMode !== 'legacy' && autoAcct.length > 0 && autoPwd.length > 0) {
-              // 桥接失败（TGC 过期）：仅自动重登模式用账号密码走服务大厅登录补登
-              JwApi.login(autoAcct, DataStore.decodePwd(autoPwd), '', 'service')
-                .then(() => JwApi.refreshAll().catch(() => {}))
-                .catch(() => {});
-            }
-            // 桥接失败 + 手动重登：保留缓存，等用户点"重登"
-            AppState.sessionReady = true;
-          })
-          .catch(() => {
-            JwApi.refreshAll().catch(() => {});
-            AppState.sessionReady = true;
-          });
-      } else {
-        // 教务登录（无 TGC）：按重登方式（自动=账号密码 RSA 直登刷新；手动=不自动刷新）
-        if (loginMode !== 'legacy') {
-          if (autoAcct.length > 0 && autoPwd.length > 0) {
-            JwApi.login(autoAcct, DataStore.decodePwd(autoPwd), '', 'original')
-              .then(() => {
+      // 冷启动会话恢复策略（按登录方式区分）：
+      //  1) 网页登录 / 统一认证 CAS（service）：有 CASTGC 时用 CASTGC 静默桥接换取全新 jwglxt 会话，
+      //     这是教务会话不可持久化场景下唯一可靠的恢复路径；
+      //  2) 教务 RSA 直登（original）：有账号密码时用 RSA 直登刷新会话；
+      //  3) 兜底：用本地会话 Cookie（可能已过期，后台刷新会失败并触发"重登"提示）。
+      const loginMethod: string = DataStore.getLoginMethod();
+      const loginSystem: string = DataStore.get(DataStore.KEY_LOGIN_SYSTEM);
+      const casTgc: string = DataStore.get(DataStore.KEY_CAS_TGC);
+      const sessionCookie: string = DataStore.get(DataStore.KEY_SESSION_COOKIE);
+      const useCas: boolean = (loginMethod === 'web' || loginSystem === 'service') && casTgc.length > 0;
+      if (loginMode !== 'legacy') {
+        if (loginMethod === 'web' && sessionCookie.length > 0) {
+          // 网页登录：优先直接用网页登录时持久化的 jwglxt 会话 Cookie（WebView 里的真实会话）。
+          // 原生 CAS 换 ST 在南医大已失效（authserver 对非浏览器 UA 不返回 ticket），
+          // 走 CASTGC 静默桥接必然失败，故不再依赖它；会话 Cookie 过期时由后台刷新触发"重登"提示。
+          HttpClient.setCookie(sessionCookie);
+          JwApi.refreshAll().catch(() => {});
+          AppState.sessionReady = true;
+        } else if (useCas) {
+          // 统一认证（原生 CAS 登录成功持久化 CASTGC）：优先用 CASTGC 静默重登（教务会话不可持久化，必须重新桥接）
+          JwApi.silentCasRelogin()
+            .then((ok: boolean) => {
+              if (ok) {
                 JwApi.refreshAll().catch(() => {});
-                AppState.sessionReady = true;
-              })
-              .catch(() => {
-                AppState.sessionReady = true;
-              });
-          } else if (sessionCookie.length > 0) {
-            // 无自动凭据时用本地会话 Cookie 恢复
-            HttpClient.setCookie(sessionCookie);
-            JwApi.refreshAll().catch(() => {});
-            AppState.sessionReady = true;
-          } else {
-            AppState.sessionReady = true;
-          }
+              }
+              AppState.sessionReady = true;
+            })
+            .catch(() => {
+              AppState.sessionReady = true;
+            });
+        } else if (autoAcct.length > 0 && autoPwd.length > 0) {
+          JwApi.login(autoAcct, DataStore.decodePwd(autoPwd), '', 'original')
+            .then(() => {
+              JwApi.refreshAll().catch(() => {});
+              AppState.sessionReady = true;
+            })
+            .catch(() => {
+              AppState.sessionReady = true;
+            });
+        } else if (sessionCookie.length > 0) {
+          // 无自动凭据时用本地会话 Cookie 恢复
+          HttpClient.setCookie(sessionCookie);
+          JwApi.refreshAll().catch(() => {});
+          AppState.sessionReady = true;
         } else {
-          // 手动重登：不自动刷新，直接放行（首页用缓存展示）
           AppState.sessionReady = true;
         }
+      } else {
+        // 手动重登：不自动刷新，直接放行（首页用缓存展示）
+        AppState.sessionReady = true;
       }
       return;
     }
@@ -280,33 +281,7 @@ struct Index {
           }
         })
       }
-      // 功能浏览模式：全屏淡水印（进入功能浏览模式 5 秒后强制显示；每字单独旋转保证平铺铺满无死角；不拦截触摸）
-      if (this.mockWatermark) {
-        Stack() {
-          // 平铺多行水印：Column/Row 不旋转（正常铺满全屏），每个 Text 自身旋转 -28°，避免整块旋转露白
-          Column() {
-            ForEach([0, 1, 2, 3, 4, 5, 6, 7, 8], (row: number) => {
-              Row() {
-                ForEach([0, 1, 2, 3, 4], (col: number) => {
-                  Text('功能浏览模式，内容非真实信息')
-                    .fontSize(15)
-                    .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
-                    .fontColor(this.isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)')
-                    .rotate({ angle: -28 })
-                    .margin({ left: 34, right: 34, top: 30, bottom: 30 })
-                    .hitTestBehavior(HitTestMode.None)
-                }, (col: number) => `${col}`)
-              }
-              .hitTestBehavior(HitTestMode.None)
-            }, (row: number) => `${row}`)
-          }
-          .width('100%')
-          .hitTestBehavior(HitTestMode.None)
-        }
-        .width('100%')
-        .height('100%')
-        .hitTestBehavior(HitTestMode.None)
-      }
+      // 功能浏览模式水印已移除（用户要求去除模拟数据预览水印）。
       // "重登" 全局遮罩：叠加在主页之上，居中提示正在重新登录
       if (this.forceReloginLoading) {
         Column() {

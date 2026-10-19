@@ -17,15 +17,15 @@ export interface DeclarationSection {
 export const DEVELOPER_DECLARATION: DeclarationSection[] = [
   {
     title: '独立开发声明',
-    content: '本应用由新疆农业大学学生独立开发，非学校官方应用。'
+    content: '本应用由南京医科大学学生独立开发，非学校官方应用。'
   },
   {
     title: '素材版权',
-    content: '应用内涉及到的新疆农业大学相关网站资源、视觉素材、标识等内容，其著作权、所有权均归属新疆农业大学。' +
+    content: '应用内涉及到的南京医科大学相关网站资源、视觉素材、标识等内容，其著作权、所有权均归属南京医科大学。' +
       '本应用未在任何界面中以任何方式宣称、暗示自身为"官方应用"或与校方存在合作关系。'
   },
   {
     title: '开源说明',
-    content: '本应用为非商业性开源学习项目，欢迎通过 GitHub（FengHDSL/XJAU-Helper）参与改进与反馈。'
+    content: '本应用为非商业性开源学习项目，移植自 FengHDSL/XJAU-Helper，欢迎参与改进与反馈。'
   }
 ];

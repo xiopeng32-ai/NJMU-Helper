@@ -2,15 +2,15 @@
   "color": [
     {
       "name": "start_window_background",
-      "value": "#3A4A38"
+      "value": "#2A3D5C"
     },
     {
       "name": "brand",
-      "value": "#3FBF92"
+      "value": "#5B9AE8"
     },
     {
       "name": "brand_light",
-      "value": "#153029"
+      "value": "#152C4A"
     },
     {
       "name": "brand_on",

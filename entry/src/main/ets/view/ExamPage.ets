@@ -499,10 +499,10 @@ export struct ExamPage {
     .padding({ top: 7, bottom: 7 })
   }
 
-  /** 考试性质配色（互不冲突）：正考=农大绿 / 补考重修=橙 / 缓考=蓝 / 其他=灰 */
+  /** 考试性质配色（互不冲突）：正考=南医蓝 / 补考重修=橙 / 缓考=蓝 / 其他=灰 */
   private examTypeColor(examType: string): string {
     if (examType === '正考' || examType === '正常考试') {
-      return '#079841';
+      return '#005BAC';
     }
     if (examType === '补考' || examType === '重修') {
       return '#FF9800';

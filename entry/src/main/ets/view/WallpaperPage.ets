@@ -1,6 +1,6 @@
 /**
  * 外观设置页（二级页）：顶栏主题色 + 全局壁纸 + 沉浸光感 + 字体（移植自参考项目 miha_hm 外观设置）
- *  - 顶栏主题色：中国红/天空蓝/农大绿/自定义 #RRGGBB（输入 hex 即用）
+ *  - 顶栏主题色：中国红/天空蓝/南医蓝/自定义 #RRGGBB（输入 hex 即用）
  *  - 全局壁纸：自定义图片（选择 → 裁剪页裁切后应用）/ 图像地址导入 / 蒙版开关
  *  - 沉浸光感：全局开关（API≥26）+ 卡片沾色 / 主题色流光 / 卡片流光触感 / 高权限自定义主题色
  *  - 字体：字体管理入口（上传/选择/删除）+ 字重模式 + 字号大小（跟随系统 / 自定义）
@@ -254,7 +254,7 @@ export struct WallpaperPage {
     if (t === 'purple') {
       return '紫罗兰';
     }
-    return '农大绿';
+    return '南医蓝';
   }
 
   /** 应用主题（三色枚举 / hex） */
@@ -649,7 +649,7 @@ export struct WallpaperPage {
       Row({ space: 12 }) {
         this.themeSwatch('red', '#C3272B', '中国红')
         this.themeSwatch('blue', '#3B82F6', '天空蓝')
-        this.themeSwatch('green', '#079841', '农大绿')
+        this.themeSwatch('green', '#005BAC', '南医蓝')
         this.themeSwatch('orange', '#E0603A', '落日橙')
         this.themeSwatch('purple', '#7C5CE0', '紫罗兰')
       }
