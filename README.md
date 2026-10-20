@@ -8,12 +8,12 @@
 
 南京医科大学教务信息鸿蒙原生客户端 · ArkTS / ArkUI · HarmonyOS NEXT
 
-[![Version](https://img.shields.io/badge/version-2.0.3-005BAC)](https://www.sydxky.cn/detail.php?id=1034)
+[![Version](https://img.shields.io/badge/version-2.0.15-005BAC)](https://www.sydxky.cn/detail.php?id=1034)
 [![HarmonyOS](https://img.shields.io/badge/HarmonyOS%20NEXT-API%2026-0A59F7)](https://developer.huawei.com/consumer/cn/harmonyos/)
 [![License](https://img.shields.io/badge/license-MIT-2EA44F)](LICENSE)
 [![Fork](https://img.shields.io/badge/fork-XJAU--Helper-8B5CF6)](https://github.com/FengHDSL/XJAU-Helper)
 
-[应用商店](https://www.sydxky.cn/detail.php?id=1034) · [直接下载 .hap](website/assets/download/NJMU-Helper-2.0.3.hap) · [GitHub 备用](https://github.com/xiopeng32-ai/NJMU-Helper/releases/download/v2.0.3/NJMU-Helper-2.0.3.hap) · [项目主页](website/index.html) · [界面预览](website/shots.html) · [更新日志](CHANGELOG.md) · [参与贡献](CONTRIBUTING.md)
+[应用商店](https://www.sydxky.cn/detail.php?id=1034) · [直接下载 .hap](website/assets/download/NJMU-Helper-2.0.15.hap) · [开源鸿蒙版 .hap](website/assets/download/NJMU-Helper-2.0.15-oh.hap) · [GitHub 备用](https://github.com/xiopeng32-ai/NJMU-Helper/releases/download/v2.0.3/NJMU-Helper-2.0.15.hap) · [项目主页](website/index.html) · [界面预览](website/shots.html) · [更新日志](CHANGELOG.md) · [参与贡献](CONTRIBUTING.md)
 
 </div>
 

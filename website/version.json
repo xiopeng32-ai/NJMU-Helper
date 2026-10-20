@@ -1,0 +1,16 @@
+{
+  "version": "2.0.15",
+  "versionCode": 2000015,
+  "date": "2026-10-20",
+  "notes": [
+    "新增智慧屏支持（遥控器可操作）",
+    "PC 窗口最小尺寸与底栏加宽",
+    "快捷入口支持焦点与回车",
+    "关于页显示设备类型"
+  ],
+  "downloadUrl": "assets/download/NJMU-Helper-2.0.15.hap",
+  "minSupported": "1.9.0",
+  "ohVersion": "2.0.15-oh",
+  "ohDownloadUrl": "assets/download/NJMU-Helper-2.0.15-oh.hap",
+  "ohNotes": "开源鸿蒙版：移除华为专有 Kit，底栏改为原生标签栏，无前台防窥检测"
+}

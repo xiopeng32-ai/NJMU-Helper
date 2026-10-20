@@ -62,6 +62,8 @@ export struct AboutPage {
   @State debugActive: boolean = false;
   /** 当前应用版本（与界面「版本」文本保持同步，发版时两处一起改） */
   private readonly currentVersion: string = '1.9.4';
+  /** 备案编号：App 备案通过后填入，例如「苏ICP备2026XXXXXX号-3A」；留空则不显示 */
+  private readonly icpNo: string = '';
   /** 检查更新请求进行中 */
   @State checkingUpdate: boolean = false;
   /** 连点计时器（超时重置计数） */
@@ -187,6 +189,11 @@ export struct AboutPage {
         .width('100%')
         .textAlign(TextAlign.Center)
         .margin({ top: 18 })
+
+      // 备案编号（工信部要求 App 显著位置展示并链接备案系统）：icpNo 为空时整行不渲染
+      if (this.icpNo.length > 0) {
+        this.linkRow('备案号：' + this.icpNo, 'https://beian.miit.gov.cn/')
+      }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
