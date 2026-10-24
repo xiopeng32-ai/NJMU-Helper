@@ -9,7 +9,7 @@
     repo: "https://github.com/xiopeng32-ai/NJMU-Helper",
     owner: "xiopeng32-ai",
     download: "https://www.sydxky.cn/detail.php?id=1034",
-    hap: "https://github.com/xiopeng32-ai/NJMU-Helper/releases/download/v2.0.3/NJMU-Helper-2.0.3.hap"
+    hap: "https://github.com/xiopeng32-ai/NJMU-Helper/releases/download/v2.2.1/NJMU-Helper-2.2.1.hap"
   };
 
   var doc = document;

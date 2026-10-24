@@ -1,0 +1,76 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "NJMU academic services client"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Main entry of NJMU Helper"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "NJMU Helper"
+    },
+    {
+      "name": "reason_internet",
+      "value": "Used to connect to the university academic system for timetables and grades"
+    },
+    {
+      "name": "reason_calendar",
+      "value": "Used to write exam schedules into the system calendar for reminders"
+    },
+    {
+      "name": "EntryFormAbility_label",
+      "value": "Class preview"
+    },
+    {
+      "name": "EntryFormAbility_desc",
+      "value": "Home widget: today's classes and exam countdown"
+    },
+    {
+      "name": "class_preview_card_name",
+      "value": "Class preview"
+    },
+    {
+      "name": "class_preview_card_desc",
+      "value": "Today's and tomorrow's classes at a glance"
+    },
+    {
+      "name": "exam_countdown_card_name",
+      "value": "Exam countdown"
+    },
+    {
+      "name": "exam_countdown_card_desc",
+      "value": "Countdown to your next exam"
+    },
+    {
+      "name": "today_schedule_card_name",
+      "value": "Today's classes"
+    },
+    {
+      "name": "today_schedule_card_desc",
+      "value": "Shows the classes you have today"
+    },
+    {
+      "name": "score_card_name",
+      "value": "Grades"
+    },
+    {
+      "name": "score_card_desc",
+      "value": "Shows GPA, ranking and earned credits"
+    },
+    {
+      "name": "reason_agent_reminder",
+      "value": "Used to send class reminders before they start, even when the app is closed"
+    },
+    {
+      "name": "BackgroundWorkAbility_label",
+      "value": "Background sync"
+    },
+    {
+      "name": "BackgroundWorkAbility_desc",
+      "value": "Periodically checks for new grades and notices in the background and notifies you"
+    }
+  ]
+}

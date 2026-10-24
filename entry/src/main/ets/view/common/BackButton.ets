@@ -9,6 +9,8 @@ import { IconCircleButton } from './IconCircleButton';
 
 @Component
 export struct BackButton {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('isDarkMode') isDarkMode: boolean = false;
   /** 返回回调（默认 pop，由调用页决定） */
   onBack: () => void = () => {

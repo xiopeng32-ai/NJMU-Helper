@@ -36,11 +36,30 @@ import { LogStore } from '../common/LogStore';
 import zlib from '@ohos.zlib';
 import { fileIo } from '@kit.CoreFileKit';
 import { CourseRawStore } from '../common/CourseRawStore';
+import { T } from '../common/I18n';
 
 /** 正方下发的 RSA 公钥 */
 interface RsaPublicKey {
   modulus: string;
   exponent: string;
+}
+
+/** 数据刷新状态（供页面层展示「获取状态提示」：全部成功 / 部分用缓存 / 全部失败） */
+interface RefreshStatus {
+  /** 是否全部接口都拿到了最新数据（无一项回退缓存） */
+  allFresh: boolean;
+  /** 回退到上次成功缓存的接口数量 */
+  fromCacheCount: number;
+  /** 参与统计的接口总数 */
+  totalCount: number;
+  /** 刷新完成时间戳 */
+  time: number;
+}
+
+/** 容错拉取结果：data=数据（最新或缓存回退），fromCache=是否来自缓存回退 */
+interface FetchResult<T> {
+  data: T;
+  fromCache: boolean;
 }
 
 /** 校历缓存结构：来源（最新校历文章/PDF URL）+ 转换结果数据 */
@@ -65,6 +84,9 @@ export class JwApi {
   static USE_MOCK: boolean = true;
   /** 总体成绩接口单飞缓存（并发去重） */
   private static overallInflight: Promise<OverallGrades> | null = null;
+
+  /** 数据刷新状态广播键（AppStorage）：refreshAll 完成后写入 RefreshStatus，页面层据此展示获取状态提示 */
+  static readonly KEY_REFRESH_STATUS: string = 'dataRefreshStatus';
 
   private static term: TermInfo = DateUtil.buildCurrentTerm();
 
@@ -256,7 +278,7 @@ export class JwApi {
       endSection: secInfo.end,
       weeks: weeksInfo.weeks,
       weeksText: weeksInfo.text,
-      courseType: (raw['kcxzmc'] as string) ?? (raw['kcxz'] as string) ?? '必修',
+      courseType: (raw['kcxzmc'] as string) ?? (raw['kcxz'] as string) ?? T('必修'),
       credit: Number(raw['xf'] ?? 0),
       colorIndex: (xqj + name.length) % 8,
       noSchedule: noSchedule
@@ -302,25 +324,56 @@ export class JwApi {
 
   private static mapExam(raw: ESObject): ExamItem {
     const kssj: string = (raw['kssj'] as string) ?? '';
-    let date: string = '';
-    let timeRange: string = '';
-    const sp: string[] = kssj.split(' ');
-    if (sp.length >= 2) {
-      date = sp[0];
-      timeRange = sp[1];
-    } else if (sp.length === 1) {
-      date = sp[0];
-    }
+    const parsed: string[] = JwApi.parseExamTime(kssj);
+    // 考场优先 cdmc（"博学楼A207"），cdbh 只是场地编号（如 "001"），直接用会显示成一串数字
+    const cdmc: string = ((raw['cdmc'] as string) ?? '').trim();
+    const cdbh: string = ((raw['cdbh'] as string) ?? '').trim();
+    // 类型优先 ksxz（考试性质：期末/期中/补考），ksfs 是考试方式（闭卷/开卷）
+    const ksxz: string = ((raw['ksxz'] as string) ?? '').trim();
+    const ksfs: string = ((raw['ksfs'] as string) ?? '').trim();
+    // 课程名优先 kcmc（如「人体结构与功能01」）；ksmc 是考试批次名
+    // （如「2026-2027学年第一学期期末考试」），直接用会让所有考试同名
+    const kcmc: string = ((raw['kcmc'] as string) ?? '').trim();
+    const ksmc: string = ((raw['ksmc'] as string) ?? '').trim();
+    const courseName: string = kcmc.length > 0 ? kcmc : (ksmc.length > 0 ? ksmc : '未知考试');
     return {
-      id: `${raw['ksmc']}_${kssj}`,
-      courseName: (raw['ksmc'] as string) ?? '未知考试',
-      date: date,
-      timeRange: timeRange,
-      location: (raw['cdbh'] as string) ?? '待定',
+      id: `${courseName}_${kssj}`,
+      courseName: courseName,
+      date: parsed[0],
+      timeRange: parsed[1],
+      location: cdmc.length > 0 ? cdmc : (cdbh.length > 0 ? cdbh : '待定'),
       seat: (raw['zwh'] as string) ?? '待定',
-      examType: (raw['ksfs'] as string) ?? '考试',
+      examType: ksxz.length > 0 ? ksxz : (ksfs.length > 0 ? ksfs : T('考试')),
       teacher: (raw['jsxm'] as string) ?? ''
     };
+  }
+
+  /**
+   * 解析教务返回的考试时间字符串，兼容三种常见形态：
+   *   "2026-01-05 09:00-11:00" / "2026-01-05(09:00-11:00)" / "2026/1/5 9:00~11:00"
+   * 返回 [日期(yyyy-MM-dd), 时间段(HH:mm-HH:mm)]，缺项为空串。
+   */
+  private static parseExamTime(kssj: string): string[] {
+    const out: string[] = ['', ''];
+    if (kssj.length === 0) {
+      return out;
+    }
+    const dm: RegExpMatchArray | null = kssj.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (dm !== null) {
+      const mm: string = dm[2].length === 1 ? `0${dm[2]}` : dm[2];
+      const dd: string = dm[3].length === 1 ? `0${dm[3]}` : dm[3];
+      out[0] = `${dm[1]}-${mm}-${dd}`;
+    }
+    const tm: RegExpMatchArray | null = kssj.match(/(\d{1,2}:\d{2})\s*[-~至—–]\s*(\d{1,2}:\d{2})/);
+    if (tm !== null) {
+      out[1] = `${tm[1]}-${tm[2]}`;
+    } else {
+      const single: RegExpMatchArray | null = kssj.match(/(\d{1,2}:\d{2})/);
+      if (single !== null) {
+        out[1] = single[1];
+      }
+    }
+    return out;
   }
 
   /** 判断是否核心课程（CC）：课程类别/性质名称含「核心」字样。
@@ -334,7 +387,7 @@ export class JwApi {
     const cj: number = Number(raw['cj']);
     const valid: boolean = !isNaN(cj);
     const kclbmc: string = (raw['kclbmc'] as string) ?? '';
-    const kcxzmc: string = (raw['kcxzmc'] as string) ?? '必修';
+    const kcxzmc: string = (raw['kcxzmc'] as string) ?? T('必修');
     return {
       id: `${raw['kcmc']}_${raw['xnmmc']}_${raw['xqmmc']}`,
       courseName: (raw['kcmc'] as string) ?? '未知课程',
@@ -343,7 +396,7 @@ export class JwApi {
       scoreText: valid ? `${cj}` : (raw['cj'] as string),
       gradePoint: Number(raw['jd'] ?? 0),
       courseType: kcxzmc,
-      examType: (raw['ksxz'] as string) ?? '正常考试',
+      examType: (raw['ksxz'] as string) ?? T('正常考试'),
       // 任课教师名：教务返回的字段是 jsxm，xm 是学生本人名字（不能错位）
       teacher: (raw['jsxm'] as string) ?? '',
       termId: termId,
@@ -453,7 +506,7 @@ export class JwApi {
       const ok: boolean = account.length >= 6 && password.length >= 6;
       const result: LoginResult = {
         success: ok,
-        message: ok ? '登录成功' : '学号或密码格式不正确（demo：学号 6 位以上、密码 6 位以上即可）',
+        message: ok ? T('登录成功') : '学号或密码格式不正确（demo：学号 6 位以上、密码 6 位以上即可）',
         profile: ok ? MockData.PROFILE : null,
         needCaptcha: false
       };
@@ -475,7 +528,7 @@ export class JwApi {
       } catch (e) {
         // 登录链路任一步异常（网络失败/解析失败/RSA 异常）：记录完整诊断，便于定位登录失败根因
         const errText: string = LogStore.errorOf(e as Object);
-        LogStore.logNet('登录', '原版', '异常',
+        LogStore.logNet(T('登录'), '原版', T('异常'),
           {
             method: 'POST',
             url: '/jwglxt/xtgl/login_slogin.html',
@@ -519,7 +572,7 @@ export class JwApi {
     } catch (e) {
       // 登录链路任一步异常（网络失败/解析失败/RSA 异常）：记录完整诊断，便于定位登录失败根因
       const errText: string = LogStore.errorOf(e as Object);
-      LogStore.logNet('登录', '登录', '异常',
+      LogStore.logNet(T('登录'), T('登录'), T('异常'),
         {
           method: 'POST',
           url: '/jwglxt/xtgl/login_slogin.html',
@@ -573,9 +626,9 @@ export class JwApi {
       const profile: UserProfile = await JwApi.getProfile();
       if (profile.name.length > 0) {
         DataStore.cacheProfile(profile);
-        LogStore.logNet('登录', 'CAS', '成功',
+        LogStore.logNet(T('登录'), 'CAS', T('成功'),
           { method: 'POST', url: '/authserver/login', status: '200', detail: '已建立教务系统会话' });
-        return { success: true, message: '登录成功', profile: profile, needCaptcha: false };
+        return { success: true, message: T('登录成功'), profile: profile, needCaptcha: false };
       }
       // 会话 Cookie 有但资料取不到：视为失败，回退
       JwApi.lastCasError = '会话已建立但资料校验失败';
@@ -586,7 +639,7 @@ export class JwApi {
       }
       // 网络/解析等其它异常：CAS 不可用，回退 RSA（记录原因供 UI 明确提示）
       JwApi.lastCasError = LogStore.errorOf(e as Object);
-      LogStore.logNet('登录', 'CAS', '异常',
+      LogStore.logNet(T('登录'), 'CAS', T('异常'),
         { method: 'POST', url: '/authserver/login', status: '', error: LogStore.errorOf(e as Object),
           detail: 'CAS 登录失败，将回退旧版 RSA 直登' });
       return null;
@@ -612,6 +665,67 @@ export class JwApi {
       LogStore.log('登录', 'CAS', '自动重登', '失败：' + LogStore.errorOf(e as Object));
       return false;
     }
+  }
+
+  /** 会话过期自动恢复：优先 CASTGC 静默桥接，其次用保存的账号密码直登。成功返回 true。 */
+  static async tryAutoRecoverSession(): Promise<boolean> {
+    if (JwApi.USE_MOCK) {
+      return false;
+    }
+    // 1) CASTGC 静默桥接（无需密码，最快）
+    if (await JwApi.silentCasRelogin()) {
+      LogStore.log('登录', '自动恢复', '成功', 'CASTGC 静默桥接恢复会话');
+      return true;
+    }
+    // 2) 保存的账号密码 RSA 直登
+    const acct: string = DataStore.get(DataStore.KEY_AUTO_ACCOUNT);
+    const pwd: string = DataStore.decodePwd(DataStore.get(DataStore.KEY_AUTO_PWD));
+    if (acct.length === 0 || pwd.length === 0) {
+      LogStore.log('登录', '自动恢复', '跳过', '无可用凭据（CASTGC/账号密码均缺失）');
+      return false;
+    }
+    try {
+      const r: LoginResult = await JwApi.login(acct, pwd, '', 'original');
+      if (r.success) {
+        LogStore.log('登录', '自动恢复', '成功', '账号密码直登恢复会话');
+        return true;
+      }
+      LogStore.log('登录', '自动恢复', '失败', r.message);
+      return false;
+    } catch (e) {
+      LogStore.log('登录', '自动恢复', '异常', LogStore.errorOf(e as Object));
+      return false;
+    }
+  }
+
+  /**
+   * 会话过期后按需自动恢复（fire-and-forget，不阻塞调用方）。
+   * 每进程最多尝试 2 次，避免密码错误/账号被锁时反复登录。
+   */
+  static autoRecoverIfNeeded(): void {
+    if (!AppState.sessionExpired || JwApi.recovering || JwApi.recoverCount >= 2) {
+      return;
+    }
+    JwApi.recovering = true;
+    JwApi.recoverCount += 1;
+    JwApi.tryAutoRecoverSession().then((ok: boolean) => {
+      JwApi.recovering = false;
+      if (ok) {
+        HttpClient.clearSessionExpired();
+        LogStore.log('首页', '会话', '恢复成功', '重新拉取数据');
+        // 重置节流并重拉（延迟 300ms 让会话 Cookie 生效）
+        JwApi.lastRefreshAt = 0;
+        setTimeout(() => {
+          JwApi.refreshAll().catch(() => {
+            // ignore
+          });
+        }, 300);
+      } else {
+        LogStore.log('首页', '会话', '恢复失败', '需手动点击「登录已过期 · 重登」');
+      }
+    }).catch((_e: Object) => {
+      JwApi.recovering = false;
+    });
   }
 
   /** 真实登录主流程（被 login 包装，带阶段跟踪与异常日志） */
@@ -649,7 +763,7 @@ export class JwApi {
     const needCaptcha: boolean = body.indexOf('验证码') >= 0 || body.indexOf('校验码') >= 0;
 
     if (body.indexOf('账号被锁定') >= 0 || body.indexOf('账号被冻结') >= 0) {
-      LogStore.logNet('登录', '登录', '失败',
+      LogStore.logNet(T('登录'), T('登录'), T('失败'),
         {
           method: 'POST',
           url: '/jwglxt/xtgl/login_slogin.html',
@@ -662,7 +776,7 @@ export class JwApi {
 
     // 明确的密码错误且未要求验证码：直接返回失败，避免多余请求
     if (failByPwd && !needCaptcha) {
-      LogStore.logNet('登录', '登录', '失败',
+      LogStore.logNet(T('登录'), T('登录'), T('失败'),
         {
           method: 'POST',
           url: '/jwglxt/xtgl/login_slogin.html',
@@ -682,16 +796,16 @@ export class JwApi {
         if (profile.name.length > 0) {
           // 登录成功：记录账号 + 缓存资料
           DataStore.cacheProfile(profile);
-          LogStore.logNet('登录', '登录', '成功',
+          LogStore.logNet(T('登录'), T('登录'), T('成功'),
             { method: 'POST', url: '/jwglxt/xtgl/login_slogin.html', status: `${res.code}`, detail: `enteredHome=${enteredHome} hasJsession=${hasJsession}` });
-          return { success: true, message: '登录成功', profile: profile, needCaptcha: false };
+          return { success: true, message: T('登录成功'), profile: profile, needCaptcha: false };
         }
       } catch (e) {
         LogStore.log('登录', '登录', '资料获取异常', LogStore.errorOf(e as Object));
         // 忽略，走下面的失败分支
       }
     }
-    LogStore.logNet('登录', '登录', '失败',
+    LogStore.logNet(T('登录'), T('登录'), T('失败'),
       {
         method: 'POST',
         url: '/jwglxt/xtgl/login_slogin.html',
@@ -714,9 +828,9 @@ export class JwApi {
    *  依次匹配常见提示关键词，命中即返回；无命中则截取响应体中可读文本片段。 */
   private static extractLoginError(body: string): string {
     const hints: string[] = [
-      '账号被锁定', '账号被冻结', '用户名或密码错误', '密码错误', '账号错误',
+      '账号被锁定', '账号被冻结', '用户名或密码错误', T('密码错误'), '账号错误',
       '验证码错误', '验证码不正确', '校验码', '请输入验证码', '该账号已过期',
-      '登录已过期', '系统繁忙', '网络异常', '服务器错误'
+      T('登录已过期'), '系统繁忙', T('网络异常'), '服务器错误'
     ];
     for (let i = 0; i < hints.length; i++) {
       const idx: number = body.indexOf(hints[i]);
@@ -818,6 +932,7 @@ export class JwApi {
     const t: TermInfo = JwApi.applyCustomStart(term);
     JwApi.term = t;
     AppState.term = t;
+    AppState.termExplicit = true; // 标记"学期已就绪"，提醒排程不再回退到默认值
     DataStore.put(DataStore.KEY_DS_TERM, term.id);
     // 广播学期变化，供各页（课程表等）@StorageProp @Watch 监听同步切换
     AppStorage.setOrCreate('currentTermId', term.id);
@@ -853,7 +968,7 @@ export class JwApi {
         grade: nj.length > 0 ? `${nj}级` : '',
         counselor: '', // 教务系统不提供辅导员字段
         eduSystem: (xs['XZ'] as string) ?? '',
-        status: (xs['XJZT'] as string) ?? '在读'
+        status: (xs['XJZT'] as string) ?? T('在读')
       };
       // 学院字段：课表 xsxx 无 JGMC，尝试从"查询个人信息"页面补全
       if (profile.name.length > 0 && profile.college.length === 0) {
@@ -950,9 +1065,7 @@ export class JwApi {
   static async getCourses(termId: string): Promise<CourseItem[]> {
     if (JwApi.USE_MOCK) {
       const list: CourseItem[] = MockData.courses();
-      DataStore.cacheJSON(DataStore.KEY_COURSES, JSON.stringify(list));
-      // 功能浏览模式同样落一份"原文件"，便于预览该入口
-      CourseRawStore.save(termId, JSON.stringify({ source: 'mock', kbList: list }), 'MOCK', list.length);
+      // ⚠ 演示数据不写真实缓存：否则切回真实登录后首页会读到 mock 课表（个人数据显示成演示学生）
       JwApi.markCoursesFetched(termId);
       return JwApi.delay(list, 500);
     }
@@ -964,7 +1077,7 @@ export class JwApi {
     try {
       root = JSON.parse(res.body);
     } catch (e) {
-      LogStore.logNet('课表', '解析', '异常',
+      LogStore.logNet(T('课表'), '解析', T('异常'),
         { url: JwApi.COURSE_URL, status: `${res.code}`, error: LogStore.errorOf(e as Object), body: res.body, detail: `xnm=${xnm} xqm=${xqm}` });
       throw e as Error;
     }
@@ -989,7 +1102,7 @@ export class JwApi {
     CourseRawStore.save(termId, res.body, JwApi.COURSE_URL, list.length);
     // 记录"今天已查询识别"，同一天内不再自动重复请求
     JwApi.markCoursesFetched(termId);
-    LogStore.logNet('课表', '获取', '成功',
+    LogStore.logNet(T('课表'), '获取', T('成功'),
       { url: JwApi.COURSE_URL, status: `${res.code}`, detail: `${list.length}节 xnm=${xnm} xqm=${xqm}` });
     return list;
   }
@@ -1020,34 +1133,97 @@ export class JwApi {
   /**
    * 课表智能获取：默认**每天只查询识别一次**（当天已有成功记录 → 直接返回缓存，不再请求教务系统）；
    * force=true 时强制重新查询识别（课表页刷新按钮、原文件缺失需要重取时）。
+   * 获取失败时回退上次成功缓存（有缓存返回缓存，无缓存才抛出）。
    */
   static async getCoursesSmart(termId: string, force: boolean): Promise<CourseItem[]> {
+    const key: string = `${termId}|${force}`;
+    const running: Promise<CourseItem[]> | undefined = JwApi.coursesInflight.get(key);
+    if (running !== undefined) {
+      return running;
+    }
+    const task: Promise<CourseItem[]> = JwApi.getCoursesSmartInner(termId, force).then((v: CourseItem[]) => {
+      JwApi.coursesInflight.delete(key);
+      return v;
+    }).catch((e: Object) => {
+      JwApi.coursesInflight.delete(key);
+      throw e as Error;
+    });
+    JwApi.coursesInflight.set(key, task);
+    return task;
+  }
+
+  /** getCoursesSmart 实际执行体（单飞内层） */
+  private static async getCoursesSmartInner(termId: string, force: boolean): Promise<CourseItem[]> {
     if (!force && JwApi.coursesFetchedToday(termId)) {
       const cached: CourseItem[] = JwApi.loadCachedCourses();
       if (cached.length > 0) {
         return cached;
       }
     }
-    return JwApi.getCourses(termId);
+    try {
+      return await JwApi.getCourses(termId);
+    } catch (e) {
+      const cached: CourseItem[] = JwApi.loadCachedCourses();
+      if (cached.length > 0) {
+        LogStore.log('课表', '获取', '失败回退缓存', LogStore.errorOf(e as Object));
+        return cached;
+      }
+      throw e as Error;
+    }
   }
 
   /** 考试安排 */
   static async getExams(termId: string): Promise<ExamItem[]> {
     if (JwApi.USE_MOCK) {
       const list: ExamItem[] = MockData.exams();
-      DataStore.cacheJSON(DataStore.KEY_EXAMS, JSON.stringify(list));
+      // 演示数据不写真实缓存（避免污染真实登录后的考试安排）
       return JwApi.delay(list, 500);
     }
+    // 单飞：日志里出现过同一参数并行请求两次（refreshAll + 页面），直接复用进行中的 Promise
+    const running: Promise<ExamItem[]> | undefined = JwApi.examsInflight.get(termId);
+    if (running !== undefined) {
+      return running;
+    }
+    const task: Promise<ExamItem[]> = JwApi.getExamsInner(termId).then((list: ExamItem[]) => {
+      JwApi.examsInflight.delete(termId);
+      return list;
+    }).catch((err: Object) => {
+      JwApi.examsInflight.delete(termId);
+      throw err as Error;
+    });
+    JwApi.examsInflight.set(termId, task);
+    try {
+      return await task;
+    } catch (e) {
+      const cached: ExamItem[] = JwApi.loadCachedExams(termId);
+      if (cached.length > 0) {
+        LogStore.log('考试', '获取', '失败回退缓存', LogStore.errorOf(e as Object));
+        return cached;
+      }
+      throw e as Error;
+    }
+  }
+
+  /** 考试安排真实拉取（内部，失败由 getExams 统一回退缓存） */
+  private static async getExamsInner(termId: string): Promise<ExamItem[]> {
     const parts: string[] = termId.split('-');
     const xnm: string = parts[0];
     const xqm: string = JwApi.xqmOf(termId);
-    const res: HttpResult = await HttpClient.postForm('/jwglxt/kwgl/kscx_cxXsksxxIndex.html',
-      { 'doType': 'query', 'xnm': xnm, 'xqm': xqm });
+    // 补全分页/排序参数：缺 showCount 时教务默认每页 10 条，考试多于一页会被截断（表现为"考试不全"）
+    const res: HttpResult = await HttpClient.postForm('/jwglxt/kwgl/kscx_cxXsksxxIndex.html', {
+      'doType': 'query',
+      'xnm': xnm,
+      'xqm': xqm,
+      'queryModel.showCount': '100',
+      'queryModel.currentPage': '1',
+      'queryModel.sortName': 'kssj',
+      'queryModel.sortOrder': 'asc'
+    });
     let root: ESObject;
     try {
       root = JSON.parse(res.body);
     } catch (e) {
-      LogStore.logNet('考试', '解析', '异常',
+      LogStore.logNet(T('考试'), '解析', T('异常'),
         { url: '/jwglxt/kwgl/kscx_cxXsksxxIndex.html', status: `${res.code}`, error: LogStore.errorOf(e as Object), body: res.body, detail: `xnm=${xnm} xqm=${xqm}` });
       throw e as Error;
     }
@@ -1056,10 +1232,17 @@ export class JwApi {
     for (let i = 0; i < items.length; i++) {
       list.push(JwApi.mapExam(items[i]));
     }
-    DataStore.cacheJSON(DataStore.KEY_EXAMS, JSON.stringify(list));
-    LogStore.logNet('考试', '获取', '成功',
+    // 按学期分别缓存：同一键会被不同学期的结果互相覆盖，切回上学期会读到别的学期考试
+    DataStore.cacheJSON(JwApi.examCacheKey(termId), JSON.stringify(list));
+    LogStore.logNet(T('考试'), '获取', T('成功'),
       { url: '/jwglxt/kwgl/kscx_cxXsksxxIndex.html', status: `${res.code}`, detail: `${list.length}条 xnm=${xnm} xqm=${xqm}` });
     return list;
+  }
+
+  /** 考试缓存键（按学期隔离） */
+  private static examCacheKey(termId: string): string {
+    // v2：修正课程名字段（kcmc）后升版，旧缓存里的「学期期末考试」标题自然失效
+    return `cache_exams_v2_${termId}`;
   }
 
   /** 等级考试（考级项目报名 kjbm_cxXskjbm）请求 URL（xmlbfl 只能放 query，不能进 body） */
@@ -1078,7 +1261,7 @@ export class JwApi {
       computerName: '', computerPassed: false, items: []
     };
     if (JwApi.USE_MOCK) {
-      return empty;
+      return JwApi.delay(MockData.levelExams(), 300);
     }
     try {
       const res: HttpResult = await HttpClient.postForm(JwApi.LEVEL_EXAM_URL, {
@@ -1114,7 +1297,7 @@ export class JwApi {
       }
       const summary: LevelExamSummary = JwApi.summarizeLevelExams(list);
       DataStore.cacheJSON(DataStore.KEY_LEVEL_EXAMS, JSON.stringify(summary));
-      LogStore.logNet('等级考试', '获取', '成功',
+      LogStore.logNet(T('等级考试'), '获取', T('成功'),
         { url: JwApi.LEVEL_EXAM_URL, status: `${res.code}`, detail: `${list.length}条` });
       return summary;
     } catch (e) {
@@ -1226,10 +1409,45 @@ export class JwApi {
 
   /** 各学期成绩（默认当前学期，可传入指定学期 id 如 2024-2025-2） */
   static async getTermScores(termId?: string): Promise<TermScore[]> {
+    const key: string = termId ?? '';
+    const running: Promise<TermScore[]> | undefined = JwApi.scoresInflight.get(key);
+    if (running !== undefined) {
+      return running;
+    }
+    const task: Promise<TermScore[]> = JwApi.getTermScoresFetch(termId).then((v: TermScore[]) => {
+      JwApi.scoresInflight.delete(key);
+      return v;
+    }).catch((e: Object) => {
+      JwApi.scoresInflight.delete(key);
+      throw e as Error;
+    });
+    JwApi.scoresInflight.set(key, task);
+    return task;
+  }
+
+  /** getTermScores 的外层（mock + 失败回退缓存），真实拉取在 getTermScoresInner */
+  private static async getTermScoresFetch(termId?: string): Promise<TermScore[]> {
     if (JwApi.USE_MOCK) {
       return JwApi.delay(MockData.termScores(MockData.terms(JwApi.term)), 600);
     }
     const realTermId: string = termId ?? JwApi.term.id;
+    try {
+      return await JwApi.getTermScoresInner(realTermId);
+    } catch (e) {
+      // 失败回退缓存：仅当前学期有缓存（其他学期成绩不落缓存）
+      if (realTermId === JwApi.term.id) {
+        const cached: TermScore[] = JwApi.loadCachedTermScores();
+        if (cached.length > 0) {
+          LogStore.log('成绩', '获取', '失败回退缓存', LogStore.errorOf(e as Object));
+          return cached;
+        }
+      }
+      throw e as Error;
+    }
+  }
+
+  /** 各学期成绩真实拉取（内部，失败由 getTermScores 统一回退缓存） */
+  private static async getTermScoresInner(realTermId: string): Promise<TermScore[]> {
     const parts: string[] = realTermId.split('-');
     const xnm: string = parts[0];
     const xqm: string = JwApi.xqmOf(realTermId);
@@ -1271,7 +1489,7 @@ export class JwApi {
     if (realTermId === JwApi.term.id) {
       DataStore.cacheJSON(DataStore.KEY_TERM_SCORES, JSON.stringify(result));
     }
-    LogStore.logNet('成绩', '获取', '成功',
+    LogStore.logNet(T('成绩'), '获取', T('成功'),
       { method: 'POST', url: '/jwglxt/cjcx/cjcx_cxDgXscj.html', status: `${res.code}`,
         detail: `${scores.length}条 GPA=${ts.gpa.toFixed(2)} ${termLabel}` });
     return result;
@@ -1284,9 +1502,24 @@ export class JwApi {
   static async getNotices(): Promise<NoticeItem[]> {
     if (JwApi.USE_MOCK) {
       const list: NoticeItem[] = MockData.notices();
-      DataStore.cacheJSON(DataStore.KEY_NOTICES, JSON.stringify(list));
+      // 演示数据不写真实缓存（避免污染真实登录后的消息列表）
       return JwApi.delay(list, 400);
     }
+    // 并发单飞：refreshAll 与首页 loadData 常同时请求通知，去重后只发一次网络请求
+    if (JwApi.noticesInflight !== null) {
+      return JwApi.noticesInflight;
+    }
+    const task: Promise<NoticeItem[]> = JwApi.getNoticesInner();
+    JwApi.noticesInflight = task;
+    try {
+      return await task;
+    } finally {
+      JwApi.noticesInflight = null;
+    }
+  }
+
+  /** 通知真实拉取（内部） */
+  private static async getNoticesInner(): Promise<NoticeItem[]> {
     // 真实拉取（POST 表单，sfyy=0 拉全部消息，按创建时间倒序）。
     // 注意：缓存秒开由页面层 loadCachedNotices 负责，这里始终拉最新，避免旧缓存一直显示。
     try {
@@ -1325,7 +1558,7 @@ export class JwApi {
           // jsmc 是角色名（"学生"），无展示意义；消息来源统一标"教务处"
           source: '教务处',
           date: date,
-          tag: '通知',
+          tag: T('通知'),
           isTop: false,
           read: read,
           summary: content,
@@ -1334,11 +1567,17 @@ export class JwApi {
         });
       }
       DataStore.cacheJSON(DataStore.KEY_NOTICES, JSON.stringify(list));
-      LogStore.logNet('通知', '加载', '成功',
+      LogStore.logNet(T('通知'), '加载', T('成功'),
         { method: 'POST', url: '/jwglxt/xtgl/index_cxDbsy.html', status: `${res.code}`, detail: `${list.length}条` });
       return list;
     } catch (e) {
       LogStore.log('通知', '加载', '失败', LogStore.errorOf(e as Object));
+      // 失败回退上次成功缓存（有缓存返回缓存，无缓存才返回空数组）
+      const cached: NoticeItem[] = JwApi.loadCachedNotices();
+      if (cached.length > 0) {
+        LogStore.log('通知', '加载', '失败回退缓存', `缓存${cached.length}条`);
+        return cached;
+      }
       return [];
     }
   }
@@ -1367,7 +1606,7 @@ export class JwApi {
       if (list.length > 0) {
         DataStore.cacheJSON(DataStore.KEY_NOTICES_JWC, JSON.stringify(list));
       }
-      LogStore.logNet('通知', '官网列表', '成功',
+      LogStore.logNet(T('通知'), '官网列表', T('成功'),
         { method: 'GET', url: Const.JWC_LIST_URL, status: `${res.code}`, detail: `${list.length}条` });
       return list;
     } catch (e) {
@@ -1395,7 +1634,7 @@ export class JwApi {
           title: title,
           source: '南京医科大学官网',
           date: date,
-          tag: '通知',
+          tag: T('通知'),
           isTop: out.length === 0,
           read: false,
           summary: title,
@@ -1421,7 +1660,7 @@ export class JwApi {
               title: title,
               source: '南京医科大学官网',
               date: dm !== null ? dm[1] : '',
-              tag: '通知',
+              tag: T('通知'),
               isTop: out.length === 0,
               read: false,
               summary: title,
@@ -1541,7 +1780,7 @@ export class JwApi {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       };
       const res: HttpResult = await HttpClient.getExtra(Const.JXRL_LIST_URL, calHeader);
-      LogStore.logNet('校历', '拉取', '成功',
+      LogStore.logNet(T('校历'), '拉取', T('成功'),
         { method: 'GET', url: Const.JXRL_LIST_URL, status: `${res.code}`, detail: `本地缓存=${cached !== null ? '有' : '无'}` });
       const article: string = JwApi.firstCalendarArticle(res.body);
       if (article.length === 0) {
@@ -1604,40 +1843,186 @@ export class JwApi {
   /**
    * 登录成功 / 手动刷新时：把课表、成绩、考试、学业、消息、头像全部重新拉取并写入本地缓存。
    * 界面可先用旧缓存秒开，后台静默刷新覆盖。
+   *
+   * ★ 单飞锁：并发调用（日志实测 3 秒内被触发 7 次）只执行一次，其余复用同一个 Promise。
+   * ★ 广播前置：五接口完成后立即写缓存+广播+成功日志；头像/资料移到广播之后异步执行，
+   *   绝不阻塞广播（此前广播排在最后，任一环节卡住/抛异常 → 首页回填永不触发 → 首页空白）。
    */
   static async refreshAll(): Promise<void> {
     if (JwApi.USE_MOCK) {
       return;
     }
-    LogStore.log('首页', '刷新', '开始', '并行拉取课表/成绩/考试/学业/通知');
-    const term: TermInfo = JwApi.term;
-    const parts: string[] = term.id.split('-');
-    const xnm: string = parts[0];
-    const xqm: string = JwApi.xqmOf(term.id);
-    const h: Record<string, string> = { 'xnm': xnm, 'xqm': xqm };
-
-    // 并行拉取
-    const taskCourses: Promise<CourseItem[]> = JwApi.getCoursesSmart(term.id, false);
-    const taskScores: Promise<TermScore[]> = JwApi.getTermScores();
-    const taskExams: Promise<ExamItem[]> = JwApi.getExams(term.id);
-    const taskAcademic: Promise<AcademicReport> = JwApi.getAcademic();
-    const taskNotices: Promise<NoticeItem[]> = JwApi.getNotices();
-
-    const courses: CourseItem[] = await taskCourses;
-    const scores: TermScore[] = await taskScores;
-    const exams: ExamItem[] = await taskExams;
-    const academic: AcademicReport = await taskAcademic;
-    const notices: NoticeItem[] = await taskNotices;
-
-    DataStore.cacheJSON(DataStore.KEY_COURSES, JSON.stringify(courses));
-    DataStore.cacheJSON(DataStore.KEY_TERM_SCORES, JSON.stringify(scores));
-    DataStore.cacheJSON(DataStore.KEY_EXAMS, JSON.stringify(exams));
-    DataStore.cacheJSON(DataStore.KEY_ACADEMIC, JSON.stringify(academic));
-    DataStore.cacheJSON(DataStore.KEY_NOTICES, JSON.stringify(notices));
-
-    // 个人资料与头像
+    if (JwApi.refreshInflight !== null) {
+      return JwApi.refreshInflight;
+    }
+    // 节流：2s 内重复触发直接忽略（日志实测曾出现每秒一次连刷 10 次，避免网络风暴与日志刷屏）
+    const now: number = Date.now();
+    if (now - JwApi.lastRefreshAt < 2000) {
+      return;
+    }
+    JwApi.lastRefreshAt = now;
+    const task: Promise<void> = JwApi.refreshAllInner();
+    JwApi.refreshInflight = task;
     try {
-      const profile: UserProfile = await JwApi.getProfile();
+      await task;
+    } finally {
+      JwApi.refreshInflight = null;
+    }
+  }
+
+  /** refreshAll 实际执行体（由 refreshAll 单飞包裹） */
+  private static async refreshAllInner(): Promise<void> {
+    LogStore.log('首页', '刷新', '开始', '并行拉取课表/成绩/考试/学业/通知（失败回退缓存）');
+    try {
+      const term: TermInfo = JwApi.term;
+
+      // 容错拉取：每个子任务独立 catch，失败回退上次成功缓存，单点失败不拖垮整体。
+      // 返回 [数据, 是否来自缓存] 以便汇总刷新状态提示。
+      // ★ 并行发起（总耗时≈最慢一个，而非串行累加），加速登录后首页数据就绪。
+      const pCourses: Promise<FetchResult<CourseItem[]>> =
+        JwApi.safeFetch(T('课表'), () => JwApi.getCoursesSmart(term.id, false), JwApi.loadCachedCourses());
+      const pScores: Promise<FetchResult<TermScore[]>> =
+        JwApi.safeFetch(T('成绩'), () => JwApi.getTermScores(), JwApi.loadCachedTermScores());
+      const pExams: Promise<FetchResult<ExamItem[]>> =
+        JwApi.safeFetch(T('考试'), () => JwApi.getExams(term.id), JwApi.loadCachedExams());
+      const pAcademic: Promise<FetchResult<AcademicReport>> =
+        JwApi.safeFetch(T('学业'), () => JwApi.getAcademic(), JwApi.loadCachedAcademic());
+      const pNotices: Promise<FetchResult<NoticeItem[]>> =
+        JwApi.safeFetch(T('通知'), () => JwApi.getNotices(), JwApi.loadCachedNotices());
+
+      const coursesRes: FetchResult<CourseItem[]> = await pCourses;
+      const scoresRes: FetchResult<TermScore[]> = await pScores;
+      const examsRes: FetchResult<ExamItem[]> = await pExams;
+      const academicRes: FetchResult<AcademicReport> = await pAcademic;
+      const noticesRes: FetchResult<NoticeItem[]> = await pNotices;
+
+      const courses: CourseItem[] = coursesRes.data;
+      const scores: TermScore[] = scoresRes.data;
+      const exams: ExamItem[] = examsRes.data;
+      const academic: AcademicReport = academicRes.data;
+      const notices: NoticeItem[] = noticesRes.data;
+
+      DataStore.cacheJSON(DataStore.KEY_COURSES, JSON.stringify(courses));
+      DataStore.cacheJSON(DataStore.KEY_TERM_SCORES, JSON.stringify(scores));
+      DataStore.cacheJSON(DataStore.KEY_EXAMS, JSON.stringify(exams));
+      DataStore.cacheJSON(DataStore.KEY_ACADEMIC, JSON.stringify(academic));
+      DataStore.cacheJSON(DataStore.KEY_NOTICES, JSON.stringify(notices));
+
+      // ★ 广播前置：缓存已写入，立即广播 + 成功日志（首页据此回填），不再被 profile/photo 阻塞
+      const fromCacheCount: number =
+        (coursesRes.fromCache ? 1 : 0) + (scoresRes.fromCache ? 1 : 0) +
+        (examsRes.fromCache ? 1 : 0) + (academicRes.fromCache ? 1 : 0) + (noticesRes.fromCache ? 1 : 0);
+      const status: RefreshStatus = {
+        allFresh: fromCacheCount === 0,
+        fromCacheCount: fromCacheCount,
+        totalCount: 5,
+        time: Date.now()
+      };
+      AppStorage.setOrCreate(JwApi.KEY_REFRESH_STATUS, status);
+      // 五接口全部成功拿到真实数据 → 会话有效，清除「登录已过期」标记
+      if (fromCacheCount === 0) {
+        HttpClient.clearSessionExpired();
+      }
+      LogStore.log('首页', '刷新', '成功',
+        `课表${courses.length}节 成绩${scores.length}学期 考试${exams.length}门 学业GPA=${academic.gpa} 通知${notices.length}条（${fromCacheCount}项来自缓存）`);
+      DataStore.put(DataStore.KEY_CACHE_TIME, `${Date.now()}`);
+    } catch (e) {
+      // 全局兜底：任何未预期异常也必须广播 + 记录（否则首页回填永不触发，且问题无从排查）
+      LogStore.log('首页', '刷新', '异常', LogStore.errorOf(e as Object));
+      const status: RefreshStatus = {
+        allFresh: false,
+        fromCacheCount: 5,
+        totalCount: 5,
+        time: Date.now()
+      };
+      AppStorage.setOrCreate(JwApi.KEY_REFRESH_STATUS, status);
+    }
+    // 会话过期自动恢复：本轮刷新已检测到会话失效 → 后台静默重登并自动重拉（失败才提示手动重登）
+    JwApi.autoRecoverIfNeeded();
+    // 头像与资料：广播之后异步执行（fire-and-forget，各带 10s 超时，绝不阻塞/绝不抛出）
+    JwApi.refreshProfilePhoto();
+  }
+
+  /** 清除可能被「功能浏览模式」演示数据污染的缓存（切回真实登录时调用一次）。
+   *  历史版本 mock 分支会把演示课表/考试/通知/学业写入真实缓存键，
+   *  导致真实登录后首页出现演示学生数据，这里统一清理。 */
+  static clearMockPollutedCache(): void {
+    const keys: string[] = [DataStore.KEY_COURSES, DataStore.KEY_EXAMS, DataStore.KEY_NOTICES,
+      DataStore.KEY_ACADEMIC, DataStore.KEY_TERM_SCORES, DataStore.KEY_COURSES_FETCH];
+    for (let i: number = 0; i < keys.length; i++) {
+      DataStore.remove(keys[i]);
+    }
+    // 内存层必须一起清：loadCachedCourses 命中内存层时会继续返回旧/演示数据
+    JwApi.coursesMem = null;
+    JwApi.coursesMemStamp = '';
+    JwApi.examsMem.clear();
+    JwApi.examsMemStamp = '';
+    DataStore.remove(DataStore.KEY_CACHE_TIME);
+    LogStore.log('数据', '缓存', '清理演示数据', `已清 ${keys.length} 项缓存键（含内存层）`);
+  }
+
+  /** 重置刷新节流（网络恢复 / 手动重登 / 会话恢复成功后应立即重拉） */
+  static lastRefreshReset(): void {
+    JwApi.lastRefreshAt = 0;
+  }
+
+  /** 单飞锁：并发 refreshAll 去重 */
+  private static refreshInflight: Promise<void> | null = null;
+  /** 上次 refreshAll 触发时间（节流：2s 内重复触发忽略） */
+  private static lastRefreshAt: number = 0;
+  /** 会话自动恢复：进行中标记 + 本进程已尝试次数（上限 2） */
+  private static recovering: boolean = false;
+  private static recoverCount: number = 0;
+
+  /** 单飞锁：通知并发请求去重（refreshAll 与首页同时拉取时只发一次） */
+  private static noticesInflight: Promise<NoticeItem[]> | null = null;
+  /** 课表缓存内存层（避免每次回填都读文件 + JSON.parse 116 条） */
+  private static coursesMem: CourseItem[] | null = null;
+  private static coursesMemStamp: string = '';
+  /** 考试缓存内存层（按学期，键为 termId） */
+  private static examsMem: Map<string, ExamItem[]> = new Map<string, ExamItem[]>();
+  /** 考试请求单飞（按学期）：refreshAll 与考试页并发时只发一次网络请求 */
+  private static examsInflight: Map<string, Promise<ExamItem[]>> = new Map<string, Promise<ExamItem[]>>();
+  /** 课表单飞（按 termId+force）：冷启动时 Index/HomeView/ScheduleView 并发打同一接口 */
+  private static coursesInflight: Map<string, Promise<CourseItem[]>> = new Map<string, Promise<CourseItem[]>>();
+  /** 成绩单飞（按 termId） */
+  private static scoresInflight: Map<string, Promise<TermScore[]>> = new Map<string, Promise<TermScore[]>>();
+  private static examsMemStamp: string = '';
+
+  /** 带超时的 Promise 竞速（超时返回 fallback，防单个请求挂起拖死链路） */
+  private static withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+    return new Promise<T>((resolve: (v: T) => void) => {
+      let done: boolean = false;
+      const timer: number = setTimeout(() => {
+        if (!done) {
+          done = true;
+          resolve(fallback);
+        }
+      }, ms);
+      p.then((v: T) => {
+        if (!done) {
+          done = true;
+          clearTimeout(timer);
+          resolve(v);
+        }
+      }).catch((_e: Object) => {
+        if (!done) {
+          done = true;
+          clearTimeout(timer);
+          resolve(fallback);
+        }
+      });
+    });
+  }
+
+  /** 异步刷新个人资料与头像（10s 超时保护，失败静默） */
+  private static async refreshProfilePhoto(): Promise<void> {
+    const emptyProfile: UserProfile = {
+      studentId: '', name: '', college: '', major: '', className: '', grade: '', counselor: '', eduSystem: '', status: ''
+    };
+    try {
+      const task: Promise<UserProfile> = JwApi.getProfile().catch((_e: Object): UserProfile => emptyProfile);
+      const profile: UserProfile = await JwApi.withTimeout<UserProfile>(task, 10000, emptyProfile);
       if (profile.name.length > 0) {
         AppState.profile = profile;
         DataStore.cacheProfile(profile);
@@ -1646,17 +2031,29 @@ export class JwApi {
       // ignore
     }
     try {
-      const p: string = await JwApi.getPhoto();
+      const p: string = await JwApi.withTimeout<string>(JwApi.getPhoto(), 10000, '');
       if (p.length > 0) {
         DataStore.cacheJSON(DataStore.KEY_PHOTO, p);
       }
     } catch (e) {
       // ignore
     }
-    LogStore.log('首页', '刷新', '成功',
-      `课表${courses.length}节 成绩${scores.length}学期 考试${exams.length}门 学业GPA=${academic.gpa} 通知${notices.length}条`);
-    // 记录更新时间
-    DataStore.put(DataStore.KEY_CACHE_TIME, `${Date.now()}`);
+  }
+
+  /**
+   * 容错拉取：优先走 fetcher 拿最新数据，失败时回退 fallback（上次成功缓存）。
+   * 回退数据为空时原样返回（调用方据长度判断），不抛异常，保证 refreshAll 永不因单点失败中断。
+   */
+  private static async safeFetch<T>(label: string, fetcher: () => Promise<T>, fallback: T): Promise<FetchResult<T>> {
+    try {
+      const data: T = await fetcher();
+      // 会话失效时各接口会内部回退缓存并"正常返回"，这里按全局过期标记判定数据实为缓存，
+      // 使刷新状态提示（N/5 项来自缓存）准确
+      return { data: data, fromCache: AppState.sessionExpired };
+    } catch (e) {
+      LogStore.log('刷新', label, '失败回退缓存', LogStore.errorOf(e as Object));
+      return { data: fallback, fromCache: true };
+    }
   }
 
   /** 读取缓存中的课程表（功能浏览模式不读真实缓存，避免泄露真实用户数据；无缓存返回空数组） */
@@ -1664,15 +2061,25 @@ export class JwApi {
     if (JwApi.USE_MOCK) {
       return [];
     }
+    // 内存层：首页刷新广播会多次回填（课表/今日课/下一节），每次都读大值文件 + 解析 116 条开销明显。
+    // 用缓存时间戳做失效判断（任何 cacheJSON 写入都会更新 KEY_CACHE_TIME）。
+    const stamp: string = DataStore.get(DataStore.KEY_CACHE_TIME);
+    if (JwApi.coursesMem !== null && stamp === JwApi.coursesMemStamp) {
+      return JwApi.coursesMem;
+    }
     const raw: string = DataStore.loadJSON(DataStore.KEY_COURSES);
     if (raw.length === 0) {
-      return [];
+      JwApi.coursesMem = [];
+      JwApi.coursesMemStamp = stamp;
+      return JwApi.coursesMem;
     }
     try {
-      return JSON.parse(raw) as CourseItem[];
+      JwApi.coursesMem = JSON.parse(raw) as CourseItem[];
     } catch (e) {
-      return [];
+      JwApi.coursesMem = [];
     }
+    JwApi.coursesMemStamp = stamp;
+    return JwApi.coursesMem;
   }
 
   /** 读取缓存中的学期成绩（功能浏览模式不读真实缓存） */
@@ -1692,16 +2099,32 @@ export class JwApi {
   }
 
   /** 读取缓存中的考试安排（功能浏览模式不读真实缓存） */
-  static loadCachedExams(): ExamItem[] {
+  static loadCachedExams(termId?: string): ExamItem[] {
     if (JwApi.USE_MOCK) {
       return [];
     }
-    const raw: string = DataStore.loadJSON(DataStore.KEY_EXAMS);
+    const tid: string = termId ?? '';
+    // 内存层：缓存时间戳未变时直接返回，避免切学期/回填时反复读大值文件
+    const stamp: string = DataStore.get(DataStore.KEY_CACHE_TIME);
+    if (tid.length > 0 && JwApi.examsMem.has(tid) && stamp === JwApi.examsMemStamp) {
+      return JwApi.examsMem.get(tid) as ExamItem[];
+    }
+    let raw: string = tid.length > 0 ? DataStore.loadJSON(JwApi.examCacheKey(tid)) : '';
+    // 兼容旧版本单键缓存：仅当前学期可信（旧键会被不同学期互相覆盖）
+    if (raw.length === 0 && (tid.length === 0 || tid === JwApi.term.id)) {
+      raw = DataStore.loadJSON(DataStore.KEY_EXAMS);
+    }
     if (raw.length === 0) {
       return [];
     }
     try {
-      return JSON.parse(raw) as ExamItem[];
+      const list: ExamItem[] = JSON.parse(raw) as ExamItem[];
+      if (tid.length > 0) {
+        JwApi.examsMem.clear();
+        JwApi.examsMem.set(tid, list);
+        JwApi.examsMemStamp = stamp;
+      }
+      return list;
     } catch (e) {
       return [];
     }
@@ -1761,7 +2184,7 @@ export class JwApi {
   static async getAcademic(): Promise<AcademicReport> {
     if (JwApi.USE_MOCK) {
       const report: AcademicReport = MockData.academic();
-      DataStore.cacheJSON(DataStore.KEY_ACADEMIC, JSON.stringify(report));
+      // 演示数据不写真实缓存（避免污染真实登录后的学业数据）
       return JwApi.delay(report, 550);
     }
     // 1) 优先读本地缓存
@@ -1781,7 +2204,7 @@ export class JwApi {
         '/jwglxt/xsxy/xsxyqk_cxXsxyqkIndex.html?gnmkdm=N105515&layout=default');
       const report: AcademicReport = JwApi.parseAcademicText(res.body);
       DataStore.cacheJSON(DataStore.KEY_ACADEMIC, JSON.stringify(report));
-      LogStore.logNet('学业', '加载', '成功',
+      LogStore.logNet(T('学业'), '加载', T('成功'),
         { method: 'GET', url: '/jwglxt/xsxy/xsxyqk_cxXsxyqkIndex.html', status: `${res.code}`,
           detail: `GPA=${report.gpa} 分类${report.categories.length}门 警告${report.warnings.length}条` });
       return report;
@@ -1807,7 +2230,7 @@ export class JwApi {
   static async getPlanProgress(): Promise<PlanProgress> {
     const empty: PlanProgress = JwApi.emptyPlanProgress();
     if (JwApi.USE_MOCK) {
-      return JwApi.delay(empty, 300);
+      return JwApi.delay(MockData.planProgress(), 300);
     }
     // 1) 优先读缓存（培养方案课程池稳定，按学年学期缓存）
     const cached: string = DataStore.loadJSON(DataStore.KEY_PLAN_PROGRESS);
@@ -2260,7 +2683,10 @@ export class JwApi {
 
     const stats: OverallGradeStats = JwApi.buildOverallStats(courses, '', 0, 0);
     // ③ 官方直出值覆盖
-    stats.coreGpa = official.coreGpa;
+    // 学校体检单页常不返回核心 GPA（-1）：用必修 GPA 兜底，保证学位预警规则仍可用
+    stats.coreGpa = official.coreGpa >= 0
+      ? official.coreGpa
+      : (official.requiredGpa >= 0 ? official.requiredGpa : stats.coreGpa);
     stats.requiredGpa = official.requiredGpa;
     stats.officialOverall = official.officialOverall;
     stats.cet4 = official.cet4;
@@ -2502,7 +2928,7 @@ export class JwApi {
         }
       } catch (e) {
         // 单个方案/页失败跳过，不阻塞整体（与参考项目一致）
-        LogStore.logNet('学业', '总体成绩', '轮次失败',
+        LogStore.logNet(T('学业'), T('总体成绩'), '轮次失败',
           { url: JwApi.ACADEMIC_PLAN_URL, status: '-', error: LogStore.errorOf(e as Object), detail: `id=${id} page=${page}` });
         return;
       }
@@ -2741,22 +3167,21 @@ export class JwApi {
       // 功能浏览模式：返回固定校区/楼号/场地类别，便于演示
       return {
         campus: [
-          { code: '1', name: '老满城校区' },
-          { code: '2', name: '亚心校区' },
-          { code: '3', name: '塔城校区' }
+          { code: '1', name: '江宁校区' },
+          { code: '2', name: '五台校区' }
         ],
         building: [
-          { code: '01', name: '主教学楼' },
-          { code: '02', name: '综合实验楼' },
-          { code: '03', name: '博学楼' },
-          { code: '04', name: '图书馆' }
+          { code: '01', name: '博学楼' },
+          { code: '02', name: '明达楼' },
+          { code: '03', name: '善志楼' },
+          { code: '04', name: '逸夫楼' },
+          { code: '05', name: '德馨楼' }
         ],
         roomType: [
           { code: '1', name: '普通教室' },
           { code: '2', name: '多媒体教室' },
           { code: '3', name: '实验室' },
-          { code: '4', name: '机房' },
-          { code: '5', name: '报告厅' }
+          { code: '4', name: '机房' }
         ]
       };
     }
@@ -2804,7 +3229,7 @@ export class JwApi {
       const mocks: Record<string, EmptyRoomCondition[]> = {
         '1': [{ code: '11', name: '普通小教室' }, { code: '12', name: '普通大教室' }],
         '2': [{ code: '21', name: '多媒体小教室' }, { code: '22', name: '多媒体大教室' }, { code: '23', name: '智慧教室' }],
-        '3': [{ code: '31', name: '化学实验室' }, { code: '32', name: '物理实验室' }, { code: '33', name: '计算机实验室' }],
+        '3': [{ code: '31', name: '医学形态学实验室' }, { code: '32', name: '机能学实验室' }, { code: '33', name: '计算机实验室' }],
         '4': [{ code: '41', name: '公共机房' }, { code: '42', name: '专业机房' }],
         '5': [{ code: '51', name: '大型报告厅' }, { code: '52', name: '中型报告厅' }]
       };
@@ -2838,7 +3263,7 @@ export class JwApi {
   private static buildMockEmptyRooms(p: EmptyRoomQueryParams): EmptyRoomItem[] {
     const name: string = p.roomName.length > 0 ? p.roomName : '';
     const out: EmptyRoomItem[] = [];
-    const buildings: string[] = ['主教学楼', '综合实验楼', '博学楼', '图书馆'];
+    const buildings: string[] = ['博学楼', '明达楼', '善志楼', '逸夫楼'];
     const roomNames: string[] = ['101', '102', '201', '202', '301', '305', '401', '408', '502', '506'];
     for (let i: number = 0; i < roomNames.length; i++) {
       const b: string = buildings[i % buildings.length];
@@ -2846,11 +3271,11 @@ export class JwApi {
       out.push({
         cdbh: `${b.charAt(0)}${r}`,
         cdmc: `${b} ${r}室`,
-        xqmc: '老满城校区',
+        xqmc: '江宁校区',
         jxlmc: b,
         lch: `${1 + Math.floor(i / 3)}`,
         cdlbmc: i % 3 === 0 ? '多媒体教室' : (i % 3 === 1 ? '普通教室' : '实验室'),
-        cdejlbmc: i % 3 === 0 ? '多媒体小教室' : (i % 3 === 1 ? '普通小教室' : '物理实验室'),
+        cdejlbmc: i % 3 === 0 ? '多媒体小教室' : (i % 3 === 1 ? '普通小教室' : '医学形态学实验室'),
         sjzws: `${40 + (i % 5) * 20}`,
         sybmmc: i % 2 === 0 ? '教务处' : '学院',
         sybj: '',
@@ -2959,7 +3384,7 @@ export class JwApi {
         return emptyResult;
       }
       emptyResult.rooms = out;
-      LogStore.logNet('空教室', '查询', '成功',
+      LogStore.logNet('空教室', '查询', T('成功'),
         { method: 'POST', url: '/jwglxt/cdjy/cdjy_cxKxcdlb.html?doType=query', status: '200', detail: `${out.length}间` });
       return emptyResult;
     } catch (e) {
@@ -3086,7 +3511,7 @@ export class JwApi {
       } else {
         JwApi.lastXlsxError = '导出文件格式异常（非表格文件），请稍后重试';
       }
-      LogStore.logNet('空教室', '解析', '失败',
+      LogStore.logNet('空教室', '解析', T('失败'),
         { method: 'POST', url: '/jwglxt/cdjy/cdjy_cxDcKxcdlb.html', status: '200', detail: `非zip 头部=${headText.substring(0, 80)}` });
       return out;
     }
@@ -3124,7 +3549,7 @@ export class JwApi {
       }
       if (sheetXml.length === 0 || sharedXml.length === 0) {
         JwApi.lastXlsxError = '导出文件解压失败（未找到工作表数据），请稍后重试';
-        LogStore.logNet('空教室', '解析', '失败',
+        LogStore.logNet('空教室', '解析', T('失败'),
           { method: 'POST', url: '/jwglxt/cdjy/cdjy_cxDcKxcdlb.html', status: '200', detail: `解压失败 sheet=${sheetXml.length} shared=${sharedXml.length}` });
         return out;
       }
@@ -3132,7 +3557,7 @@ export class JwApi {
       const rows: string[][] = JwApi.parseSheetRows(sheetXml, shared);
       if (rows.length < 2) {
         JwApi.lastXlsxError = '导出文件内容为空，该条件下暂无教室数据';
-        LogStore.logNet('空教室', '解析', '失败',
+        LogStore.logNet('空教室', '解析', T('失败'),
           { method: 'POST', url: '/jwglxt/cdjy/cdjy_cxDcKxcdlb.html', status: '200', detail: `行数=${rows.length}（仅表头或无数据）` });
         return out;
       }

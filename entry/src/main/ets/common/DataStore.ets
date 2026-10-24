@@ -6,6 +6,7 @@
  */
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
+import { fileIo } from '@kit.CoreFileKit';
 import { UserProfile } from '../model/Models';
 import { DateUtil } from './DateUtil';
 
@@ -25,18 +26,93 @@ export interface CustomFontItem {
 
 export class DataStore {
   private static pref: preferences.Preferences | null = null;
+  /** Ability Context（init 注入；大值文件存储需要 filesDir） */
+  private static ctx: common.Context | null = null;
   /** flush 防抖：高频写入合并成一次落盘，降低 IO 开销（setTimeout 句柄） */
   private static flushTimer: number = -1;
   /** flush 防抖延迟（毫秒）：窗口内多次 put/remove 只落盘一次 */
   private static readonly FLUSH_DEBOUNCE_MS: number = 120;
+  /**
+   * Preferences 单 string 值硬上限 8192 字节（ArkData 限制），超限 putSync 直接抛异常。
+   * 课表 116 节 / 成绩 / 通知等 JSON 远超此值 → 此前被 catch 吞掉 → 缓存从未写入 → 首页永远读不到课表。
+   * 超过该阈值改为写文件（filesDir/kv_big），读取时透明回退。
+   */
+  private static readonly PREF_VALUE_MAX: number = 7000;
+  /** 大值文件存储目录名（filesDir 下） */
+  private static readonly BIG_DIR: string = 'kv_big';
 
   /** 需在 Ability onCreate 后调用一次，注入 context */
   static init(context: common.Context): void {
+    DataStore.ctx = context;
     try {
       const options: preferences.Options = { name: 'njmu_helper' };
       DataStore.pref = preferences.getPreferencesSync(context, options);
     } catch (e) {
       DataStore.pref = null;
+    }
+  }
+
+  /** 大值目录绝对路径（无 Context 时返回空串） */
+  private static bigDir(): string {
+    const c: common.Context | null = DataStore.ctx;
+    return c === null ? '' : `${c.filesDir}/${DataStore.BIG_DIR}`;
+  }
+
+  /** 大值文件路径 */
+  private static bigPath(key: string): string {
+    const d: string = DataStore.bigDir();
+    return d.length > 0 ? `${d}/${key}.json` : '';
+  }
+
+  /** 写大值文件（自动建目录；失败返回 false） */
+  private static writeBig(key: string, value: string): boolean {
+    const p: string = DataStore.bigPath(key);
+    if (p.length === 0) {
+      return false;
+    }
+    try {
+      const d: string = DataStore.bigDir();
+      if (d.length > 0 && !fileIo.accessSync(d)) {
+        fileIo.mkdirSync(d);
+      }
+      const f: fileIo.File = fileIo.openSync(p,
+        fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC | fileIo.OpenMode.READ_WRITE);
+      fileIo.writeSync(f.fd, value);
+      fileIo.closeSync(f);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /** 读大值文件（不存在/失败返回空串） */
+  private static readBig(key: string): string {
+    const p: string = DataStore.bigPath(key);
+    if (p.length === 0) {
+      return '';
+    }
+    try {
+      if (!fileIo.accessSync(p)) {
+        return '';
+      }
+      return fileIo.readTextSync(p);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /** 删除大值文件 */
+  private static removeBig(key: string): void {
+    const p: string = DataStore.bigPath(key);
+    if (p.length === 0) {
+      return;
+    }
+    try {
+      if (fileIo.accessSync(p)) {
+        fileIo.unlinkSync(p);
+      }
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -75,26 +151,47 @@ export class DataStore {
     }
   }
 
-  /** 写入本地键值缓存（string）。putSync 已写内存，落盘由防抖合并完成。 */
+  /** 写入本地键值缓存（string）。putSync 已写内存，落盘由防抖合并完成。
+   *  超过 Preferences 单值上限（8KB）的大数据自动改走文件，避免静默写失败。 */
   static put(key: string, value: string): void {
+    if (value.length > DataStore.PREF_VALUE_MAX) {
+      if (DataStore.writeBig(key, value)) {
+        // 成功写入文件：清掉 Preferences 里的同名旧值，避免读到过期小数据
+        try {
+          DataStore.store().deleteSync(key);
+          DataStore.scheduleFlush();
+        } catch (e) {
+          // ignore
+        }
+        return;
+      }
+      // 文件写入失败则继续尝试 Preferences（可能截断但至少有数据）
+    }
     try {
       DataStore.store().putSync(key, value);
       DataStore.scheduleFlush();
     } catch (e) {
       // 忽略持久化失败
     }
-  }
-
-  /** 读取本地键值缓存，不存在返回空串 */
-  static get(key: string): string {
-    try {
-      return DataStore.store().getSync(key, '') as string;
-    } catch (e) {
-      return '';
+    if (value.length <= DataStore.PREF_VALUE_MAX) {
+      DataStore.removeBig(key);
     }
   }
 
-  /** 删除单个缓存键并落盘（防抖） */
+  /** 读取本地键值缓存，不存在返回空串（Preferences 未命中时回退大值文件） */
+  static get(key: string): string {
+    try {
+      const v: string = DataStore.store().getSync(key, '') as string;
+      if (v.length > 0) {
+        return v;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return DataStore.readBig(key);
+  }
+
+  /** 删除单个缓存键并落盘（防抖）；同时清理大值文件 */
   static remove(key: string): void {
     try {
       DataStore.store().deleteSync(key);
@@ -102,6 +199,7 @@ export class DataStore {
     } catch (e) {
       // ignore
     }
+    DataStore.removeBig(key);
   }
 
   /** 清空所有本地数据（含历史账号、缓存、个人信息等） */
@@ -109,7 +207,7 @@ export class DataStore {
   /** 不参与备份的敏感键（账号、密码、会话凭据） */
   static readonly BACKUP_EXCLUDE: string[] = [
     'login_accounts', 'last_account', 'auto_relogin_account', 'auto_relogin_pwd',
-    'session_cookie', 'cas_tgc', 'sso_cookies'
+    'session_cookie', 'cas_tgc', 'sso_cookies', 'cas_auth_cookies'
   ];
 
   /** 参与备份的键（设置项 + 数据缓存 + 个人化内容） */
@@ -125,8 +223,11 @@ export class DataStore {
     'custom_fonts',
     'cache_profile', 'cache_courses', 'cache_term_scores', 'cache_exams', 'cache_academic',
     'cache_notices', 'cache_notices_jwc', 'cache_teaching_cal', 'cache_jwc_cal',
-    'cache_photo', 'cache_time', 'news_favs', 'web_history'
-  ];
+    'cache_photo', 'cache_time', 'news_favs', 'web_history',
+      'notify_master', 'notify_class_remind', 'notify_live_view', 'notify_liveview_grace',
+    'notify_score', 'notify_notice', 'notify_exam', 'notify_bg_refresh',
+    'notify_lead_min', 'notify_horizon_days',
+];
 
   /** 导出全部可备份数据（不含账号、密码、Cookie） */
   static exportAll(): Record<string, string> {
@@ -168,6 +269,15 @@ export class DataStore {
     try {
       DataStore.store().clearSync();
       DataStore.store().flush();
+    } catch (e) {
+      // ignore
+    }
+    // 同时清掉大值文件目录（课表/成绩等大 JSON 现存放于此）
+    try {
+      const d: string = DataStore.bigDir();
+      if (d.length > 0 && fileIo.accessSync(d)) {
+        fileIo.rmdirSync(d);
+      }
     } catch (e) {
       // ignore
     }
@@ -432,6 +542,9 @@ export class DataStore {
   static readonly KEY_LOGIN_SYSTEM: string = 'login_system';
   // 统一身份认证 TGC（CASTGC）：开启"7天免登录"时持久化，冷启动静默重登教务系统会话用
   static readonly KEY_CAS_TGC: string = 'cas_tgc';
+  /** authserver 域全部 Cookie（含 MULTIFACTOR_BROWSER_FINGERPRINT 可信设备指纹）：
+   *  换 ST 时必须回放，否则服务端判定不可信设备 → 触发 MFA → 不返回 ticket */
+  static readonly KEY_CAS_AUTH_COOKIES: string = 'cas_auth_cookies';
   // SSO 会话 Cookie（网页版"服务大厅"登录后捕获，host\ncookie 成对存储）：
   // 我的页「服务大厅/第二课堂」等 SSO 页面打开时按域名注入，保持登录态
   static readonly KEY_SSO_COOKIES: string = 'sso_cookies';
@@ -874,6 +987,25 @@ export class DataStore {
   static readonly KEY_JWC_CAL: string = 'cache_jwc_cal_v2'; // 校历转换结果 v2（v1 内置数据开学日期有误，换键强制刷新）
   static readonly KEY_PHOTO: string = 'cache_photo';
   static readonly KEY_CACHE_TIME: string = 'cache_time';
+
+  // ── 通知与提醒（2026-10 新增）──
+  static readonly KEY_NOTIFY_MASTER: string = 'notify_master';
+  static readonly KEY_NOTIFY_CLASS: string = 'notify_class_remind';
+  static readonly KEY_NOTIFY_LIVE: string = 'notify_live_view';
+  static readonly KEY_NOTIFY_GRACE: string = 'notify_liveview_grace';
+  static readonly KEY_NOTIFY_SCORE: string = 'notify_score';
+  static readonly KEY_NOTIFY_NOTICE: string = 'notify_notice';
+  static readonly KEY_NOTIFY_EXAM: string = 'notify_exam';
+  static readonly KEY_NOTIFY_BG: string = 'notify_bg_refresh';
+  static readonly KEY_NOTIFY_LEAD: string = 'notify_lead_min';
+  static readonly KEY_NOTIFY_HORIZON: string = 'notify_horizon_days';
+  static readonly KEY_NOTIFY_LAST_ERROR: string = 'notify_last_error';
+  static readonly KEY_NOTIFY_SESSION_DATE: string = 'notify_session_alert_date';
+  static readonly KEY_NOTIFY_PENDING_STOP: string = 'notify_pending_stop';
+  static readonly KEY_NOTIFY_LV_UNSUPPORTED: string = 'notify_lv_unsupported_at';
+  static readonly KEY_NOTIFY_SNAPSHOT: string = 'notify_snapshot';
+  /** 当前展示中的实况窗：'id|key'（进程重启后接管/停止用；不参与备份） */
+  static readonly KEY_NOTIFY_LV_ACTIVE: string = 'notify_lv_active';
   /**
    * 课表最近一次成功拉取的标记：'<termId>|<yyyy-MM-dd>'。
    * 用途：课表**每天只自动查询识别一次**（同一天内直接读缓存），

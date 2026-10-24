@@ -15,31 +15,46 @@ export class WallpaperTone {
 
   /** 分析图片平均亮度（0~1，越大越亮）；失败或异常返回 -1 */
   static async analyze(data: ArrayBuffer): Promise<number> {
+    let src: image.ImageSource | null = null;
+    let pm: image.PixelMap | null = null;
     try {
-      const src: image.ImageSource = image.createImageSource(data);
-      const pm: image.PixelMap = await src.createPixelMap();
+      src = image.createImageSource(data);
+      // 降采样到 64×64 再取平均亮度：原图解码（4000×3000 ≈ 48MB + 48MB 缓冲）
+      // 在换壁纸时会瞬时吃掉上百 MB，低端机直接被杀
+      pm = await src.createPixelMap({ desiredSize: { width: 64, height: 64 } });
       const info: image.ImageInfo = await pm.getImageInfo();
-      const w: number = info.size.width;
-      const h: number = info.size.height;
-      const total: number = w * h;
+      const total: number = info.size.width * info.size.height;
       const buf: ArrayBuffer = new ArrayBuffer(total * 4);
       await pm.readPixelsToBuffer(buf);
       const view: Uint8Array = new Uint8Array(buf);
-      const step: number = Math.max(1, Math.floor(total / 4000));
       let sum: number = 0;
       let cnt: number = 0;
-      for (let i = 0; i < total; i += step) {
+      for (let i: number = 0; i < total; i++) {
         const r: number = view[i * 4];
         const g: number = view[i * 4 + 1];
         const b: number = view[i * 4 + 2];
         sum += (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
         cnt++;
       }
-      pm.release();
-      src.release();
       return cnt > 0 ? sum / cnt : -1;
     } catch (e) {
       return -1;
+    } finally {
+      // 异常路径同样释放，避免换壁纸失败时把原图留在内存
+      if (pm !== null) {
+        try {
+          await pm.release();
+        } catch (e) {
+          // ignore
+        }
+      }
+      if (src !== null) {
+        try {
+          await src.release();
+        } catch (e) {
+          // ignore
+        }
+      }
     }
   }
 

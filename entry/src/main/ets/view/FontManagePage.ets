@@ -28,6 +28,7 @@ import { MaterialButton } from './common/MaterialButton';
 import { materialAvailable } from '../common/SystemMaterial';
 import { PageHeader } from './common/UiKit';
 import { WallpaperFill } from './common/WallpaperFill';
+import { T } from '../common/I18n';
 
 /** 字重方案（key 需与 AppearanceStore.fontWeight 的分支保持一致） */
 interface WeightOption {
@@ -40,9 +41,9 @@ const WEIGHT_OPTIONS: WeightOption[] = [
   { key: 'thin', label: '细' },
   { key: 'light', label: '较轻' },
   { key: 'regular', label: '常规' },
-  { key: 'medium', label: '中等' },
+  { key: 'medium', label: T('中等') },
   { key: 'bold', label: '粗' },
-  { key: 'custom', label: '自定义' }
+  { key: 'custom', label: T('自定义') }
 ];
 
 /** 系统字体枚举上限（列表过长影响滚动性能，取前 300 条） */
@@ -54,6 +55,8 @@ const SYSTEM_FONT_LIMIT: number = 300;
  */
 @Component
 struct SectionCard {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop title: string = '';
   @Prop subtitle: string = '';
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
@@ -112,6 +115,8 @@ struct SectionCard {
 
 @Component
 export struct FontManagePage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -233,7 +238,7 @@ export struct FontManagePage {
 
   /** 字体族显示名（空=跟随系统） */
   private familyLabel(name: string): string {
-    return name.length > 0 ? name : '跟随系统';
+    return name.length > 0 ? name : T('跟随系统');
   }
 
   /** 当前选择目标是否已选中该字体族（面板里高亮用） */
@@ -422,7 +427,7 @@ export struct FontManagePage {
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
             .fontColor($r('app.color.text_primary'))
           Blank()
-          Text('关闭')
+          Text(T('关闭'))
             .fontSize(13)
             .fontColor(Theme.colorOf(this.themeColor))
             .onClick(() => {
@@ -434,7 +439,7 @@ export struct FontManagePage {
 
         Scroll() {
           Column() {
-            Text('跟随系统')
+            Text(T('跟随系统'))
               .fontSize(14)
               .fontColor(Theme.colorOf(this.themeColor))
               .width('100%')
@@ -445,7 +450,7 @@ export struct FontManagePage {
             Divider().color($r('app.color.divider'))
 
             if (this.customFonts.length > 0) {
-              Text('已上传字体')
+              Text(T('已上传字体'))
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 .width('100%')
@@ -463,13 +468,13 @@ export struct FontManagePage {
               Divider().color($r('app.color.divider'))
             }
 
-            Text('系统字体')
+            Text(T('系统字体'))
               .fontSize(11)
               .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
               .width('100%')
               .margin({ top: 10, bottom: 4 })
             if (this.systemFonts.length === 0) {
-              Text('系统未提供可枚举字体（仍可用「跟随系统」或已上传字体）')
+              Text(T('系统未提供可枚举字体（仍可用「跟随系统」或已上传字体）'))
                 .fontSize(12)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 .width('100%')
@@ -508,7 +513,7 @@ export struct FontManagePage {
   fontSizeBody() {
     Column() {
       Row() {
-        Text('小')
+        Text(T('小'))
           .fontSize(12)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         Slider({
@@ -524,7 +529,7 @@ export struct FontManagePage {
           .onChange((value: number, mode: SliderChangeMode) => {
             this.applyFontScale(value / 100);
           })
-        Text('特大')
+        Text(T('特大'))
           .fontSize(12)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
       }
@@ -555,7 +560,7 @@ export struct FontManagePage {
 
       if (this.weightMode === 'custom') {
         Row() {
-          Text('数值')
+          Text(T('数值'))
             .fontSize(12)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width(36)
@@ -594,7 +599,7 @@ export struct FontManagePage {
   familyBody(target: string) {
     Column() {
       Row() {
-        Text('当前：' + (target === 'zh' ? this.familyLabel(this.fontFamilyZh) : this.familyLabel(this.fontFamilyEn)))
+        Text(T('当前：') + (target === 'zh' ? this.familyLabel(this.fontFamilyZh) : this.familyLabel(this.fontFamilyEn)))
           .fontSize(12)
           .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .layoutWeight(1)
@@ -609,7 +614,7 @@ export struct FontManagePage {
             this.openFamilySheet(target);
           }
         }) {
-          Text('选择')
+          Text(T('选择'))
             .fontSize(13)
             .fontColor(Color.White)
             .padding({ left: 16, right: 16, top: 8, bottom: 8 })
@@ -627,7 +632,7 @@ export struct FontManagePage {
             this.applyFamily('');
           }
         }) {
-          Text('跟随系统')
+          Text(T('跟随系统'))
             .fontSize(13)
             .fontColor($r('app.color.text_primary'))
             .padding({ left: 14, right: 14, top: 8, bottom: 8 })
@@ -642,7 +647,7 @@ export struct FontManagePage {
   @Builder
   uploadBody() {
     Column() {
-      Text('支持 .ttf / .otf / .ttc；上传后自动注册，可在上方「中文字体 / 英数字体」中选择。')
+      Text(T('支持 .ttf / .otf / .ttc；上传后自动注册，可在上方「中文字体 / 英数字体」中选择。'))
         .fontSize(11)
         .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .width('100%')
@@ -668,7 +673,7 @@ export struct FontManagePage {
   manageBody() {
     Column() {
       if (this.fontItems.length === 0) {
-        Text('尚未上传字体。上方「上传字体」可添加 .ttf / .otf 文件。')
+        Text(T('尚未上传字体。上方「上传字体」可添加 .ttf / .otf 文件。'))
           .fontSize(12)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .width('100%')
@@ -688,7 +693,7 @@ export struct FontManagePage {
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1)
 
-          Text('设为中文')
+          Text(T('设为中文'))
             .fontSize(11)
             .fontColor(Theme.colorOf(this.themeColor))
             .padding({ left: 8, right: 8, top: 4, bottom: 4 })
@@ -696,7 +701,7 @@ export struct FontManagePage {
               this.pickTarget = 'zh';
               this.applyFamily(it.alias);
             })
-          Text('设为英数')
+          Text(T('设为英数'))
             .fontSize(11)
             .fontColor(Theme.colorOf(this.themeColor))
             .padding({ left: 8, right: 8, top: 4, bottom: 4 })
@@ -704,7 +709,7 @@ export struct FontManagePage {
               this.pickTarget = 'en';
               this.applyFamily(it.alias);
             })
-          Text('删除')
+          Text(T('删除'))
             .fontSize(11)
             .fontColor('#DB5252')
             .padding({ left: 8, right: 4, top: 4, bottom: 4 })

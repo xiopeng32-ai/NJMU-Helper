@@ -18,12 +18,15 @@ import { WallpaperFill } from './common/WallpaperFill';
 import { MaterialCard } from './common/MaterialCard';
 import { MaterialButton } from './common/MaterialButton';
 import { AppearanceStore } from '../common/AppearanceStore';
+import { T } from '../common/I18n';
 
 /** JSON 原文预览最多显示的字符数（完整内容可复制） */
 const PREVIEW_MAX: number = 20000;
 
 @Component
 export struct CourseRawPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -74,7 +77,7 @@ export struct CourseRawPage {
   /** 统计已识别课程的星期分布（1=周一 … 7=周日） */
   private loadSummary(): void {
     const list: CourseItem[] = JwApi.loadCachedCourses();
-    const names: string[] = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const names: string[] = [T('周一'), T('周二'), T('周三'), T('周四'), T('周五'), T('周六'), T('周日')];
     const parts: string[] = [];
     for (let d: number = 1; d <= 7; d++) {
       let n: number = 0;
@@ -207,7 +210,7 @@ export struct CourseRawPage {
                     this.copyAll();
                   }
                 }) {
-                  Text('复制原文')
+                  Text(T('复制原文'))
                     .fontSize(12)
                     .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                     .padding({ left: 14, right: 14, top: 7, bottom: 7 })
@@ -253,7 +256,7 @@ export struct CourseRawPage {
                       this.copyAll();
                     }
                   }) {
-                    Text('复制全文')
+                    Text(T('复制全文'))
                       .fontSize(11)
                       .fontColor(Theme.colorOf(this.themeColor))
                       .padding({ left: 10, right: 10, top: 4, bottom: 4 })
@@ -284,11 +287,11 @@ export struct CourseRawPage {
                 cardShadow: GlassMaterial.cardShadowStyle()
               }) {
               Column() {
-                Text('暂无课表原文件')
+                Text(T('暂无课表原文件'))
                   .fontSize(13)
                   .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                   .fontColor($r('app.color.text_primary'))
-                Text('原文件在每次成功拉取课表时生成。点上方「重新获取」，或回到课程表页点标题旁的刷新按钮即可生成。')
+                Text(T('原文件在每次成功拉取课表时生成。点上方「重新获取」，或回到课程表页点标题旁的刷新按钮即可生成。'))
                   .fontSize(12)
                   .lineHeight(18)
                   .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
@@ -309,7 +312,7 @@ export struct CourseRawPage {
         .edgeEffect(EdgeEffect.Spring)
 
         PageHeader({
-          title: '课表原文件',
+          title: T('课表原文件'),
           onBack: () => {
             AppState.stack.pop();
           }

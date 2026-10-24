@@ -15,9 +15,12 @@ import { BackButton } from './common/BackButton';
 import { WallpaperFill } from './common/WallpaperFill';
 import { AppearanceStore } from '../common/AppearanceStore';
 import { GlassMaterial } from '../common/GlassMaterial';
+import { T } from '../common/I18n';
 
 @Component
 export struct CollegeNoticePage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   @StorageProp('grayTick') grayTick: number = 0;
   @StorageProp('fontWeightMode') fwMode: string = 'follow';
@@ -86,7 +89,7 @@ export struct CollegeNoticePage {
         .alignItems(HorizontalAlign.Start)
 
         // 订阅按钮：已订阅=主题色实底「已订阅」，未订阅=描边「订阅」
-        Text(this.isSub(c.domain) ? '已订阅' : '订阅')
+        Text(this.isSub(c.domain) ? T('已订阅') : '订阅')
           .fontSize(12)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
           .fontColor(this.isSub(c.domain) ? Color.White : Theme.colorOf(this.themeColor))
@@ -120,7 +123,7 @@ export struct CollegeNoticePage {
             .backgroundBlurStyle(Immersive.blur(BlurStyle.Thin, this.barStyle === 'legacy'))
         Row() {
           BackButton({ onBack: () => { AppState.stack.pop(); } })
-          Text('学院公告订阅')
+          Text(T('学院公告订阅'))
             .fontSize(18).fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
             .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
             .margin({ left: 6 })
@@ -136,12 +139,12 @@ export struct CollegeNoticePage {
           // 说明卡片
           ListItem() {
             Column() {
-              Text('订阅说明')
+              Text(T('订阅说明'))
                 .fontSize(14)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor($r('app.color.text_primary'))
                 .width('100%')
-              Text('勾选订阅你所在/关注的学院后，可在「已订阅」分组快速进入学院官网查看最新公告。学院公告内容以各学院官网发布为准。')
+              Text(T('勾选订阅你所在/关注的学院后，可在「已订阅」分组快速进入学院官网查看最新公告。学院公告内容以各学院官网发布为准。'))
                 .fontSize(12)
                 .lineHeight(19)
                 .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
@@ -156,7 +159,7 @@ export struct CollegeNoticePage {
           // 已订阅分组标题
           ListItem() {
             Row() {
-              Text('已订阅')
+              Text(T('已订阅'))
                 .fontSize(13)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor($r('app.color.text_primary'))
@@ -179,7 +182,7 @@ export struct CollegeNoticePage {
           // 全部学院分组标题
           ListItem() {
             Row() {
-              Text('全部学院')
+              Text(T('全部学院'))
                 .fontSize(13)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor($r('app.color.text_primary'))
@@ -193,7 +196,8 @@ export struct CollegeNoticePage {
             ListItem() {
               this.collegeRow(c, idx, idx < NewsApi.COLLEGES.length - 1)
             }
-          }, (c: CollegeEntry) => `all-${c.domain}`)
+          // key 带订阅态：ForEach 对 key 未变的项不重跑 itemGenerator，订阅按钮会停在旧文字
+          }, (c: CollegeEntry) => `all-${c.domain}-${this.isSub(c.domain) ? 1 : 0}`)
 
           // 底部空隙
           ListItem() {

@@ -18,9 +18,12 @@ import { MaterialCard } from './common/MaterialCard';
 import { WallpaperFill } from './common/WallpaperFill';
 import { BackButton } from './common/BackButton';
 import { AppearanceStore } from '../common/AppearanceStore';
+import { T } from '../common/I18n';
 
 @Component
 export struct NewsDetailPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -123,7 +126,7 @@ export struct NewsDetailPage {
     if (this.faved) {
       DataStore.removeNewsFav(url);
       this.faved = false;
-      this.getUIContext().getPromptAction().showToast({ message: '已取消收藏' });
+      this.getUIContext().getPromptAction().showToast({ message: T('已取消收藏') });
     } else {
       const item: NewsItem = new NewsItem();
       if (this.detail !== null) {
@@ -178,7 +181,7 @@ export struct NewsDetailPage {
             .backgroundBlurStyle(Immersive.blur(BlurStyle.Thin, this.barStyle === 'legacy'))
         Row() {
           BackButton({ onBack: () => { AppState.stack.pop(); } })
-          Text('新闻详情')
+          Text(T('新闻详情'))
             .fontSize(18).fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
             .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
             .margin({ left: 6 })
@@ -198,7 +201,7 @@ export struct NewsDetailPage {
             btnTintRatio: 0.85,
             btnOnClick: (): void => { this.toggleFav(); }
           }) {
-            Text(this.faved ? '取消收藏' : '收藏')
+            Text(this.faved ? T('取消收藏') : T('收藏'))
               .fontSize(13)
               .fontColor(this.faved ? Color.White : WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
               .height(34)
@@ -214,7 +217,7 @@ export struct NewsDetailPage {
             btnPersistent: true,
             btnOnClick: (): void => { this.shareNews(); }
           }) {
-            Text('分享')
+            Text(T('分享'))
               .fontSize(13)
               .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
               .height(34)
@@ -233,12 +236,12 @@ export struct NewsDetailPage {
         if (this.loading) {
           Column() {
             LoadingProgress().width(32).height(32).color(Theme.colorOf(this.themeColor))
-            Text('加载中').fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 10 })
+            Text(T('加载中')).fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 10 })
           }
           .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
         } else if (this.detail === null) {
           Column() {
-            Text('加载失败').fontSize(14).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
+            Text(T('加载失败')).fontSize(14).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           }
           .width('100%').layoutWeight(1).justifyContent(FlexAlign.Center)
         } else {

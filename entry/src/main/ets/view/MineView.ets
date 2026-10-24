@@ -21,6 +21,8 @@ import { JwApi } from '../api/JwApi';
 import { AppState } from '../common/AppState';
 import { Const } from '../common/Constants';
 import { DataStore } from '../common/DataStore';
+import { NotifySettings } from '../common/NotifySettings';
+import { AntiPeepManager } from '../common/AntiPeepManager';
 import { Theme } from '../common/ThemeUtil';
 import { AppearanceStore } from '../common/AppearanceStore';
 import { GlassMaterial } from '../common/GlassMaterial';
@@ -36,10 +38,15 @@ import { BarTitle, SettingRow } from './common/UiKit';
 import { MaterialCard, MaterialSheetPanel } from './common/MaterialCard';
 import { MaterialButton } from './common/MaterialButton';
 import { sheetBlurStyle } from '../common/SystemMaterial';
+import { I18n, T } from '../common/I18n';
 
 @Component
 export struct MineView {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
+  /** 会话过期标记（驱动登录状态文案实时刷新） */
+  @StorageProp('sessionExpired') sessionExpiredFlag: boolean = false;
   @StorageProp('bottomInsetPx') bottomInsetPx: number = 0;
   @StorageProp('themeColor') themeColor: string = 'green';
   @StorageProp('barStyle') barStyle: string = 'new';
@@ -65,12 +72,18 @@ export struct MineView {
   /** 全局壁纸 id（我的页入口显示当前状态） */
   @StorageProp('wallpaperId') wallpaperId: string = 'none';
   @State report: AcademicReport = EMPTY_REPORT;
+  /** 防窥保护开关状态文案（已开启 / 未开启 / 设备不支持） */
+  @State peepLabel: string = '';
+  /** 通知与提醒状态摘要（设置行右侧） */
+  @State notifySummary: string = '';
+  /** 设置页改动广播：本页是常驻 Tab，不重新挂载，靠它刷新摘要 */
+  @Watch('onNotifyRev') @StorageProp('notifyRev') notifyRev: number = 0;
   /** 总体成绩统计（学业总评成绩/累计绩点回退来源；xsxyqk 学业情况接口本校未部署，report 常缺数据） */
   @State ovrStats: OverallGradeStats | null = null;
   @State loaded: boolean = false;
   @State syncing: boolean = false;
   @State photo: string = '';
-  @State cacheSizeText: string = '计算中…';
+  @State cacheSizeText: string = T('计算中…');
   @State isLandscape: boolean = false;
   /** 恢复备份：半模态面板 */
   @State showBackupSheet: boolean = false;
@@ -99,28 +112,28 @@ export struct MineView {
       return t.toUpperCase();
     }
     if (t === 'red') {
-      return '中国红';
+      return T('中国红');
     }
     if (t === 'blue') {
-      return '天空蓝';
+      return T('天空蓝');
     }
     if (t === 'orange') {
-      return '落日橙';
+      return T('落日橙');
     }
     if (t === 'purple') {
-      return '紫罗兰';
+      return T('紫罗兰');
     }
-    return '南医蓝';
+    return T('南医蓝');
   }
 
   /** 壁纸摘要（跟随全局 wallpaperId 实时刷新） */
   private wallpaperValueText(): string {
     const id: string = this.wallpaperId;
     if (id === 'none' || id.length === 0) {
-      return '未设置';
+      return T('未设置');
     }
     if (id.startsWith('c:')) {
-      return '自定义';
+      return T('自定义');
     }
     return `内置 ${id.substring(1)}`;
   }
@@ -149,13 +162,40 @@ export struct MineView {
   }
 
   /** 页面出现：加载学业概览并刷新缓存大小 */
+  /** 查询并刷新防窥开关状态（用于设置行展示） */
+  private async refreshPeepLabel(): Promise<void> {
+    const on: boolean = await AntiPeepManager.querySwitch();
+    this.peepLabel = on ? T('已开启') : T('未开启');
+  }
+
+  /** 刷新"通知与提醒"状态摘要 */
+  private refreshNotifySummary(): void {
+    this.notifySummary = NotifySettings.summary();
+  }
+
+  /** 设置页改了开关 / 参数 → 摘要立即重算 */
+  private onNotifyRev(): void {
+    this.refreshNotifySummary();
+  }
+
   aboutToAppear(): void {
+    this.refreshPeepLabel();
     this.load();
     this.refreshCacheSize();
     this.listenLandscape();
   }
 
   aboutToDisappear(): void {
+    // 注销 MediaQuery 监听（只置 null 不会取消注册，回调会持续持有已销毁的组件）
+    if (this.landscapeListener !== null) {
+      this.landscapeListener.off('change');
+      this.landscapeListener = null;
+    }
+    if (this.wideListener !== null) {
+      this.wideListener.off('change');
+      this.wideListener = null;
+    }
+
     this.landscapeListener = null;
     this.wideListener = null;
   }
@@ -190,7 +230,7 @@ export struct MineView {
   /** 异步读取应用缓存大小并格式化显示（MB/KB） */
   private refreshCacheSize(delayMs: number = 0): void {
     if (delayMs > 0) {
-      this.cacheSizeText = '计算中…';
+      this.cacheSizeText = T('计算中…');
       setTimeout(() => this.refreshCacheSize(0), delayMs);
       return;
     }
@@ -321,11 +361,11 @@ export struct MineView {
       try {
         const rt: string = decryptBackup(enc, password);
         if (rt !== content) {
-          this.getUIContext().getPromptAction().showToast({ message: '导出自检失败（加解密不一致），请重试' });
+          this.getUIContext().getPromptAction().showToast({ message: T('导出自检失败（加解密不一致），请重试') });
           return;
         }
       } catch (e) {
-        this.getUIContext().getPromptAction().showToast({ message: '导出自检失败（解密异常），请重试' });
+        this.getUIContext().getPromptAction().showToast({ message: T('导出自检失败（解密异常），请重试') });
         return;
       }
       // 用户选位置保存 .zip
@@ -335,7 +375,7 @@ export struct MineView {
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(ctx);
       docPicker.save(options).then((uris: string[]) => {
         if (uris.length === 0) {
-          this.getUIContext().getPromptAction().showToast({ message: '已取消导出' });
+          this.getUIContext().getPromptAction().showToast({ message: T('已取消导出') });
           return;
         }
         try {
@@ -345,16 +385,16 @@ export struct MineView {
           // 回读自检：确认落盘文件完整（排除写读环节问题）
           const back: Uint8Array = this.readFileBytes(uris[0]);
           if (back.length !== enc.length) {
-            this.getUIContext().getPromptAction().showToast({ message: '备份文件写入异常（回读长度不一致），请重试' });
+            this.getUIContext().getPromptAction().showToast({ message: T('备份文件写入异常（回读长度不一致），请重试') });
             return;
           }
-          this.getUIContext().getPromptAction().showToast({ message: '备份已导出（加密备份文件，导入需输入密码）' });
+          this.getUIContext().getPromptAction().showToast({ message: T('备份已导出（加密备份文件，导入需输入密码）') });
         } catch (e) {
           const em: string = (e as Error).message ?? '';
           this.getUIContext().getPromptAction().showToast({ message: em.length > 0 ? `导出失败：${em}` : '导出失败' });
         }
       }).catch(() => {
-        this.getUIContext().getPromptAction().showToast({ message: '导出失败' });
+        this.getUIContext().getPromptAction().showToast({ message: T('导出失败') });
       });
     } catch (e) {
       const em: string = (e as Error).message ?? '';
@@ -372,7 +412,7 @@ export struct MineView {
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(ctx);
       docPicker.select(options).then((uris: string[]) => {
         if (uris.length === 0) {
-          this.getUIContext().getPromptAction().showToast({ message: '已取消导入' });
+          this.getUIContext().getPromptAction().showToast({ message: T('已取消导入') });
           return;
         }
         try {
@@ -406,7 +446,7 @@ export struct MineView {
   private confirmBackupPassword(): void {
     const pwd: string = this.backupPassword;
     if (pwd.length === 0) {
-      this.getUIContext().getPromptAction().showToast({ message: '请输入密码' });
+      this.getUIContext().getPromptAction().showToast({ message: T('请输入密码') });
       return;
     }
     this.backupPassword = ''; // 密码用后即清
@@ -428,7 +468,7 @@ export struct MineView {
     } catch (e) {
       const msg: string = (e as Error).message ?? '';
       this.getUIContext().getPromptAction().showToast({
-        message: msg.indexOf('password') >= 0 ? '密码错误' : '密码错误或文件损坏'
+        message: msg.indexOf('password') >= 0 ? T('密码错误') : T('密码错误或文件损坏')
       });
     } finally {
       this.pendingZipBytes = new Uint8Array(0);
@@ -452,7 +492,7 @@ export struct MineView {
       const btype: string = obj['type'] ?? '';
       // 校验备份格式（v2 全量备份 / v1 旧版课表备份）
       if (obj['app'] !== 'njmu-helper' || (btype !== 'full-backup' && btype !== 'schedule-backup')) {
-        this.getUIContext().getPromptAction().showToast({ message: '不是有效的备份文件' });
+        this.getUIContext().getPromptAction().showToast({ message: T('不是有效的备份文件') });
         return;
       }
       if (btype === 'full-backup') {
@@ -491,21 +531,21 @@ export struct MineView {
         if (Theme.isBuiltin(theme)) {
           Theme.apply(theme);
         }
-        this.getUIContext().getPromptAction().showToast({ message: '恢复成功（旧版备份），重新进入课程表查看' });
+        this.getUIContext().getPromptAction().showToast({ message: T('恢复成功（旧版备份），重新进入课程表查看') });
       }
     } catch (e) {
-      this.getUIContext().getPromptAction().showToast({ message: '导入失败，文件格式不正确' });
+      this.getUIContext().getPromptAction().showToast({ message: T('导入失败，文件格式不正确') });
     }
   }
 
   /** 最近同步时间文案 */
   private lastSyncText(): string {
     if (this.syncing) {
-      return '同步中…';
+      return T('同步中…');
     }
     const ts: number = JwApi.lastRefreshTime();
     if (ts <= 0) {
-      return '尚未同步';
+      return T('尚未同步');
     }
     const d: Date = new Date(ts);
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${d.getMinutes() < 10 ? '0' + d.getMinutes() : d.getMinutes()}`;
@@ -515,21 +555,21 @@ export struct MineView {
   private async syncNow(): Promise<void> {
     // 功能浏览模式（未登录）：无法联网同步（用户要求给出明确提示）
     if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-      this.getUIContext().getPromptAction().showToast({ message: '功能浏览模式，未登录，无法同步' });
+      this.getUIContext().getPromptAction().showToast({ message: T('功能浏览模式，未登录，无法同步') });
       return;
     }
     if (this.syncing) {
       return;
     }
     this.syncing = true;
-    this.getUIContext().getPromptAction().showToast({ message: '正在同步教务数据…' });
+    this.getUIContext().getPromptAction().showToast({ message: T('正在同步教务数据…') });
     try {
       JwApi.USE_MOCK = false;
       await JwApi.refreshAll();
       this.report = JwApi.loadCachedAcademic();
-      this.getUIContext().getPromptAction().showToast({ message: '数据已更新' });
+      this.getUIContext().getPromptAction().showToast({ message: T('数据已更新') });
     } catch (e) {
-      this.getUIContext().getPromptAction().showToast({ message: '同步失败，请检查网络' });
+      this.getUIContext().getPromptAction().showToast({ message: T('同步失败，请检查网络') });
     } finally {
       this.syncing = false;
     }
@@ -586,40 +626,44 @@ export struct MineView {
   private loginMethodText(): string {
     // 功能浏览模式（mock 数据、无真实会话）：统一显示"功能浏览模式"
     if (JwApi.USE_MOCK) {
-      return '功能浏览模式';
+      return T('功能浏览模式');
+    }
+    // 会话已过期（接口被重定向到统一认证登录页）：明确告知，避免误以为数据已同步
+    if (AppState.sessionExpired) {
+      return T('登录已过期');
     }
     const method: string = DataStore.getLoginMethod();
     if (method === 'cas') {
-      return '服务大厅登录';
+      return T('服务大厅登录');
     }
     if (method === 'pwd') {
-      return '教务登录';
+      return T('教务登录');
     }
     if (method === 'web') {
       // 网页版登录：按登录目标归类（教务系统 / 服务大厅）
-      return DataStore.get(DataStore.KEY_LOGIN_SYSTEM) === 'original' ? '教务登录' : '服务大厅登录';
+      return DataStore.get(DataStore.KEY_LOGIN_SYSTEM) === 'original' ? T('教务登录') : T('服务大厅登录');
     }
     // 回退：登录方式未记录时按登录系统标记归类（冷启动自动重登等场景）
     const sys: string = DataStore.get(DataStore.KEY_LOGIN_SYSTEM);
     if (sys === 'original') {
-      return '教务登录';
+      return T('教务登录');
     }
     if (sys === 'service') {
-      return '服务大厅登录';
+      return T('服务大厅登录');
     }
     // 无有效登录方式记录：会话异常或登录态已过期
-    return '登录超时（异常）';
+    return T('登录超时（异常）');
   }
 
   /** 弹出退出登录确认框：取消 / 前往登录页（不退出）/ 退出；并提示当前登录方式 */
   private confirmLogout(): void {
     this.getUIContext().getPromptAction().showDialog({
-      title: '退出登录',
+      title: T('退出登录'),
       message: `当前登录方式：${this.loginMethodText()}\n\n退出后需要重新使用学号密码登录，确定退出吗？`,
       buttons: [
-        { text: '取消', color: '#888888' },
-        { text: '前往登录页', color: '#005BAC' },
-        { text: '退出', color: '#F0524D' }
+        { text: T('取消'), color: '#888888' },
+        { text: T('前往登录页'), color: '#005BAC' },
+        { text: T('退出'), color: '#F0524D' }
       ]
     }).then((result: promptAction.ShowDialogSuccessResponse) => {
       if (result.index === 1) {
@@ -644,7 +688,7 @@ export struct MineView {
   /** 长按退出按钮：功能浏览模式提示模式名称（调试模式提示调试模式），真实登录提示登录方式 / 日志调试 */
   private showLoginMethod(): void {
     if (JwApi.USE_MOCK) {
-      this.getUIContext().getPromptAction().showToast({ message: AppState.debugNetwork ? '调试模式' : '功能浏览模式', duration: 2000 });
+      this.getUIContext().getPromptAction().showToast({ message: AppState.debugNetwork ? T('调试模式') : T('功能浏览模式'), duration: 2000 });
       return;
     }
     if (AppState.logEnabled) {
@@ -652,18 +696,18 @@ export struct MineView {
       return;
     }
     const method: string = DataStore.getLoginMethod();
-    const text: string = method === 'web' ? '当前为网页登录' : (method === 'pwd' ? '当前为密码登录' : '当前登录方式未知');
+    const text: string = method === 'web' ? T('当前为网页登录') : (method === 'pwd' ? T('当前为密码登录') : T('当前登录方式未知'));
     this.getUIContext().getPromptAction().showToast({ message: text, duration: 2000 });
   }
 
   /** 打开网页端教务系统（在"外部链接"页面中访问，自动注入会话 Cookie 保持登录态） */
   private openWebPortal(): void {
     if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-      this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+      this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
       return;
     }
     AppState.webUrl = Const.WEB_PORTAL_URL;
-    AppState.webTitle = '网页端教务系统';
+    AppState.webTitle = T('网页端教务系统');
     AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
   }
 
@@ -681,7 +725,7 @@ export struct MineView {
         })
         .backgroundBlurStyle(Immersive.blur(BlurStyle.Thin, this.barStyle === 'legacy'))
     Row() {
-      BarTitle({ title: '我的' })
+      BarTitle({ title: T('我的') })
       Blank()
     }
     .width('100%')
@@ -726,8 +770,8 @@ export struct MineView {
               .combine(TransitionEffect.scale({ x: 0.8, y: 0.8 }))
               .animation({ duration: 260, curve: Curve.Friction }))
         } else if (JwApi.USE_MOCK) {
-          // 功能浏览模式：使用默认占位头像（死代码清理同上，观感不变）
-          Image($r('app.media.default_avatar'))
+          // 功能浏览模式：使用内置演示头像（南小医）
+          Image($r('app.media.mock_avatar'))
             .width(52)
             .height(52)
             .borderRadius(26)
@@ -873,7 +917,7 @@ export struct MineView {
           .fontSize(18)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor(Theme.colorOf(this.themeColor))
-        Text('学业总评成绩')
+        Text(T('学业总评成绩'))
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ top: 3 })
@@ -885,7 +929,7 @@ export struct MineView {
           .fontSize(18)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.accent_blue'))
-        Text('平均绩点')
+        Text(T('平均绩点'))
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ top: 3 })
@@ -905,11 +949,10 @@ export struct MineView {
     // 由 MaterialSheetPanel 的 Toggle 承载层渲染材质；配套要求是 bindSheet 显式 backgroundColor: Color.Transparent。
     // 本弹窗高度随内容（SheetSize.FIT_CONTENT），故 panelFillHeight: false（不写 height('100%')，避免被撑成整屏）。
     // 同一组件只能挂一个 bindSheet（多次仅最后生效），导出/导入的密码输入集成在面板内以阶段切换。
-    MaterialSheetPanel({ panelRadius: 24, panelPadding: 0, panelFillHeight: false, panelTitle: this.backupStage === 'menu' ? '恢复备份' : (this.backupStage === 'exportPwd' ? '设置备份密码' : '输入备份密码'), panelShowClose: true, panelOnClose: (): void => { this.showBackupSheet = false; } }) {
+    MaterialSheetPanel({ panelRadius: 24, panelPadding: 0, panelFillHeight: false, panelTitle: this.backupStage === 'menu' ? T('恢复备份') : (this.backupStage === 'exportPwd' ? T('设置备份密码') : T('输入备份密码')), panelShowClose: true, panelOnClose: (): void => { this.showBackupSheet = false; } }) {
     Column() {
       if (this.backupStage === 'menu') {
-      Text('备份包含：课程表、成绩、考试、学业情况、消息与新闻缓存，以及课表设置、主题颜色、深色模式、壁纸、日历与收藏等全部应用信息。\n'
-        + '导出为加密备份文件（.xnd，需设置密码，其他软件无法打开，导入时须输入相同密码）；不包含账号、密码与登录 Cookie。导入会覆盖当前对应数据，请确认后再恢复。')
+      Text(T('备份包含：课程表、成绩、考试、学业情况、消息与新闻缓存，以及课表设置、主题颜色、深色模式、壁纸、日历与收藏等全部应用信息。\n导出为加密备份文件（.xnd，需设置密码，其他软件无法打开，导入时须输入相同密码）；不包含账号、密码与登录 Cookie。导入会覆盖当前对应数据，请确认后再恢复。'))
         .fontSize(12)
         .lineHeight(19)
         .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
@@ -934,7 +977,7 @@ export struct MineView {
               this.backupStage = 'exportPwd';
             }
           }) {
-            Text('导出备份')
+            Text(T('导出备份'))
               .fontSize(14)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
               // 固定天蓝实底上的文字随系统深浅色自动黑白（Theme.onColor 恒定深色，深色模式不合理）
@@ -959,7 +1002,7 @@ export struct MineView {
               this.importBackup();
             }
           }) {
-            Text('导入备份')
+            Text(T('导入备份'))
               .fontSize(14)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
               .fontColor($r('sys.color.font_primary'))
@@ -981,15 +1024,15 @@ export struct MineView {
       }
       .width('100%')
       Text(this.backupStage === 'exportPwd'
-        ? '设置一个密码用于加密备份文件，导入时需输入相同密码。请牢记密码，遗失后备份无法恢复。'
-        : '该备份文件已加密，输入导出时设置的密码进行解密恢复。')
+        ? T('设置一个密码用于加密备份文件，导入时需输入相同密码。请牢记密码，遗失后备份无法恢复。')
+        : T('该备份文件已加密，输入导出时设置的密码进行解密恢复。'))
         .fontSize(12)
         .lineHeight(19)
         .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .width('100%')
         .margin({ top: 10 })
       Stack() {
-        TextInput({ placeholder: this.backupStage === 'exportPwd' ? '设置备份密码' : '输入备份密码', text: this.backupPassword })
+        TextInput({ placeholder: this.backupStage === 'exportPwd' ? T('设置备份密码') : T('输入备份密码'), text: this.backupPassword })
           .type(InputType.Password)
           .height(40)
           .borderRadius(10)
@@ -1013,7 +1056,7 @@ export struct MineView {
           btnTint: '',
           btnOnClick: () => { this.confirmBackupPassword(); }
         }) {
-          Text(this.backupStage === 'exportPwd' ? '导出' : '开始恢复')
+          Text(this.backupStage === 'exportPwd' ? T('导出') : T('开始恢复'))
             .fontSize(14)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('sys.color.font_primary'))
@@ -1066,15 +1109,29 @@ export struct MineView {
             cardShadow: GlassMaterial.cardShadowStyle()
           }) {
           Column() {
+            // 通知与提醒（设置区第一行，最易发现）
             SettingRow({
-              icon: '', title: '外观设置', value: this.personaValueText(), onTap: () => {
+              icon: '', title: T('通知与提醒'), value: this.notifySummary, onTap: () => {
+                AppState.stack.pushPath({ name: Const.ROUTE_NOTIFY_SETTINGS });
+                this.refreshNotifySummary();
+              }
+            })
+            Divider().color($r('app.color.divider'))
+            SettingRow({
+              icon: '', title: T('外观设置'), value: this.personaValueText(), onTap: () => {
                 AppState.stack.pushPath({ name: Const.ROUTE_WALLPAPER });
+              }
+            })
+            // 语言与地区（跟随系统 / 简体 / 繁體 / English）
+            SettingRow({
+              icon: '', title: T('语言与地区'), value: I18n.displayName(), onTap: () => {
+                AppState.stack.pushPath({ name: Const.ROUTE_LANGUAGE });
               }
             })
             Divider().color($r('app.color.divider'))
             // 深色模式：开关切换，即时生效（默认浅色）
             Row() {
-              Text('深色模式')
+              Text(T('深色模式'))
                 .fontSize(15)
                 .fontColor($r('app.color.text_primary'))
               Blank()
@@ -1091,7 +1148,7 @@ export struct MineView {
             Divider().color($r('app.color.divider'))
 
             Row() {
-              Text('头像显示')
+              Text(T('头像显示'))
                 .fontSize(15)
                 .fontColor($r('app.color.text_primary'))
               Blank()
@@ -1125,19 +1182,19 @@ export struct MineView {
           }) {
           Column() {
             SettingRow({
-              icon: '', title: '教室查询', onTap: () => {
+              icon: '', title: T('教室查询'), onTap: () => {
                 AppState.stack.pushPath({ name: Const.ROUTE_EMPTY_ROOM });
               }
             })
             Divider().color($r('app.color.divider'))
             SettingRow({
-              icon: '', title: '考试查询', onTap: () => {
+              icon: '', title: T('考试查询'), onTap: () => {
                 AppState.stack.pushPath({ name: Const.ROUTE_EXAM });
               }
             })
             Divider().color($r('app.color.divider'))
             SettingRow({
-              icon: '', title: '学业情况', onTap: () => {
+              icon: '', title: T('学业情况'), onTap: () => {
                 AppState.stack.pushPath({ name: Const.ROUTE_ACADEMIC });
               }
             })
@@ -1167,53 +1224,62 @@ export struct MineView {
           Column() {
             // 1. 网页端教务系统
             SettingRow({
-              icon: '', title: '教务系统', value: '', onTap: () => {
+              icon: '', title: T('教务系统'), value: '', onTap: () => {
                 this.openWebPortal();
               }
             })
             Divider().color($r('app.color.divider'))
-            // 1.1 云课堂（智教云：我的课程 / 课堂实录 / 通知）
+            // 防窥保护：显示系统开关状态，点击直达系统防窥设置
             SettingRow({
-              icon: '', title: '云课堂', value: '', onTap: () => {
+              icon: '', title: T('防窥保护'), value: this.peepLabel, onTap: () => {
+                AntiPeepManager.openSettings(getContext(this) as common.UIAbilityContext).then(() => {
+                  this.refreshPeepLabel();
+                });
+              }
+            })
+            Divider().color($r('app.color.divider'))
+            // 1.1 云课堂（网页版：内嵌智教云页面，统一认证免密进入）
+            SettingRow({
+              icon: '', title: T('云课堂'), value: '网页版', onTap: () => {
                 AppState.stack.pushPath({ name: Const.ROUTE_CLOUD_CLASS });
               }
             })
             Divider().color($r('app.color.divider'))
             // 2. 服务大厅（外部链接页打开，注入 SSO 会话保持登录态）
             SettingRow({
-              icon: '', title: '服务大厅', value: '', onTap: () => {
+              icon: '', title: T('服务大厅'), value: '', onTap: () => {
                 if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-                  this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+                  this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
                   return;
                 }
                 AppState.webUrl = Const.CAS_LOGIN_URL;
-                AppState.webTitle = '服务大厅';
+                AppState.webTitle = T('服务大厅');
                 AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
               }
             })
             Divider().color($r('app.color.divider'))
             // 3. 智慧学工（外部链接页打开，注入 SSO 会话保持登录态）
             SettingRow({
-              icon: '', title: '智慧学工', value: '', onTap: () => {
+              icon: '', title: T('智慧学工'), value: '', onTap: () => {
                 if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-                  this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+                  this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
                   return;
                 }
                 AppState.webUrl = Const.ZHIHUI_XUEGONG_URL;
-                AppState.webTitle = '智慧学工';
+                AppState.webTitle = T('智慧学工');
                 AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
               }
             })
             Divider().color($r('app.color.divider'))
             // 4. 学校官网（外部链接页打开）
             SettingRow({
-              icon: '', title: '学校官网', value: '', onTap: () => {
+              icon: '', title: T('学校官网'), value: '', onTap: () => {
                 if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-                  this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+                  this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
                   return;
                 }
                 AppState.webUrl = 'https://www.njmu.edu.cn/';
-                AppState.webTitle = '学校官网';
+                AppState.webTitle = T('学校官网');
                 AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
               }
             })
@@ -1243,20 +1309,20 @@ export struct MineView {
           Column() {
             // 1. 数据同步
             SettingRow({
-              icon: '', title: '数据同步', value: this.lastSyncText(), onTap: () => {
+              icon: '', title: T('数据同步'), value: this.lastSyncText(), onTap: () => {
                 this.syncNow();
               }
             })
             Divider().color($r('app.color.divider'))
             // 5. 清除缓存（低配版清除数据：保留登录信息/登录 Cookie/用户设置，只删数据缓存）
             SettingRow({
-              icon: '', title: '清除缓存', value: this.cacheSizeText, onTap: () => {
+              icon: '', title: T('清除缓存'), value: this.cacheSizeText, onTap: () => {
                 this.getUIContext().getPromptAction().showDialog({
-                  title: '清除缓存',
-                  message: '将删除课表、成绩、考试、通知、校历、头像等数据缓存，\n并释放网页内存与磁盘缓存，\n保留登录信息、登录 Cookie 与您的个性化设置。确认继续？',
+                  title: T('清除缓存'),
+                  message: T('将删除课表、成绩、考试、通知、校历、头像等数据缓存，\n并释放网页内存与磁盘缓存，\n保留登录信息、登录 Cookie 与您的个性化设置。确认继续？'),
                   buttons: [
-                    { text: '取消', color: '#666666' },
-                    { text: '确认清除', color: '#DB5252', primary: true }
+                    { text: T('取消'), color: '#666666' },
+                    { text: T('确认清除'), color: '#DB5252', primary: true }
                   ]
                 }).then((res) => {
                   if (res.index === 1) {
@@ -1284,7 +1350,7 @@ export struct MineView {
                     this.trimWebMemory();
                     // 清空应用磁盘缓存（模块级+应用级，EL1+EL2 四个目录：WebView HTTP 缓存、导出临时文件等）
                     this.clearAllCache();
-                    this.getUIContext().getPromptAction().showToast({ message: '已清除缓存（保留登录信息与设置）' });
+                    this.getUIContext().getPromptAction().showToast({ message: T('已清除缓存（保留登录信息与设置）') });
                     this.refreshCacheSize(500);
                   }
                 });
@@ -1293,26 +1359,26 @@ export struct MineView {
             Divider().color($r('app.color.divider'))
             // 6. 恢复备份（导出/导入：课表内容 + 课程表设置项 + 主题颜色，打包为 txt）
             SettingRow({
-              icon: '', title: '恢复备份', value: '', onTap: () => {
+              icon: '', title: T('恢复备份'), value: '', onTap: () => {
                 this.showBackupSheet = true;
               }
             })
             Divider().color($r('app.color.divider'))
             // 7. 清空数据（确认后自动重启应用）
             SettingRow({
-              icon: '', title: '清空数据', value: '', onTap: () => {
+              icon: '', title: T('清空数据'), value: '', onTap: () => {
                 this.getUIContext().getPromptAction().showDialog({
-                  title: '清空数据',
-                  message: '将清除全部使用记录（历史账号、缓存、个人信息等），此操作不可恢复，确认继续？',
+                  title: T('清空数据'),
+                  message: T('将清除全部使用记录（历史账号、缓存、个人信息等），此操作不可恢复，确认继续？'),
                   buttons: [
-                    { text: '取消', color: '#666666' },
-                    { text: '确认清空', color: '#DB5252', primary: true }
+                    { text: T('取消'), color: '#666666' },
+                    { text: T('确认清空'), color: '#DB5252', primary: true }
                   ]
                 }).then((res) => {
                   if (res.index === 1) {
                     DataStore.clearAll();
                     AppState.profile = null;
-                    this.getUIContext().getPromptAction().showToast({ message: '数据已清空，正在重启…' });
+                    this.getUIContext().getPromptAction().showToast({ message: T('数据已清空，正在重启…') });
                     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
                     const want: Want = {
                       bundleName: 'com.xndhelper.lzb',
@@ -1324,19 +1390,41 @@ export struct MineView {
               }
             })
             Divider().color($r('app.color.divider'))
-            // 8. 关于（打开独立页面）
+            // 8. 关于（打开独立页面；版本号从 AppState.appVersion 动态读取，杜绝硬编码漏改）
             SettingRow({
-              icon: '', title: '关于应用', value: 'v1.4.1', onTap: () => {
+              icon: '', title: '关于应用', value: `v${AppState.appVersion}`, onTap: () => {
                 AppState.stack.pushPath({ name: Const.ROUTE_ABOUT });
               }
             })
-            // 10. 日志详情（仅登录账号且开启日志调试时显示，分隔线一并条件渲染；
-            //     收集中=亮绿灯，暂停=灰色灭灯）
-            if (this.logEnabled && AppState.profile !== null) {
+            Divider().color($r('app.color.divider'))
+            // 9. 日志收集开关（持久化，默认开启持续收集，方便定位问题；任何用户可直接手动开关）
+            Row() {
+              Column() {
+                Text(T('日志收集'))
+                  .fontSize(15)
+                  .fontColor($r('app.color.text_primary'))
+                Text(T('自动记录使用与联网日志，便于排查问题'))
+                  .fontSize(11)
+                  .fontColor($r('app.color.text_tertiary'))
+                  .margin({ top: 2 })
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+              Blank()
+              Toggle({ type: ToggleType.Switch, isOn: this.logEnabled })
+                .selectedColor(Theme.colorOf(this.themeColor))
+                .onChange((isOn: boolean) => {
+                  AppState.logEnabled = isOn;
+                })
+            }
+            .width('100%')
+            .height(56)
+            // 10. 日志详情（开启日志收集即可见，不再要求已登录账号）
+            if (this.logEnabled) {
               Divider().color($r('app.color.divider'))
               SettingRow({
                 icon: '',
-                title: '日志详情',
+                title: T('日志详情'),
                 value: this.logCollecting ? '● 收集中' : '○ 已暂停',
                 valueColor: this.logCollecting ? Theme.colorOf(this.themeColor) : $r('app.color.text_tertiary'),
                 onTap: () => {
@@ -1351,12 +1439,12 @@ export struct MineView {
 
         // 数据来源（Scroll 大 Column 内部）
         Column() {
-          Text('数据来源: 南京医科大学教务系统').fontSize(11)
+          Text(T('数据来源: 南京医科大学教务系统')).fontSize(11)
             .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
-          Text('南京医科大学新闻网').fontSize(11)
+          Text(T('南京医科大学新闻网')).fontSize(11)
             .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
             .margin({ top: 3 })
-          Text('南京医科大学教务处').fontSize(11)
+          Text(T('南京医科大学教务处')).fontSize(11)
             .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
             .margin({ top: 3 })
         }
@@ -1464,14 +1552,19 @@ export struct MineView {
     }) {
     Column() {
       SettingRow({
-        icon: '', title: '外观设置', value: this.personaValueText(), onTap: () => {
+        icon: '', title: T('外观设置'), value: this.personaValueText(), onTap: () => {
           AppState.stack.pushPath({ name: Const.ROUTE_WALLPAPER });
+        }
+      })
+      SettingRow({
+        icon: '', title: T('语言与地区'), value: I18n.displayName(), onTap: () => {
+          AppState.stack.pushPath({ name: Const.ROUTE_LANGUAGE });
         }
       })
       Divider().color($r('app.color.divider'))
       // 深色模式：开关切换，即时生效（默认浅色）
       Row() {
-        Text('深色模式')
+        Text(T('深色模式'))
           .fontSize(15)
           .fontColor($r('app.color.text_primary'))
         Blank()
@@ -1487,7 +1580,7 @@ export struct MineView {
       .height(52)
       Divider().color($r('app.color.divider'))
       Row() {
-        Text('头像显示')
+        Text(T('头像显示'))
           .fontSize(15)
           .fontColor($r('app.color.text_primary'))
         Blank()
@@ -1521,19 +1614,19 @@ export struct MineView {
     }) {
     Column() {
       SettingRow({
-        icon: '', title: '教室查询', onTap: () => {
+        icon: '', title: T('教室查询'), onTap: () => {
           AppState.stack.pushPath({ name: Const.ROUTE_EMPTY_ROOM });
         }
       })
       Divider().color($r('app.color.divider'))
       SettingRow({
-        icon: '', title: '考试查询', onTap: () => {
+        icon: '', title: T('考试查询'), onTap: () => {
           AppState.stack.pushPath({ name: Const.ROUTE_EXAM });
         }
       })
       Divider().color($r('app.color.divider'))
       SettingRow({
-        icon: '', title: '学业情况', onTap: () => {
+        icon: '', title: T('学业情况'), onTap: () => {
           AppState.stack.pushPath({ name: Const.ROUTE_ACADEMIC });
         }
       })
@@ -1564,48 +1657,56 @@ export struct MineView {
       cardShadow: GlassMaterial.cardShadowStyle()
     }) {
     Column() {
+      // 0. 通知与提醒（横屏右列最顶上）
+      SettingRow({
+        icon: '', title: T('通知与提醒'), value: this.notifySummary, onTap: () => {
+          AppState.stack.pushPath({ name: Const.ROUTE_NOTIFY_SETTINGS });
+          this.refreshNotifySummary();
+        }
+      })
+      Divider().color($r('app.color.divider'))
       // 1. 网页端教务系统（最顶上）
       SettingRow({
-        icon: '', title: '教务系统', value: '', onTap: () => {
+        icon: '', title: T('教务系统'), value: '', onTap: () => {
           this.openWebPortal();
         }
       })
       Divider().color($r('app.color.divider'))
       // 1.1 服务大厅（外部链接页打开，注入 SSO 会话保持登录态）
       SettingRow({
-        icon: '', title: '服务大厅', value: '', onTap: () => {
+        icon: '', title: T('服务大厅'), value: '', onTap: () => {
           if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-            this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+            this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
             return;
           }
           AppState.webUrl = Const.CAS_LOGIN_URL;
-          AppState.webTitle = '服务大厅';
+          AppState.webTitle = T('服务大厅');
           AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
         }
       })
       Divider().color($r('app.color.divider'))
       // 1.2 智慧学工（外部链接页打开，注入 SSO 会话保持登录态）
       SettingRow({
-        icon: '', title: '智慧学工', value: '', onTap: () => {
+        icon: '', title: T('智慧学工'), value: '', onTap: () => {
           if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-            this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+            this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
             return;
           }
           AppState.webUrl = Const.ZHIHUI_XUEGONG_URL;
-          AppState.webTitle = '智慧学工';
+          AppState.webTitle = T('智慧学工');
           AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
         }
       })
       Divider().color($r('app.color.divider'))
       // 1.3 学校官网（外部链接页打开）
       SettingRow({
-        icon: '', title: '学校官网', value: '', onTap: () => {
+        icon: '', title: T('学校官网'), value: '', onTap: () => {
           if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-            this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+            this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
             return;
           }
           AppState.webUrl = 'https://www.njmu.edu.cn/';
-          AppState.webTitle = '学校官网';
+          AppState.webTitle = T('学校官网');
           AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
         }
       })
@@ -1619,20 +1720,20 @@ export struct MineView {
       Divider().color($r('app.color.divider'))
       // 2. 数据同步
       SettingRow({
-        icon: '', title: '数据同步', value: this.lastSyncText(), onTap: () => {
+        icon: '', title: T('数据同步'), value: this.lastSyncText(), onTap: () => {
           this.syncNow();
         }
       })
       Divider().color($r('app.color.divider'))
       // 5. 清除缓存（低配版清除数据：保留登录信息/登录 Cookie/用户设置，只删数据缓存）
       SettingRow({
-        icon: '', title: '清除缓存', value: this.cacheSizeText, onTap: () => {
+        icon: '', title: T('清除缓存'), value: this.cacheSizeText, onTap: () => {
           this.getUIContext().getPromptAction().showDialog({
-            title: '清除缓存',
-            message: '将删除课表、成绩、考试、通知、校历、头像等数据缓存，\n并释放网页内存与磁盘缓存，\n保留登录信息、登录 Cookie 与您的个性化设置。确认继续？',
+            title: T('清除缓存'),
+            message: T('将删除课表、成绩、考试、通知、校历、头像等数据缓存，\n并释放网页内存与磁盘缓存，\n保留登录信息、登录 Cookie 与您的个性化设置。确认继续？'),
             buttons: [
-              { text: '取消', color: '#666666' },
-              { text: '确认清除', color: '#DB5252', primary: true }
+              { text: T('取消'), color: '#666666' },
+              { text: T('确认清除'), color: '#DB5252', primary: true }
             ]
           }).then((res) => {
             if (res.index === 1) {
@@ -1656,7 +1757,7 @@ export struct MineView {
               }
               this.trimWebMemory();
               this.clearAllCache();
-              this.getUIContext().getPromptAction().showToast({ message: '已清除缓存（保留登录信息与设置）' });
+              this.getUIContext().getPromptAction().showToast({ message: T('已清除缓存（保留登录信息与设置）') });
               this.refreshCacheSize(500);
             }
           });
@@ -1665,26 +1766,26 @@ export struct MineView {
       Divider().color($r('app.color.divider'))
       // 6. 恢复备份（导出/导入：课表内容 + 课程表设置项 + 主题颜色，打包为 txt）
       SettingRow({
-        icon: '', title: '恢复备份', value: '', onTap: () => {
+        icon: '', title: T('恢复备份'), value: '', onTap: () => {
           this.showBackupSheet = true;
         }
       })
       Divider().color($r('app.color.divider'))
       // 7. 清空数据（确认后自动重启应用）
       SettingRow({
-        icon: '', title: '清空数据', value: '', onTap: () => {
+        icon: '', title: T('清空数据'), value: '', onTap: () => {
           this.getUIContext().getPromptAction().showDialog({
-            title: '清空数据',
-            message: '将清除全部使用记录（历史账号、缓存、个人信息等），此操作不可恢复，确认继续？',
+            title: T('清空数据'),
+            message: T('将清除全部使用记录（历史账号、缓存、个人信息等），此操作不可恢复，确认继续？'),
             buttons: [
-              { text: '取消', color: '#666666' },
-              { text: '确认清空', color: '#DB5252', primary: true }
+              { text: T('取消'), color: '#666666' },
+              { text: T('确认清空'), color: '#DB5252', primary: true }
             ]
           }).then((res) => {
             if (res.index === 1) {
               DataStore.clearAll();
               AppState.profile = null;
-              this.getUIContext().getPromptAction().showToast({ message: '数据已清空，正在重启…' });
+              this.getUIContext().getPromptAction().showToast({ message: T('数据已清空，正在重启…') });
               const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
               const want: Want = {
                 bundleName: 'com.xndhelper.lzb',
@@ -1696,19 +1797,41 @@ export struct MineView {
         }
       })
       Divider().color($r('app.color.divider'))
-      // 8. 关于（打开独立页面）
+      // 8. 关于（打开独立页面；版本号从 AppState.appVersion 动态读取）
       SettingRow({
-        icon: '', title: '关于应用', value: 'v1.4.1', onTap: () => {
+        icon: '', title: '关于应用', value: `v${AppState.appVersion}`, onTap: () => {
           AppState.stack.pushPath({ name: Const.ROUTE_ABOUT });
         }
       })
-      // 10. 日志详情（仅登录账号且开启日志调试时显示，分隔线一并条件渲染；
-      //     收集中=亮绿灯，暂停=灰色灭灯）
-      if (this.logEnabled && AppState.profile !== null) {
+      Divider().color($r('app.color.divider'))
+      // 9. 日志收集开关（持久化，默认开启持续收集）
+      Row() {
+        Column() {
+          Text(T('日志收集'))
+            .fontSize(15)
+            .fontColor($r('app.color.text_primary'))
+          Text(T('自动记录使用与联网日志，便于排查问题'))
+            .fontSize(11)
+            .fontColor($r('app.color.text_tertiary'))
+            .margin({ top: 2 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Blank()
+        Toggle({ type: ToggleType.Switch, isOn: this.logEnabled })
+          .selectedColor(Theme.colorOf(this.themeColor))
+          .onChange((isOn: boolean) => {
+            AppState.logEnabled = isOn;
+          })
+      }
+      .width('100%')
+      .height(56)
+      // 10. 日志详情（开启日志收集即可见，不再要求已登录账号）
+      if (this.logEnabled) {
         Divider().color($r('app.color.divider'))
         SettingRow({
           icon: '',
-          title: '日志详情',
+          title: T('日志详情'),
           value: this.logCollecting ? '● 收集中' : '○ 已暂停',
           valueColor: this.logCollecting ? Theme.colorOf(this.themeColor) : $r('app.color.text_tertiary'),
           onTap: () => {

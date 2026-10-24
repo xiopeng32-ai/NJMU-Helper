@@ -4,8 +4,9 @@
  * 接入真实教务系统后，本文件可整体删除，只需保证 JwApi 返回同样的模型即可。
  */
 import { DateUtil } from '../common/DateUtil';
-import { AcademicReport, CourseItem, CreditCategory, ExamItem, NoticeItem, ScoreItem, TermGpa, TermInfo,
-  TermScore, UserProfile } from '../model/Models';
+import { T } from '../common/I18n';
+import { AcademicReport, CourseItem, CreditCategory, ExamItem, LevelExamItem, LevelExamSummary, NoticeItem,
+  PlanProgress, ScoreItem, TermGpa, TermInfo, TermScore, UserProfile } from '../model/Models';
 
 function range(from: number, to: number, step: number): number[] {
   const list: number[] = [];
@@ -16,45 +17,46 @@ function range(from: number, to: number, step: number): number[] {
 }
 
 export class MockData {
+  /** 功能浏览模式演示档案：南京医科大学 基础医学院 基础医学专业（虚构学号/姓名，不含真实个人信息） */
   static readonly PROFILE: UserProfile = {
-    studentId: '0123456789',
-    name: '张三',
-    college: 'XXX学院',
-    major: 'XXX',
-    className: 'XXX2601班',
-    grade: '2026 级',
-    counselor: '李四',
-    eduSystem: '四年制本科',
-    status: '在读'
+    studentId: '24220199',
+    name: '南小医',
+    college: '基础医学院',
+    major: '基础医学',
+    className: '24级基础1班',
+    grade: '2024 级',
+    counselor: '郭旭',
+    eduSystem: '五年制本科',
+    status: T('在读')
   };
 
-  /** 当前学期课表 */
+  /** 当前学期课表（对齐南医大 15 节制作息与课程命名习惯：人体结构与功能 / 医学形态学实验 / PBL 等） */
   static courses(): CourseItem[] {
     return [
-      MockData.course('c01', '高等数学Ⅱ', '王五', '主楼 A203', 1, 1, 2, range(1, 16, 1), '1-16周', '必修', 4, 0),
-      MockData.course('c02', '高等数学Ⅱ', '王五', '主楼 A203', 3, 3, 4, range(1, 16, 1), '1-16周', '必修', 4, 0),
-      MockData.course('c03', '大学英语（三）', '赵六', '外语楼 302', 1, 3, 4, range(1, 16, 1), '1-16周', '必修', 3, 1),
-      MockData.course('c04', '大学英语（三）', '赵六', '外语楼 302', 4, 1, 2, range(1, 16, 1), '1-16周', '必修', 3, 1),
-      MockData.course('c05', '数据结构', '孙七', '信息楼 401', 2, 1, 2, range(1, 18, 1), '1-18周', '必修', 4, 2),
-      MockData.course('c06', '数据结构', '孙七', '信息楼 401', 5, 3, 4, range(1, 18, 1), '1-18周', '必修', 4, 2),
-      MockData.course('c07', '数据结构实验', '孙七', '信息楼机房 2', 5, 5, 6, range(2, 18, 2), '2-18周(双)', '实践', 1, 3),
-      MockData.course('c08', '计算机组成原理', '周八', '信息楼 305', 2, 5, 6, range(1, 16, 1), '1-16周', '必修', 3.5, 4),
-      MockData.course('c09', '计算机组成原理', '周八', '信息楼 305', 4, 5, 6, range(1, 16, 1), '1-16周', '必修', 3.5, 4),
-      MockData.course('c10', '马克思主义基本原理', '吴九', '教学楼 B102', 3, 1, 2, range(1, 14, 1), '1-14周', '必修', 3, 5),
-      MockData.course('c11', '大学体育（三）', '郑十', '西区田径场', 3, 5, 6, range(1, 16, 1), '1-16周', '必修', 1, 6),
-      MockData.course('c12', '概率论与数理统计', '冯一', '主楼 A105', 4, 3, 4, range(1, 16, 1), '1-16周', '必修', 3, 7),
-      MockData.course('c13', 'Java 程序设计', '陈二', '信息楼机房 1', 1, 5, 6, range(1, 16, 1), '1-16周', '必修', 3, 2),
-      MockData.course('c14', '操作系统', '褚三', '信息楼 302', 2, 3, 4, range(1, 16, 1), '1-16周', '必修', 4, 5),
-      MockData.course('c15', '操作系统', '褚三', '信息楼 302', 5, 1, 2, range(1, 16, 1), '1-16周', '必修', 4, 5),
-      MockData.course('c16', '形势与政策', '卫四', '教学楼 B203', 4, 7, 8, range(5, 12, 1), '5-12周', '必修', 0.5, 3),
-      MockData.course('c17', '大学生职业发展', '蒋五', '教学楼 C101', 2, 7, 8, range(1, 8, 1), '1-8周', '选修', 1, 6),
-      MockData.course('c18', '农业信息化导论', '沈六', '信息楼 203', 5, 7, 8, range(1, 12, 1), '1-12周', '选修', 2, 7),
-      MockData.course('c19', '人工智能导论', '韩七', '信息楼 406', 1, 7, 8, range(3, 16, 1), '3-16周', '选修', 2, 4),
-  MockData.course('c20', '创新创业实践', '杨八', '大学生活动中心', 3, 9, 10, range(1, 10, 2), '1-10周(单)', '实践', 1, 1),
-      // 周末课程（用于验证周末列显示：周六 / 周日各一门）
-      MockData.course('c21', '工程训练', '朱九', '工程训练中心', 6, 1, 4, range(1, 16, 1), '1-16周', '实践', 2, 3),
-      MockData.course('c22', '专业导论', '秦十', '主楼 B301', 7, 3, 4, range(1, 16, 1), '1-16周', '必修', 1.5, 5)
-  ];
+      // ── 周一 ──
+      MockData.course('c01', '人体结构与功能01', '王晖', '博学楼A207', 1, 1, 2, range(1, 16, 1), '1-16周', '专业核心课', 4, 0),
+      MockData.course('c02', '病原与感染性疾病', '季旻珺', '明达楼213', 1, 7, 8, range(1, 16, 1), '1-16周', '专业核心课', 3, 1),
+      MockData.course('c03', '死亡教育（医文融合类）', '王健男', '博学楼A105（智慧教室）', 1, 13, 15, range(3, 14, 1), '3-14周', '通识教育课', 2, 5),
+      // ── 周二 ──
+      MockData.course('c04', '大学英语（三）', '陆敏', '博学楼B302', 2, 1, 2, range(1, 16, 1), '1-16周', '通识教育课', 3, 6),
+      MockData.course('c05', '医用物理学（B）', '龚丽英', '逸夫楼D410', 2, 7, 8, range(1, 16, 1), '1-16周', '专业基础课', 3.5, 2),
+      MockData.course('c06', '基础医学整合案例（PBL）01', '陈琳', '博学楼A205-2', 2, 9, 10, range(2, 16, 2), '2-16周(双)', '专业核心课', 1.5, 3),
+      MockData.course('c07', '文献检索与导读', '徐志鹏', '博学楼A509', 2, 11, 12, range(9, 12, 1), '9-12周', '通识教育课', 1, 7),
+      // ── 周三 ──
+      MockData.course('c08', '医学形态学实验', '靳建亮', '善志楼205', 3, 1, 4, range(1, 15, 1), '1-15周', '实践课', 2.5, 4),
+      MockData.course('c09', '思想道德与法治', '刘洋', '博学楼B203', 3, 5, 6, range(1, 14, 1), '1-14周', '通识教育课', 3, 5),
+      MockData.course('c10', '运动促进健康研究实践', '杜军', '操场', 3, 13, 14, range(3, 12, 1), '3-12周', '实践课', 1, 6),
+      // ── 周四 ──
+      MockData.course('c11', '人体结构与功能02', '陈芳', '博学楼A306', 4, 3, 5, range(1, 16, 1), '1-16周', '专业核心课', 4, 0),
+      MockData.course('c12', '大学体育（三）', '赵磊', '西区田径场', 4, 7, 8, range(1, 16, 1), '1-16周', '通识教育课', 1, 7),
+      MockData.course('c13', '军事技能', '郭旭', '操场', 4, 9, 10, range(1, 4, 1), '1-4周', '通识教育课', 2, 6),
+      // ── 周五 ──
+      MockData.course('c14', '人体结构与功能01实验', '王晖', '善志楼205', 5, 1, 4, range(2, 16, 2), '2-16周(双)', '实践课', 1.5, 4),
+      MockData.course('c15', '人体细胞与分子', '李正荣', '博学楼B208', 5, 7, 8, range(1, 16, 1), '1-16周', '专业核心课', 3.5, 1),
+      MockData.course('c16', '大学生心理健康', '张文君', '博学楼A105', 5, 11, 12, range(4, 7, 1), '4-7周', '通识教育课', 1, 5),
+      // ── 周日（验证周末列显示） ──
+      MockData.course('c17', '医学人文导论', '张文君', '博学楼B208', 7, 13, 14, range(1, 8, 1), '1-8周', '通识教育课', 1.5, 3)
+    ];
   }
 
   private static course(id: string, name: string, teacher: string, location: string, weekday: number,
@@ -77,17 +79,19 @@ export class MockData {
     };
   }
 
-  /** 考试安排：围绕今天动态生成 */
+  /** 考试安排：围绕今天动态生成（南医大考场集中在明达楼/博学楼/逸夫楼） */
   static exams(): ExamItem[] {
     const today: Date = new Date();
     return [
-      MockData.exam('e01', '大学生职业发展', DateUtil.addDays(today, -3), '10:00-11:30', '教学楼 C101', '023', '期中考试', '蒋五'),
-      MockData.exam('e02', '数据结构', DateUtil.addDays(today, 2), '10:00-12:00', '信息楼 401', '015', '期末考试', '孙七'),
-      MockData.exam('e03', '高等数学Ⅱ', DateUtil.addDays(today, 5), '16:00-18:00', '主楼 A203', '032', '期末考试', '王五'),
-      MockData.exam('e04', '计算机组成原理', DateUtil.addDays(today, 9), '10:00-12:00', '信息楼 305', '008', '期末考试', '周八'),
-      MockData.exam('e05', '大学英语（三）', DateUtil.addDays(today, 12), '16:00-18:00', '外语楼 302', '041', '期末考试', '赵六'),
-      MockData.exam('e06', '操作系统', DateUtil.addDays(today, 15), '10:00-12:00', '信息楼 302', '019', '期末考试', '褚三'),
-      MockData.exam('e07', '马克思主义基本原理', DateUtil.addDays(today, 18), '16:00-17:40', '教学楼 B102', '056', '期末考试', '吴九')
+      MockData.exam('e01', '医学形态学实验', DateUtil.addDays(today, -3), '14:00-15:40', '善志楼205', '023', '期中考试', '靳建亮'),
+      MockData.exam('e02', '病原与感染性疾病', DateUtil.addDays(today, 2), '09:00-11:00', '明达楼213', '015', '期末考试', '季旻珺'),
+      MockData.exam('e03', '人体结构与功能01', DateUtil.addDays(today, 5), '14:00-16:00', '明达楼222', '032', '期末考试', '王晖'),
+      MockData.exam('e04', '医用物理学（B）', DateUtil.addDays(today, 9), '09:00-11:00', '逸夫楼D410', '008', '期末考试', '龚丽英'),
+      MockData.exam('e05', '人体细胞与分子', DateUtil.addDays(today, 12), '14:00-16:00', '博学楼B208', '041', '期末考试', '李正荣'),
+      MockData.exam('e06', '思想道德与法治', DateUtil.addDays(today, 15), '09:00-10:40', '博学楼A207', '019', '期末考试', '刘洋'),
+      MockData.exam('e07', '基础医学整合案例（PBL）01', DateUtil.addDays(today, 18), '14:00-16:00', '博学楼A205-2', '056', '结课考核', '陈琳'),
+      MockData.exam('e08', '医学形态学实验（操作考核）', DateUtil.addDays(today, 21), '08:30-11:30', '善志楼205', '012', '操作考核', '靳建亮'),
+      MockData.exam('e09', '大学英语（三）', DateUtil.addDays(today, 24), '09:00-11:00', '博学楼B302', '088', '期末考试', '陆敏')
     ];
   }
 
@@ -156,15 +160,14 @@ export class MockData {
       rank: 6,
       classSize: 42,
       items: [
-        MockData.score('s101', '离散数学', 3, 91, 4.1, '必修', terms[1].id),
-        MockData.score('s102', '面向对象程序设计', 4, 88, 3.8, '必修', terms[1].id),
-        MockData.score('s103', '数字逻辑电路', 3, 79, 2.9, '必修', terms[1].id),
-        MockData.score('s104', '大学英语（二）', 3, 84, 3.4, '必修', terms[1].id),
-        MockData.score('s105', '高等数学Ⅰ（下）', 4, 76, 2.6, '必修', terms[1].id),
-        MockData.score('s106', '中国近现代史纲要', 2, 93, 4.3, '必修', terms[1].id),
-        MockData.score('s107', '大学体育（二）', 1, -1, 4.0, '必修', terms[1].id),
-        MockData.score('s108', '数据库原理', 3.5, 90, 4.0, '必修', terms[1].id),
-        MockData.score('s109', '摄影基础', 2, 95, 4.5, '选修', terms[1].id)
+        MockData.score('s101', '人体结构与功能02', 4, 91, 4.1, '专业核心课', terms[1].id),
+        MockData.score('s102', '医学形态学实验', 2.5, 88, 3.8, '实践课', terms[1].id),
+        MockData.score('s103', '生物化学', 4, 82, 3.2, '专业基础课', terms[1].id),
+        MockData.score('s104', '生理学', 3.5, 79, 2.9, '专业基础课', terms[1].id),
+        MockData.score('s105', '大学英语（二）', 3, 85, 3.5, '通识教育课', terms[1].id),
+        MockData.score('s106', '中国近现代史纲要', 2, 92, 4.2, '通识教育课', terms[1].id),
+        MockData.score('s107', '大学体育（二）', 1, -1, 4.0, '通识教育课', terms[1].id),
+        MockData.score('s108', '医学统计学', 2.5, 87, 3.7, '专业基础课', terms[1].id)
       ]
     });
     list.push({
@@ -177,15 +180,15 @@ export class MockData {
       rank: 9,
       classSize: 42,
       items: [
-        MockData.score('s201', 'C 语言程序设计', 4, 89, 3.9, '必修', terms[2].id),
-        MockData.score('s202', '高等数学Ⅰ（上）', 5, 72, 2.2, '必修', terms[2].id),
-        MockData.score('s203', '线性代数', 3, 85, 3.5, '必修', terms[2].id),
-        MockData.score('s204', '大学英语（一）', 3, 82, 3.2, '必修', terms[2].id),
-        MockData.score('s205', '思想道德与法治', 3, 90, 4.0, '必修', terms[2].id),
-        MockData.score('s206', '计算机导论', 2, 94, 4.4, '必修', terms[2].id),
-        MockData.score('s207', '大学体育（一）', 1, -1, 3.7, '必修', terms[2].id),
-        MockData.score('s208', '军事理论', 2, 87, 3.7, '必修', terms[2].id),
-        MockData.score('s209', '园艺与生活', 1, 91, 4.1, '选修', terms[2].id)
+        MockData.score('s201', '人体结构与功能01', 4, 89, 3.9, '专业核心课', terms[2].id),
+        MockData.score('s202', '人体细胞与分子', 3.5, 86, 3.6, '专业核心课', terms[2].id),
+        MockData.score('s203', '医用化学', 4, 78, 2.8, '专业基础课', terms[2].id),
+        MockData.score('s204', '医用物理学（B）', 3.5, 83, 3.3, '专业基础课', terms[2].id),
+        MockData.score('s205', '大学英语（一）', 3, 84, 3.4, '通识教育课', terms[2].id),
+        MockData.score('s206', '思想道德与法治', 3, 90, 4.0, '通识教育课', terms[2].id),
+        MockData.score('s207', '大学体育（一）', 1, -1, 3.7, '通识教育课', terms[2].id),
+        MockData.score('s208', '军事理论', 2, 88, 3.8, '通识教育课', terms[2].id),
+        MockData.score('s209', '医学导论', 1, 93, 4.3, '通识教育课', terms[2].id)
       ]
     });
     list.push({
@@ -198,25 +201,25 @@ export class MockData {
       rank: 14,
       classSize: 42,
       items: [
-        MockData.score('s301', '大学物理', 4, 58, 0, '必修', terms[3].id),
-        MockData.score('s302', '大学物理（补考）', 4, 62, 1.2, '必修', terms[3].id, '补考'),
-        MockData.score('s303', '程序设计基础', 3, 86, 3.6, '必修', terms[3].id),
-        MockData.score('s304', '大学语文', 2, 88, 3.8, '选修', terms[3].id),
-        MockData.score('s305', '形势与政策（一）', 0.5, -1, 4.0, '必修', terms[3].id)
+        MockData.score('s301', '医用高等数学', 4, 58, 0, '专业基础课', terms[3].id),
+        MockData.score('s302', '医用高等数学（补考）', 4, 62, 1.2, '专业基础课', terms[3].id, T('补考')),
+        MockData.score('s303', '大学计算机基础', 3, 86, 3.6, '通识教育课', terms[3].id),
+        MockData.score('s304', '医学伦理学', 2, 88, 3.8, '通识教育课', terms[3].id),
+        MockData.score('s305', '形势与政策（一）', 0.5, -1, 4.0, '通识教育课', terms[3].id)
       ]
     });
     return list;
   }
 
   private static score(id: string, name: string, credit: number, score: number, gp: number, type: string,
-    termId: string, examType: string = '正常考试'): ScoreItem {
+    termId: string, examType: string = T('正常考试')): ScoreItem {
     let text: string = score < 0 ? '优秀' : `${score}`;
     // 任课教师：按课程名取个 hash 映射，避免手填
     let hash: number = 0;
     for (let i = 0; i < name.length; i++) {
       hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
     }
-    const teachers: string[] = ['王五', '赵六', '孙七', '周八', '吴九', '郑十', '冯一', '陈二'];
+    const teachers: string[] = ['王晖', '季旻珺', '陈芳', '靳建亮', '李正荣', '龚丽英', '张文君', '刘洋'];
     const teacher: string = teachers[hash % teachers.length];
     return {
       id: id,
@@ -243,7 +246,7 @@ export class MockData {
         title: '关于做好本学期期末考试安排工作的通知',
         source: '教务处',
         date: DateUtil.format(DateUtil.addDays(today, -1)),
-        tag: '考试',
+        tag: T('考试'),
         isTop: true,
         read: false,
         summary: '各学院请于本周五前完成考场编排，学生可在教务系统查询个人考试安排。',
@@ -264,14 +267,14 @@ export class MockData {
       },
       {
         id: 'n03',
-        title: '计算机与信息工程学院关于开展学业预警工作的通知',
-        source: '计算机与信息工程学院',
+        title: '基础医学院关于开展学业预警工作的通知',
+        source: '基础医学院',
         date: DateUtil.format(DateUtil.addDays(today, -4)),
         tag: '教学',
         isTop: false,
         read: true,
         summary: '对累计不及格学分达到 10 学分的同学进行学业预警，请及时联系辅导员。',
-        content: '各位同学：\n\n为帮助同学们顺利完成学业，学院将对以下情况开展学业预警：\n\n1. 一学期不及格课程累计达 8 学分；\n2. 累计不及格课程达 15 学分；\n3. 累计获得学分低于同年级培养方案要求的 60%。\n\n被预警同学请于本周内联系辅导员，制定个人学业改进计划。家长将同步收到告知函。\n\n计算机与信息工程学院\n',
+        content: '各位同学：\n\n为帮助同学们顺利完成学业，学院将对以下情况开展学业预警：\n\n1. 一学期不及格课程累计达 8 学分；\n2. 累计不及格课程达 15 学分；\n3. 累计获得学分低于同年级培养方案要求的 60%。\n\n被预警同学请于本周内联系辅导员，制定个人学业改进计划。家长将同步收到告知函。\n\n基础医学院\n',
         url: '',
       },
       {
@@ -288,14 +291,14 @@ export class MockData {
       },
       {
         id: 'n05',
-        title: '数据结构课程调停课通知',
-        source: '计算机与信息工程学院',
+        title: '人体结构与功能01 调课通知',
+        source: '基础医学院',
         date: DateUtil.format(DateUtil.addDays(today, -7)),
-        tag: '通知',
+        tag: T('通知'),
         isTop: false,
         read: true,
-        summary: '因教师外出参加学术会议，本周五第 3-4 节数据结构课调至下周六同一时段。',
-        content: '各位同学：\n\n因孙七老师外出参加学术会议，原定本周五第 3-4 节《数据结构》课程调整至下周六第 3-4 节，上课地点不变（信息楼 401）。\n\n请相互转告，按时上课。\n\n计算机与信息工程学院教务办\n',
+        summary: '王晖老师因参加学术会议，本周一第 1-2 节课调至本周六第 1-2 节，教室不变。',
+        content: '各位同学：\n\n因王晖老师外出参加学术会议，原定本周一第 1-2 节《人体结构与功能01》（博学楼A207）调整至本周六第 1-2 节，上课地点不变。\n\n请相互转告，按时上课。\n\n基础医学院教务办\n',
         url: '',
       },
       {
@@ -315,7 +318,7 @@ export class MockData {
         title: '关于国家奖学金、励志奖学金评审工作的通知',
         source: '学生工作处',
         date: DateUtil.format(DateUtil.addDays(today, -12)),
-        tag: '通知',
+        tag: T('通知'),
         isTop: false,
         read: true,
         summary: '申请材料请于下周三前提交至学院办公室，逾期不予受理。',
@@ -354,10 +357,58 @@ export class MockData {
       passRate: 96.8,
       categories: categories,
       warnings: [
-        '《大学物理》首修不及格，已通过补考取得学分，绩点按补考成绩计入。',
-        '专业选修课已修 6 学分，距毕业要求还差 10 学分，建议下学期至少选修 2 门。'
+        '《医用高等数学》首修不及格，已通过补考取得学分，绩点按补考成绩计入。',
+        '专业选修课已修 6 学分，距毕业要求还差 10 学分，建议下学期至少选修 2 门医学人文类课程。'
       ],
       gpaTrend: trend
+    };
+  }
+
+  /** 等级考试（功能浏览模式补齐：此前返回空结构，学业页该卡片不显示） */
+  static levelExams(): LevelExamSummary {
+    const items: LevelExamItem[] = [
+      {
+        id: 'le01', categoryCode: '05', categoryName: 'CET', name: 'CET4', score: '528.00',
+        examTime: '2026-06-13 09:00', schoolYear: '2025-2026', certNo: ''
+      },
+      {
+        id: 'le02', categoryCode: '08', categoryName: '全国计算机', name: '全国计算机等级考试二级（MS Office）',
+        score: T('合格'), examTime: '2026-03-28 09:00', schoolYear: '2025-2026', certNo: '2026JSJ001234'
+      }
+    ];
+    return {
+      hasData: true,
+      cet4: 528,
+      cet4Passed: true,
+      cet6: -1,
+      cet6Passed: false,
+      computerName: '全国计算机等级考试二级（MS Office）',
+      computerPassed: true,
+      items: items
+    };
+  }
+
+  /** 培养方案进度（功能浏览模式补齐：此前返回空结构，进度卡与学分构成不显示） */
+  static planProgress(): PlanProgress {
+    const categories: CreditCategory[] = [
+      { name: '通识教育课', required: 42, earned: 38 },
+      { name: '专业基础课', required: 36, earned: 30 },
+      { name: '专业核心课', required: 48, earned: 26 },
+      { name: '实践课', required: 30, earned: 12 },
+      { name: T('选修课'), required: 16, earned: 6 }
+    ];
+    return {
+      available: true,
+      totalRequired: 58,
+      totalEarned: 21,
+      studyingCount: 9,
+      unearnedCount: 28,
+      outsideCount: 2,
+      failedCount: 1,
+      categories: categories,
+      unearnedNames: ['医学免疫学', '病理学', '药理学', '诊断学', '内科学', '外科学总论', '医学遗传学', '神经生物学'],
+      studyingNames: ['人体结构与功能01', '人体结构与功能02', '人体细胞与分子', '医学形态学实验',
+        '病原与感染性疾病', '基础医学整合案例（PBL）01', '医用物理学（B）', '思想道德与法治', '大学英语（三）']
     };
   }
 
@@ -369,7 +420,7 @@ export class MockData {
         title: '2026年秋季学期校历',
         source: '教务处官网',
         date: '2026-05-15',
-        tag: '通知',
+        tag: T('通知'),
         isTop: true,
         read: false,
         summary: '2026-2027学年第一学期校历（2026年秋季学期）已发布。',
@@ -381,7 +432,7 @@ export class MockData {
         title: '2026年春季学期校历',
         source: '教务处官网',
         date: '2025-12-31',
-        tag: '通知',
+        tag: T('通知'),
         isTop: false,
         read: false,
         summary: '2025-2026学年第二学期校历。',

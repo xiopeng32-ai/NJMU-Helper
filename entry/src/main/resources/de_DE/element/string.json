@@ -1,0 +1,44 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Client für die Dienste der NJMU"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Hauptansicht von NJMU Helper"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "NJMU Helper"
+    },
+    {
+      "name": "reason_internet",
+      "value": "Wird für die Verbindung zum Prüfungssystem der Universität benötigt (Stundenplan, Noten)"
+    },
+    {
+      "name": "reason_calendar",
+      "value": "Wird verwendet, um Prüfungstermine in den Systemkalender einzutragen"
+    },
+    {
+      "name": "reason_agent_reminder",
+      "value": "Sendet eine Erinnerung vor dem Unterricht, auch wenn die App geschlossen ist"
+    },
+    {
+      "name": "class_preview_card_name",
+      "value": "Kursvorschau"
+    },
+    {
+      "name": "exam_countdown_card_name",
+      "value": "Prüfungs-Countdown"
+    },
+    {
+      "name": "today_schedule_card_name",
+      "value": "Heutige Kurse"
+    },
+    {
+      "name": "score_card_name",
+      "value": "Studienleistungen"
+    }
+  ]
+}

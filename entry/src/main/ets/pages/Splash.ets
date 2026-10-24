@@ -7,6 +7,8 @@ import { router } from '@kit.ArkUI';
 @Entry
 @Component
 struct Splash {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 跳转定时器 id */
   private timer: number = 0;
 

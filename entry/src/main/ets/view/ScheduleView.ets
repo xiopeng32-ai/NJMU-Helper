@@ -37,9 +37,12 @@ import { MaterialButton } from './common/MaterialButton';
 import { MaterialSheetPanel } from './common/MaterialCard';
 import { MaterialCardLayer } from './common/MaterialCarrier';
 import { materialAvailable, sheetBlurStyle } from '../common/SystemMaterial';
+import { T } from '../common/I18n';
 
 @Component
 export struct ScheduleView {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   @StorageProp('bottomInsetPx') bottomInsetPx: number = 0;
   @StorageProp('themeColor') themeColor: string = 'green';
@@ -312,38 +315,49 @@ export struct ScheduleView {
         message: list.length > 0 ? `课表已更新（${list.length} 节）` : '教务系统暂无课表数据'
       });
     } catch (e) {
-      this.getUIContext().getPromptAction().showToast({ message: '刷新失败，请检查网络后重试' });
+      this.getUIContext().getPromptAction().showToast({ message: T('刷新失败，请检查网络后重试') });
     } finally {
       this.refreshingCourses = false;
     }
   }
 
-  /** 导出日历前确认：整学期逐周写入会产生较多事件，且重复导出会重复写入 */
+  /** 导出日历前确认：整学期逐周写入会产生较多事件，且重复导出会重复写入。
+   *  同时提供「每节课课前提醒」选择（不提醒 / 提前 10 分钟 / 提前 30 分钟）。 */
   private confirmExportCalendar(): void {
     if (this.exportingCalendar) {
       return;
     }
     if (this.courses.length === 0) {
-      this.getUIContext().getPromptAction().showToast({ message: '暂无课表数据，先刷新课表' });
+      this.getUIContext().getPromptAction().showToast({ message: T('暂无课表数据，先刷新课表') });
       return;
     }
     AlertDialog.show({
-      title: '导出到系统日历',
-      message: `将把「${this.currentTerm().label}」的 ${this.courses.length} 门课按周次逐条写入系统日历（共约 ${this.estimateEventCount()} 条日程）。\n\n注意：重复导出会产生重复日程，请勿多次导出同一学期。`,
+      title: T('导出到系统日历'),
+      message: `将把「${this.currentTerm().label}」的 ${this.courses.length} 门课按周次逐条写入系统日历（共约 ${this.estimateEventCount()} 条日程）。\n\n选择提醒方式（每节课都会提醒）：\n· 不提醒：只写日程，不弹通知\n· 提前 10 / 30 分钟：系统日历到点通知\n\n注意：重复导出会产生重复日程，请勿多次导出同一学期。`,
       autoCancel: true,
       alignment: DialogAlignment.Center,
-      primaryButton: {
-        value: '取消',
-        action: () => {
+      buttons: [
+        {
+          value: T('不提醒'),
+          action: () => {
+            this.doExportCalendar(0);
+          }
+        },
+        {
+          value: T('提前10分钟'),
+          fontColor: $r('app.color.brand'),
+          action: () => {
+            this.doExportCalendar(10);
+          }
+        },
+        {
+          value: T('提前30分钟'),
+          fontColor: $r('app.color.brand'),
+          action: () => {
+            this.doExportCalendar(30);
+          }
         }
-      },
-      secondaryButton: {
-        value: '导出',
-        fontColor: $r('app.color.brand'),
-        action: () => {
-          this.doExportCalendar();
-        }
-      }
+      ]
     });
   }
 
@@ -363,19 +377,24 @@ export struct ScheduleView {
     return n;
   }
 
-  /** 执行导出：逐门课 × 周次写入系统日历 */
-  private async doExportCalendar(): Promise<void> {
+  /** 执行导出：逐门课 × 周次写入系统日历（含课前提醒） */
+  private async doExportCalendar(reminderMin: number = 0): Promise<void> {
     if (this.exportingCalendar) {
       return;
     }
     this.exportingCalendar = true;
-    this.getUIContext().getPromptAction().showToast({ message: '正在写入系统日历…' });
+    const reminder: number[] = reminderMin > 0 ? [reminderMin] : [];
+    this.getUIContext().getPromptAction().showToast({
+      message: reminderMin > 0 ? `正在写入系统日历（每节课提前 ${reminderMin} 分钟提醒）…` : '正在写入系统日历…'
+    });
     try {
       const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
-      const n: number = await CalendarExport.exportSchedule(ctx, this.currentTerm(), this.courses);
-      this.getUIContext().getPromptAction().showToast({ message: `已写入 ${n} 条日程，打开「日历」即可查看` });
+      const n: number = await CalendarExport.exportSchedule(ctx, this.currentTerm(), this.courses, reminder);
+      DataStore.put('course_reminder_min', `${reminderMin}`);
+      const tip: string = reminderMin > 0 ? `已写入 ${n} 条日程，每节课提前 ${reminderMin} 分钟提醒` : `已写入 ${n} 条日程，打开「日历」即可查看`;
+      this.getUIContext().getPromptAction().showToast({ message: tip });
     } catch (e) {
-      this.getUIContext().getPromptAction().showToast({ message: '导出失败，请确认已授予日历权限后重试' });
+      this.getUIContext().getPromptAction().showToast({ message: T('导出失败，请确认已授予日历权限后重试') });
     } finally {
       this.exportingCalendar = false;
     }
@@ -387,7 +406,7 @@ export struct ScheduleView {
     const endSec: number = this.selected.endSection;
     const period: string = SectionUtil.period(startSec);
     const dateLabel: string = `${Const.WEEK_LABELS[this.selected.weekday - 1]}（${DateUtil.formatCn(this.dateOf(this.selected.weekday))}）`;
-    return `${dateLabel} ${period} 第 ${startSec}-${endSec} 节（${DateUtil.sectionRange(startSec, endSec)}）`;
+    return `${dateLabel} ${period} 第 ${startSec}-${endSec} 节（${SectionUtil.rangeText(this.cfg, startSec, endSec)}）`;
   }
 
   /** 取某星期几当天（当前周）的课程列表 */
@@ -566,7 +585,7 @@ export struct ScheduleView {
 
   /** 格子内上课时间文本（只显示时刻，不显示第几节） */
   private cellTimeText(course: CourseItem): string {
-    return DateUtil.sectionRange(course.startSection, course.endSection);
+    return SectionUtil.rangeText(this.cfg, course.startSection, course.endSection);
   }
 
   /** 格子内地点文本（@ 前缀开关） */
@@ -708,7 +727,7 @@ export struct ScheduleView {
       Row() {
         Column() {
           Row() {
-            Text('课程表')
+            Text(T('课程表'))
               .fontSize(20)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
               .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
@@ -819,7 +838,7 @@ export struct ScheduleView {
               this.viewWeek = this.currentWeek;
             }
           }) {
-            Text('回到本周')
+            Text(T('回到本周'))
               .fontSize(11)
               .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
@@ -979,7 +998,7 @@ export struct ScheduleView {
           .fontColor(week === this.viewWeek ? $r('app.color.brand_on') :
             (week === this.currentWeek ? Theme.colorOf(this.themeColor) : $r('app.color.text_primary')))
         if (week === this.currentWeek) {
-          Text('当前')
+          Text(T('当前'))
             .fontSize(9)
             .fontColor(Theme.colorOf(this.themeColor))
             .padding({ left: 4, right: 4, top: 1, bottom: 1 })
@@ -1018,7 +1037,7 @@ export struct ScheduleView {
           .fontColor(week === this.viewWeek ? $r('app.color.brand_on') :
             (week === this.currentWeek ? Theme.colorOf(this.themeColor) : $r('app.color.text_primary')))
         if (week === this.currentWeek) {
-          Text('当前')
+          Text(T('当前'))
             .fontSize(9)
             .fontColor(Theme.colorOf(this.themeColor))
             .padding({ left: 4, right: 4, top: 1, bottom: 1 })
@@ -1289,9 +1308,9 @@ export struct ScheduleView {
       const base64: string = JwApi.arrayBufferToBase64(out);
       DataStore.setScheduleBg(base64);
       this.scheduleBg = base64;
-      this.getUIContext().getPromptAction().showToast({ message: '背景图已设置' });
+      this.getUIContext().getPromptAction().showToast({ message: T('背景图已设置') });
     } catch (e) {
-      this.getUIContext().getPromptAction().showToast({ message: '设置背景图失败' });
+      this.getUIContext().getPromptAction().showToast({ message: T('设置背景图失败') });
     }
   }
 
@@ -1299,7 +1318,7 @@ export struct ScheduleView {
   private clearBackgroundImage(): void {
     DataStore.setScheduleBg('');
     this.scheduleBg = '';
-    this.getUIContext().getPromptAction().showToast({ message: '背景图已清除' });
+    this.getUIContext().getPromptAction().showToast({ message: T('背景图已清除') });
   }
 
   /** 所有课程名（去重），课程详情"一键分配"用 */
@@ -1317,7 +1336,7 @@ export struct ScheduleView {
   weekPickerSheet() {
     // 弹窗内容套 MaterialSheetPanel：材质由 Toggle 承载层渲染，bindSheet 必须显式透明底（见 weekHeaderBar 的选项）。
     // SheetSize.MEDIUM 固定高 → 保持 panelFillHeight 默认 true，材质裹住整块面板；内边距原样保留。
-    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelTitle: '点阵周次', panelShowClose: true, panelOnClose: (): void => { this.showWeekSheet = false; } }) {
+    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelTitle: T('点阵周次'), panelShowClose: true, panelOnClose: (): void => { this.showWeekSheet = false; } }) {
       Column() {
         List({ space: 10 }) {
           ForEach(this.weekList(), (w: number) => {
@@ -1329,7 +1348,8 @@ export struct ScheduleView {
                 this.showWeekSheet = false;
               })
             }
-          }, (w: number) => `pick${w}`)
+            // key 带当前周：否则切换周后弹窗里的高亮不跟着走
+          }, (w: number) => `pick${w}_${this.viewWeek === w ? 1 : 0}`)
         }
         .width('100%')
         .padding({ left: 16, right: 16 })
@@ -1346,10 +1366,10 @@ export struct ScheduleView {
     // 弹窗内容套 MaterialSheetPanel：材质由 Toggle 承载层渲染，bindSheet 必须显式透明底（见外层选项）。
     // SheetSize.FIT_CONTENT（高度随内容）→ panelFillHeight: false（true 会把弹窗撑到最大高度）；
     // 内层 20/8/24vp 内边距原样保留。学期行保留实色底：选中态靠实色背景表达，材质会吃掉选中态。
-    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false, panelTitle: '选择学年-学期', panelShowClose: true, panelOnClose: (): void => { this.showTermSheet = false; } }) {
+    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false, panelTitle: T('选择学年-学期'), panelShowClose: true, panelOnClose: (): void => { this.showTermSheet = false; } }) {
       Column() {
         if (this.terms.length === 0) {
-          Text('暂无可查询的学期')
+          Text(T('暂无可查询的学期'))
             .fontSize(13)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
@@ -1391,7 +1411,7 @@ export struct ScheduleView {
   settingsSheet() {
     // 弹窗内容套 MaterialSheetPanel：材质由 Toggle 承载层渲染，bindSheet 必须显式透明底（见外层选项）。
     // SheetSize.MEDIUM 固定高 → 保持 panelFillHeight 默认 true；ScheduleSettingsPanel 根为 Stack、无底色。
-    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelTitle: '课程表设置', panelShowClose: true, panelOnClose: (): void => { this.showSettingsSheet = false; } }) {
+    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelTitle: T('课程表设置'), panelShowClose: true, panelOnClose: (): void => { this.showSettingsSheet = false; } }) {
       ScheduleSettingsPanel({
         cfg: this.cfg,
         scheduleBg: this.scheduleBg,
@@ -1414,7 +1434,7 @@ export struct ScheduleView {
     // 弹窗内容套 MaterialSheetPanel：材质由 Toggle 承载层渲染，bindSheet 必须显式透明底
     // （竖屏/横屏两处 bindSheet 选项均已改）。SheetSize.MEDIUM 固定高 → panelFillHeight 默认 true；
     // CourseDetailPanel 根为 Scroll（自带滚动、无底色），不遮挡材质。
-    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelTitle: '课程详情', panelShowClose: true, panelOnClose: (): void => { this.showSheet = false; } }) {
+    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelTitle: T('课程详情'), panelShowClose: true, panelOnClose: (): void => { this.showSheet = false; } }) {
       CourseDetailPanel({
         selected: this.selected,
         customColors: this.customColors,
@@ -1448,7 +1468,7 @@ export struct ScheduleView {
               if (this.loading && this.courses.length === 0) {
                 LoadingTip()
               } else if (this.courses.length === 0) {
-                LoadingTip({ text: '本学期暂无课程，可点击顶部"切换学期"查看其它学期' })
+                LoadingTip({ text: T('本学期暂无课程，可点击顶部"切换学期"查看其它学期') })
               } else {
                 if (this.scheduleBg.length > 0) {
                   Image(`data:image/jpeg;base64,${this.scheduleBg}`)
@@ -1526,6 +1546,16 @@ export struct ScheduleView {
 
   /** 页面消失：注销横竖屏监听 */
   aboutToDisappear(): void {
+    // 注销 MediaQuery 监听（只置 null 不会取消注册，回调会持续持有已销毁的组件）
+    if (this.landscapeListener !== null) {
+      this.landscapeListener.off('change');
+      this.landscapeListener = null;
+    }
+    if (this.wideListener !== null) {
+      this.wideListener.off('change');
+      this.wideListener = null;
+    }
+
     this.landscapeListener = null;
     this.wideListener = null;
   }
@@ -1587,13 +1617,13 @@ export struct ScheduleView {
                 AppState.stack.pushPath({ name: Const.ROUTE_COURSE_RAW });
               }
             }) {
-              Text('课表原文件')
+              Text(T('课表原文件'))
                 .fontSize(11)
                 .fontColor(Theme.colorOf(this.themeColor))
                 .padding({ left: 8, right: 8, top: 3, bottom: 3 })
             }
             Blank()
-            Text('点击课程查看详情')
+            Text(T('点击课程查看详情'))
               .fontSize(11)
               .fontColor(this.schedTextSec())
           }
@@ -1607,7 +1637,7 @@ export struct ScheduleView {
           if (this.noScheduleCourses().length > 0) {
             Column() {
               Row() {
-                Text('无时间课程')
+                Text(T('无时间课程'))
                   .fontSize(12)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(this.schedTextSec())
@@ -1682,7 +1712,7 @@ export struct ScheduleView {
   weekDotsPanel() {
     Column() {
       Row() {
-        Text('点阵周次')
+        Text(T('点阵周次'))
           .fontSize(15)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
@@ -1718,7 +1748,7 @@ export struct ScheduleView {
       Scroll() {
         Column() {
           Row() {
-            Text('点阵周次')
+            Text(T('点阵周次'))
               .fontSize(15)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
               .fontColor($r('app.color.text_primary'))

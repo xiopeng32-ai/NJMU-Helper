@@ -32,6 +32,8 @@ import { applyMaterialCarrier } from '../../common/SystemMaterial';
 
 @Component
 export struct MaterialCardLayer {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 与 MaterialCard 的 cardRadius 保持一致，避免出现内嵌的小圆角边框 */
   /**
    * 承载层圆角：统一数值，或分角对象 `{ topLeft/topRight/bottomRight/bottomLeft }`。

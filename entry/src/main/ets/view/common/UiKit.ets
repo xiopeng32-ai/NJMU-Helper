@@ -15,10 +15,13 @@ import { MaterialCardLayer } from './MaterialCarrier';
 import { materialAvailable } from '../../common/SystemMaterial';
 import { WallpaperTone } from '../../common/WallpaperTone';
 import { BackButton } from './BackButton';
+import { T } from '../../common/I18n';
 
 /** 区块标题：左侧竖条 + 标题 + 右侧操作 */
 @Component
 export struct SectionHeader {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('themeColor') themeColor: string = 'green';
   @StorageProp('isDarkMode') isDarkMode: boolean = false;
   @StorageProp('wallpaperTone') wallpaperTone: number = -1;
@@ -82,6 +85,8 @@ export struct SectionHeader {
 /** 彩色小标签 */
 @Component
 export struct TagChip {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop text: string = '';
   color: ResourceColor = $r('app.color.brand');
   bg: ResourceColor = $r('app.color.brand_light');
@@ -99,8 +104,10 @@ export struct TagChip {
 /** 空状态 */
 @Component
 export struct EmptyTip {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop icon: string = '';
-  @Prop text: string = '暂无数据';
+  @Prop text: string = T('暂无数据');
   /** 灰字广播依赖登记：广播时本组件重算 grayTertiary 文本色 */
   @StorageProp('grayTick') grayTick: number = 0;
 
@@ -127,11 +134,13 @@ export struct EmptyTip {
 /** 加载中 */
 @Component
 export struct LoadingTip {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('themeColor') themeColor: string = 'green';
   @StorageProp('barStyle') barStyle: string = 'new';
   @StorageProp('subtitleColor') subtitleColor: string = '';
   @Prop icon: string = '';
-  @Prop text: string = '正在同步教务数据…';
+  @Prop text: string = T('正在同步教务数据…');
   /** 灰字广播依赖登记：广播时本组件重算 grayTertiary 文本色 */
   @StorageProp('grayTick') grayTick: number = 0;
 
@@ -158,6 +167,8 @@ export struct LoadingTip {
 /** 统计格：数值 + 说明 */
 @Component
 export struct StatCell {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop value: string = '';
   @Prop label: string = '';
   color: ResourceColor = $r('app.color.text_primary');
@@ -196,6 +207,8 @@ export struct StatCell {
 /** 设置项 */
 @Component
 export struct SettingRow {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop icon: string = '';
   @Prop title: string = '';
   @Prop value: string = '';
@@ -253,6 +266,8 @@ export struct SettingRow {
  *  value 过长（多选结果）时 Marquee 滚动显示，避免溢出屏幕 */
 @Component
 export struct PickRow {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop label: string = '';
   @Prop value: string = '';
   @Prop placeholder: string = '';
@@ -328,6 +343,8 @@ export struct PickRow {
  */
 @Component
 export struct BarTitle {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop title: string = '';
   @Prop subtitle: string = '';
   /** 长标题是否跑马灯滚动（默认省略号） */
@@ -403,6 +420,8 @@ export struct BarTitle {
 
 @Component
 export struct PageHeader {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 全局字重响应式订阅：表达式读 this.fwMode 才登记依赖，fwValue 声明即订阅 */
   @StorageProp('fontWeightMode') fwMode: string = 'follow';
@@ -466,7 +485,7 @@ export struct PageHeader {
       // 整体高 34 与左侧返回按钮一致 → 中心中线对齐
       if (this.showActionToggle) {
         Row() {
-          Text(this.actionToggleLabel.length > 0 ? this.actionToggleLabel : (this.actionToggleOn ? '收集中' : '已暂停'))
+          Text(this.actionToggleLabel.length > 0 ? this.actionToggleLabel : (this.actionToggleOn ? T('收集中') : T('已暂停')))
             .fontSize(11)
             .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
             .margin({ right: 8 })

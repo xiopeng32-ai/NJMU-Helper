@@ -24,6 +24,7 @@ import { MaterialCard, MaterialSheetPanel } from './common/MaterialCard';
 import { MaterialButton } from './common/MaterialButton';
 import { sheetBlurStyle } from '../common/SystemMaterial';
 import { AppearanceStore } from '../common/AppearanceStore';
+import { T } from '../common/I18n';
 
 /** 浏览器标识（UA）常量：桌面 / 手机 / 平板 */
 const DESKTOP_UA: string =
@@ -40,6 +41,8 @@ const UA_TABLET: number = 2;
 
 @Component
 export struct WebViewPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -73,7 +76,7 @@ export struct WebViewPage {
     this.pageTitle = AppState.webTitle.length > 0 ? AppState.webTitle : '网页';
     // 功能浏览模式默认禁止使用外部链接页（GitHub 开源页面白名单除外）；调试模式开启后放行
     if (JwApi.USE_MOCK && !AppState.debugNetwork && !WebViewPage.isMockAllowed(AppState.webUrl)) {
-      this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+      this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
       setTimeout(() => {
         AppState.stack.pop();
       }, 400);
@@ -101,7 +104,7 @@ export struct WebViewPage {
     try {
       const record: systemShare.SharedRecord = {
         utd: 'general.hyperlink',
-        title: AppState.webTitle.length > 0 ? AppState.webTitle : '外部链接',
+        title: AppState.webTitle.length > 0 ? AppState.webTitle : T('外部链接'),
         content: url
       };
       const data: systemShare.SharedData = new systemShare.SharedData(record);
@@ -129,7 +132,7 @@ export struct WebViewPage {
       };
       ctx.startAbility(want);
     } catch (e) {
-      this.getUIContext().getPromptAction().showToast({ message: '打开浏览器失败' });
+      this.getUIContext().getPromptAction().showToast({ message: T('打开浏览器失败') });
     }
   }
 
@@ -244,7 +247,7 @@ export struct WebViewPage {
         .onClick(() => {
           this.goForward();
         })
-      MenuItem({ content: '刷新' })
+      MenuItem({ content: T('刷新') })
         .onClick(() => {
           this.refreshPage();
         })
@@ -313,13 +316,13 @@ export struct WebViewPage {
               this.clearHistoryAll();
             }
           }) {
-            Text('清空')
+            Text(T('清空'))
               .fontSize(13)
               .fontColor('#DB5252')
               .padding({ left: 12, right: 12, top: 4, bottom: 4 })
           }
         } else {
-          Text('清空')
+          Text(T('清空'))
             .fontSize(13)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .padding({ left: 12, right: 12, top: 4, bottom: 4 })
@@ -333,7 +336,7 @@ export struct WebViewPage {
       .alignItems(VerticalAlign.Top)
 
       if (this.historyItems.length === 0) {
-        Text('暂无历史记录')
+        Text(T('暂无历史记录'))
           .fontSize(14)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ top: 40 })
@@ -409,11 +412,11 @@ export struct WebViewPage {
   @Builder
   mockBlocked() {
     Column() {
-      Text('当前为功能浏览模式')
+      Text(T('当前为功能浏览模式'))
         .fontSize(15)
         .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
         .fontColor($r('app.color.text_primary'))
-      Text('该外部链接不可用，请使用真实账号登录后访问')
+      Text(T('该外部链接不可用，请使用真实账号登录后访问'))
         .fontSize(12)
         .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .margin({ top: 8 })
@@ -457,7 +460,7 @@ export struct WebViewPage {
               this.shareLink();
             }
           }) {
-            Text('分享')
+            Text(T('分享'))
               .fontSize(12)
               .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
               .height(34)
@@ -476,7 +479,7 @@ export struct WebViewPage {
             btnBorderW: GlassMaterial.borderWidth(),
             btnBorderC: GlassMaterial.borderColor()
           }) {
-            Text('更多')
+            Text(T('更多'))
               .fontSize(12)
               .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
               .height(34)

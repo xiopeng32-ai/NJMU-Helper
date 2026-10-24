@@ -1,14 +1,15 @@
 {
-  "version": "2.0.15",
-  "versionCode": 2000015,
-  "date": "2026-10-20",
+  "version": "2.2.1",
+  "versionCode": 2000201,
+  "date": "2026-10-24",
   "notes": [
-    "新增智慧屏支持（遥控器可操作）",
-    "PC 窗口最小尺寸与底栏加宽",
-    "快捷入口支持焦点与回车",
-    "关于页显示设备类型"
+    "修复「关于应用」项目链接：GitHub / Gitee 地址原指向他人仓库（404），改为本项目仓库",
+    "新增「问题反馈（Issues）」与「官方网站」入口",
+    "《用户协议》《隐私政策》联系方式改为本项目 Issues",
+    "链接地址去协议头与末尾斜杠，超长单行省略",
+    "新增 3 条文案的多语言（问题反馈 / 官方网站 / 上游项目）"
   ],
-  "downloadUrl": "assets/download/NJMU-Helper-2.0.15.hap",
+  "downloadUrl": "assets/download/NJMU-Helper-2.2.1.hap",
   "minSupported": "1.9.0",
   "ohVersion": "2.0.15-oh",
   "ohDownloadUrl": "assets/download/NJMU-Helper-2.0.15-oh.hap",

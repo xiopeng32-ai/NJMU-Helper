@@ -18,13 +18,16 @@
  *    胶囊小按钮用公共组件 `MaterialButton`（Toggle 承载层 + 内容，普通 Button 直接挂材质真机不渲染）；
  *    半模态弹窗内容用 `MaterialSheetPanel`，且 `bindSheet` 必须显式 `backgroundColor: Color.Transparent`。
  */
+import { KeyCode } from '@kit.InputKit';
 import { SheetUtil } from '../common/SheetUtil';
 import { mediaquery } from '@kit.ArkUI';
 import { JwApi } from '../api/JwApi';
+import { HttpClient } from '../api/HttpClient';
 import { AppState } from '../common/AppState';
 import { Const } from '../common/Constants';
 import { DataStore } from '../common/DataStore';
 import { DateUtil } from '../common/DateUtil';
+import { SectionUtil } from '../common/SectionUtil';
 import { LogStore } from '../common/LogStore';
 import { Theme } from '../common/ThemeUtil';
 import { WallpaperTone } from '../common/WallpaperTone';
@@ -43,6 +46,7 @@ import { BarTitle, EmptyTip, LoadingTip, SectionHeader, TagChip } from './common
 import { WebSurface } from './WebSurface';
 import { CHANGELOG_ALL, ChangelogItem } from '../common/Changelog';
 import { ResponsiveUtil } from '../common/ResponsiveUtil';
+import { T } from '../common/I18n';
 
 /** 下一次非今日课的预告（首页课程无课时展示） */
 interface NextFutureCourse {
@@ -60,6 +64,8 @@ interface NextFutureCourse {
  */
 @CustomDialog
 struct UpdateContentDialog {
+  /** 界面语言版本号：切换语言后重建，避免对话框文案滞后 */
+  @StorageProp('langRev') langRev: number = 0;
   controller?: CustomDialogController;
   @Link titleText: string;
   @Link lines: string[];
@@ -81,7 +87,7 @@ struct UpdateContentDialog {
       }
       .alignItems(HorizontalAlign.Start)
       .width('100%')
-      Button('知道了')
+      Button(T('知道了'))
         .fontSize(14)
         .fontColor(Color.White)
         .backgroundColor('#005BAC')
@@ -101,6 +107,8 @@ struct UpdateContentDialog {
 
 @Component
 export struct HomeView {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   @StorageProp('bottomInsetPx') bottomInsetPx: number = 0;
   @StorageProp('themeColor') themeColor: string = 'green';
@@ -133,6 +141,10 @@ export struct HomeView {
   @State photo: string = '';
   @State isLandscape: boolean = false;
   @State teachingCal: TeachingCalendar | null = null;
+  /** 沉浸浏览：下滑隐藏顶部标题栏与底部 tab 栏，上滑恢复（广播给 MainView 控制底栏） */
+  @State barHidden: boolean = false;
+  /** 滚动累计偏移（onScroll 增量求和），用于下滑阈值判断 */
+  private scrollOffset: number = 0;
   /** 日历月份 Swiper 当前页（自绘页码指示器用） */
   @State calPageIndex: number = 0;
   @State jwcNotices: NoticeItem[] = [];
@@ -158,6 +170,13 @@ export struct HomeView {
   // 课程无课时：随机鼓励文案 + 下次课预告
   @State randomRestText: string = '';
   @State nextFutureCourse: NextFutureCourse | null = null;
+  /** 订阅 refreshAll 广播：登录后 refreshAll 完成会 setOrCreate 此值，触发本页从缓存重载数据
+   *  （修复「首页不显示」：refreshAll 成功但 HomeView 的 loadData 已在缓存为空时跑完，数据没回填） */
+  @Watch('onRefreshStatusChanged') @StorageProp('dataRefreshStatus') refreshStatus: Record<string, Object> = {};
+  /** 会话过期标记（HttpClient 检测到登录页响应时置真）：驱动顶栏「登录已过期 · 重登」提示 */
+  @StorageProp('sessionExpired') sessionExpiredFlag: boolean = false;
+  /** 在线保活定时器（前台每 8 分钟轻量请求一次，维持教务会话活跃） */
+  private keepAliveTimer: number = -1;
   @State refreshing: boolean = false;
   onSwitchTab: (index: number) => void = () => {
   };
@@ -236,19 +255,69 @@ export struct HomeView {
       this.currentWeek = AppState.mockCurrentWeek;
     } else {
       this.currentWeek = DateUtil.weekOfTerm(AppState.term, new Date());
+      // 兜底：学期边界（开学前/期末后）weekOfTerm 可能返回 0，周次 0 匹配不到任何课
+      // → 首页误显"当前没课了"，故夹到 [1, 30]
+      if (this.currentWeek < 1) {
+        this.currentWeek = 1;
+      } else if (this.currentWeek > 30) {
+        this.currentWeek = 30;
+      }
     }
     this.calDefaultMonth = this.computeCurrentMonth();
     this.calPageIndex = this.calInitialIndex();
     this.loadTermCustom();
     this.randomRestText = this.pickRestText();
     this.listenLandscape();
+    this.startKeepAlive();
     this.loadData();
   }
 
   /** 页面消失：注销监听 */
   aboutToDisappear(): void {
+    // 注销 MediaQuery 监听（只置 null 不会取消注册，回调会持续持有已销毁的组件）
+    if (this.landscapeListener !== null) {
+      this.landscapeListener.off('change');
+      this.landscapeListener = null;
+    }
+    if (this.wideListener !== null) {
+      this.wideListener.off('change');
+      this.wideListener = null;
+    }
+
     this.landscapeListener = null;
     this.wideListener = null;
+    this.stopKeepAlive();
+  }
+
+  /**
+   * 启动在线保活：前台每 8 分钟轻量请求一次通知接口，维持教务/云课堂会话活跃，
+   * 避免长时间停留首页后会话静默过期导致"点开就要求重登"。
+   * 已过期时改为触发一次自动恢复（CASTGC → 账号密码），无感续期。
+   */
+  private startKeepAlive(): void {
+    this.stopKeepAlive();
+    this.keepAliveTimer = setInterval(() => {
+      if (JwApi.USE_MOCK) {
+        return;
+      }
+      if (AppState.sessionExpired) {
+        HttpClient.resetNetworkCache();
+        JwApi.autoRecoverIfNeeded();
+        return;
+      }
+      // 轻量保活：只碰通知接口（缓存命中/单飞去重，开销小），失败静默
+      HttpClient.resetNetworkCache();
+      JwApi.getNotices().catch((_e: Object) => {
+        // ignore
+      });
+    }, 8 * 60 * 1000);
+  }
+
+  private stopKeepAlive(): void {
+    if (this.keepAliveTimer >= 0) {
+      clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = -1;
+    }
   }
 
   /** 监听窗口尺寸/方向变化：窗口缩放或旋转时实时切换布局（判定规则见 ResponsiveUtil） */
@@ -274,7 +343,8 @@ export struct HomeView {
     this.isLandscape = ResponsiveUtil.isWideLayout(this.wideMq, this.landscapeMq);
   }
 
-  /** 等待冷启动会话恢复完成（AppState.sessionReady；服务大厅登录时 Index 先桥接新教务系统再置 true） */
+  /** 等待冷启动会话恢复完成（AppState.sessionReady；服务大厅登录时 Index 先桥接新教务系统再置 true）
+   *  上限 8s：缓存/内置校历已在前置块秒开，网络数据晚到可后台覆盖，不必让用户等 15s */
   private waitSessionReady(): Promise<void> {
     return new Promise<void>((resolve) => {
       if (AppState.sessionReady) {
@@ -284,7 +354,7 @@ export struct HomeView {
       let waited: number = 0;
       const check: () => void = () => {
         waited += 200;
-        if (AppState.sessionReady || waited > 15000) {
+        if (AppState.sessionReady || waited > 8000) {
           resolve();
           return;
         }
@@ -296,19 +366,9 @@ export struct HomeView {
     });
   }
 
-  private async loadData(): Promise<void> {
-    // 冷启动会话恢复中（服务大厅登录：Index 正在用 CASTGC 重新桥接"新教务系统"）：
-    // 等待就绪后再取数，避免用旧教务会话导致数据拉取失败（最多等 15s 兜底）
-    await this.waitSessionReady();
-    // 学期列表（顶栏选择用）
-    this.terms = await JwApi.getTerms();
-    for (let i: number = 0; i < this.terms.length; i++) {
-      if (this.terms[i].id === AppState.term.id) {
-        this.selectedTermIndex = i;
-        break;
-      }
-    }
-    // 先用本地缓存快速展示（秒开），再后台刷新覆盖
+  private async loadData(waitSession: boolean = true): Promise<void> {
+    // ★ 缓存秒开块放最前（不依赖任何异步等待）：课表/考试/消息/内置校历立即渲染，
+    //   即使 waitSessionReady 卡 15s、getTerms 失败、任一接口挂起，首页也绝不白屏空转
     const cachedCourses: CourseItem[] = JwApi.loadCachedCourses();
     if (cachedCourses.length > 0) {
       this.todayCourses = this.pickToday(cachedCourses);
@@ -318,73 +378,176 @@ export struct HomeView {
       const cachedExams: ExamItem[] = JwApi.loadCachedExams();
       this.exams = this.pickComingExams(cachedExams);
       this.notices = JwApi.loadCachedNotices().slice(0, 3);
-      this.loading = false;
     }
-    // 校历：首屏立即用内置校历秒开（官方 xlsx 数据已内置），绝不因网络空转；
-    // 随后在下方独立分支后台刷新覆盖。
     if (this.teachingCal === null) {
       this.teachingCal = JwApi.builtinCal();
+    }
+    if (cachedCourses.length > 0 || this.teachingCal !== null) {
+      this.loading = false;
     }
     // 头像：先读缓存，再独立拉取（不依赖课表/考试成功，避免被前面接口失败跳过）
     const cachedPhoto: string = JwApi.loadCachedPhoto();
     if (cachedPhoto.length > 0) {
       this.photo = cachedPhoto;
     }
+    // 日志：记录缓存秒开结果（含下一节课是否命中，便于定位「下一节课不显示」）
+    LogStore.log('首页', '缓存秒开', cachedCourses.length > 0 ? '命中' : '无缓存',
+      `课表${cachedCourses.length}节 今日课${this.todayCourses.length}节 下一节=${this.nextClass !== null ? this.nextClass.course.name : '无'} 当前周=${this.currentWeek}`);
+    // 冷启动会话恢复中（服务大厅登录：Index 正在用 CASTGC 重新桥接"新教务系统"）：
+    // 等待就绪后再取数，避免用旧教务会话导致数据拉取失败（最多等 15s 兜底）。
+    // 下拉刷新（waitSession=false）时跳过等待：会话早已就绪，再等 15s 只会让刷新圈空转。
+    if (waitSession) {
+      await this.waitSessionReady();
+    }
+    // 学期列表（顶栏选择用）：容错化，失败不再阻塞后续刷新链路
+    try {
+      this.terms = await JwApi.getTerms();
+      for (let i: number = 0; i < this.terms.length; i++) {
+        if (this.terms[i].id === AppState.term.id) {
+          this.selectedTermIndex = i;
+          break;
+        }
+      }
+    } catch (e) {
+      LogStore.log('首页', '学期列表', '加载失败', LogStore.errorOf(e as Object));
+    }
     // 日志调试：记录本地操作（先用缓存秒开）与实际反馈（网络刷新结果）
     LogStore.log('首页', '消息加载', '开始',
       `缓存课表${cachedCourses.length}节 考试${this.exams.length}门 通知${this.notices.length}条`);
-    try {
-      const courses: CourseItem[] = await JwApi.getCoursesSmart(AppState.term.id, false);
-      this.todayCourses = this.pickToday(courses);
+    // ★ 课表/考试/消息三接口并行 + 各自容错：任一失败不阻断其余，且总耗时≈最慢一个（性能优化）
+    const taskCourses: Promise<CourseItem[]> = JwApi.getCoursesSmart(AppState.term.id, false)
+      .catch((_e: Object): CourseItem[] => []);
+    const taskExams: Promise<ExamItem[]> = JwApi.getExams(AppState.term.id)
+      .catch((_e: Object): ExamItem[] => []);
+    const taskNotices: Promise<NoticeItem[]> = JwApi.getNotices()
+      .catch((_e: Object): NoticeItem[] => []);
+
+    const courses: CourseItem[] = await taskCourses;
+    // ★ 网络返回空时回退缓存兜底：首次真实登录时 refreshAll（登录回调）与 loadData（挂载）并发，
+    //   getCoursesSmart 可能因 coursesFetchedToday 短路或时序竞态返回空，此时再读一次缓存确保首页有数据
+    let finalCourses: CourseItem[] = courses;
+    if (finalCourses.length === 0) {
+      finalCourses = JwApi.loadCachedCourses();
+    }
+    if (finalCourses.length > 0) {
+      this.todayCourses = this.pickToday(finalCourses);
       this.nextClass = this.firstUnfinished(this.todayCourses);
-      this.nextFutureCourse = this.findNextFutureCourse(courses, AppState.term);
+      this.nextFutureCourse = this.findNextFutureCourse(finalCourses, AppState.term);
       this.randomRestText = this.pickRestText();
-      const exams: ExamItem[] = await JwApi.getExams(AppState.term.id);
+      LogStore.log('首页', '课表', '刷新成功',
+        `${finalCourses.length}节 今日课${this.todayCourses.length}节 下一节=${this.nextClass !== null ? this.nextClass.course.name : '无'}`);
+    } else {
+      LogStore.log('首页', '课表', '刷新失败', '返回空且无缓存');
+    }
+    const exams: ExamItem[] = await taskExams;
+    if (exams.length > 0) {
       this.exams = this.pickComingExams(exams);
-      const notices: NoticeItem[] = await JwApi.getNotices();
+    } else {
+      // 考试空 → 回退缓存（refreshAll 并发写入场景）
+      const cachedExams2: ExamItem[] = JwApi.loadCachedExams();
+      if (cachedExams2.length > 0) {
+        this.exams = this.pickComingExams(cachedExams2);
+      }
+    }
+    const notices: NoticeItem[] = await taskNotices;
+    if (notices.length > 0) {
       this.notices = notices.slice(0, 3);
-      LogStore.log('首页', '消息加载', '完成',
-        `网络课表${courses.length}节 考试${exams.length}门 通知${notices.length}条`);
-    } catch (e) {
-      // 网络异常时保持缓存数据
-      LogStore.log('首页', '消息加载', '网络异常', LogStore.errorOf(e as Object));
-    }
-    // 校历独立分支：不阻塞主链路，失败回退内置校历（JwApi 已保证不返回 null），绝不空转
-    try {
-      const cal: TeachingCalendar | null = await JwApi.getTeachingCalendar();
-      if (cal !== null) {
-        this.teachingCal = cal;
+      LogStore.log('首页', '消息', '刷新成功', `${notices.length}条`);
+    } else {
+      // 消息空 → 回退缓存（refreshAll 并发写入场景）
+      const cachedNotices2: NoticeItem[] = JwApi.loadCachedNotices();
+      if (cachedNotices2.length > 0) {
+        this.notices = cachedNotices2.slice(0, 3);
+        LogStore.log('首页', '消息', '回退缓存', `${cachedNotices2.length}条`);
       }
-    } catch (e) {
-      LogStore.log('首页', '校历', '加载失败', LogStore.errorOf(e as Object));
     }
-    // 通知卡：教务处官网「学期校历」最新两条（独立于消息，失败不阻塞）
-    try {
-      const jn: NoticeItem[] = await JwApi.getJwcNotices();
-      if (jn.length > 0) {
-        this.jwcNotices = jn;
-      }
-    } catch (e) {
-      LogStore.log('首页', '官网通知', '加载失败', LogStore.errorOf(e as Object));
+    // 获取状态提示：若课表仍为空（缓存无 + 网络失败），提示用户可稍后重试
+    if (this.todayCourses.length === 0 && this.nextClass === null && cachedCourses.length === 0) {
+      this.getUIContext().getPromptAction().showToast({ message: T('数据获取失败，请稍后下拉刷新重试'), duration: 2000 });
     }
-    // 独立拉取头像（真实模式，不与上面共用一个 try）
+    // ★ 校历 + 官网通知并行（原为串行两次 await，总耗时翻倍）；各自独立容错，互不阻塞
+    const pCal: Promise<TeachingCalendar | null> = JwApi.getTeachingCalendar()
+      .catch((_e: Object): TeachingCalendar | null => null);
+    const pJwc: Promise<NoticeItem[]> = JwApi.getJwcNotices()
+      .catch((_e: Object): NoticeItem[] => []);
+    const cal: TeachingCalendar | null = await pCal;
+    if (cal !== null) {
+      this.teachingCal = cal;
+    }
+    const jn: NoticeItem[] = await pJwc;
+    if (jn.length > 0) {
+      this.jwcNotices = jn;
+    }
+    // 头像：不阻塞主链路（getPhoto 读超时 60s），后台静默拉取
     if (!JwApi.USE_MOCK) {
-      try {
-        const p: string = await JwApi.getPhoto();
+      JwApi.getPhoto().then((p: string) => {
         if (p.length > 0) {
           this.photo = p;
         }
-      } catch (e) {
+      }).catch((_e: Object) => {
         // ignore
+      });
+    }
+    // 解除首屏 loading（无缓存场景也依赖此行；有缓存时已在前置块提前解除）
+    this.loading = false;
+  }
+
+  /** refreshAll 完成后广播回调：从缓存重载课表/考试/消息回填 UI（修复「首页不显示」） */
+  private onRefreshStatusChanged(): void {
+    // ★ 异常隔离：此回调由 AppStorage.setOrCreate 同步触发，抛出的异常会反向冒泡到
+    //   refreshAll 的 catch（曾因节次越界导致每次刷新都被记为失败、首页永远填不上数据），
+    //   故整体兜底，任何渲染期异常都不得影响数据层。
+    try {
+      this.refillFromCache();
+    } catch (e) {
+      LogStore.log('首页', '刷新广播', '回填异常', LogStore.errorOf(e as Object));
+    }
+  }
+
+  /** 从缓存回填首页数据（课表/考试/消息/周次） */
+  private refillFromCache(): void {
+    // 周次兜底：异常场景下 currentWeek 可能为 0（周次 0 匹配不到任何课 → 误显"当前没课了"）
+    if (this.currentWeek < 1) {
+      this.currentWeek = DateUtil.weekOfTerm(AppState.term, new Date());
+      if (this.currentWeek < 1) {
+        this.currentWeek = 1;
       }
     }
+    // 仅在当前无数据时才从缓存回填（避免覆盖用户正在进行的操作/最新网络结果）
+    const cachedCourses: CourseItem[] = JwApi.loadCachedCourses();
+    if (cachedCourses.length > 0) {
+      this.todayCourses = this.pickToday(cachedCourses);
+      this.nextClass = this.firstUnfinished(this.todayCourses);
+      this.nextFutureCourse = this.findNextFutureCourse(cachedCourses, AppState.term);
+      this.randomRestText = this.pickRestText();
+    }
+    const cachedExams: ExamItem[] = JwApi.loadCachedExams();
+    if (cachedExams.length > 0) {
+      this.exams = this.pickComingExams(cachedExams);
+    }
+    const cachedNotices: NoticeItem[] = JwApi.loadCachedNotices();
+    if (cachedNotices.length > 0) {
+      this.notices = cachedNotices.slice(0, 3);
+    }
     this.loading = false;
+    LogStore.log('首页', '刷新广播', '回填缓存',
+      `课表${cachedCourses.length}节 今日课${this.todayCourses.length}节 消息${this.notices.length}条`);
   }
 
   /** 下拉刷新：重新加载首页全部数据 */
   private async onRefresh(): Promise<void> {
-    await this.loadData();
-    this.refreshing = false;
+    // 下拉刷新会回滚到顶部：恢复顶栏/底栏显示
+    this.restoreBars();
+    // 用户主动刷新 → 重新探测网络（此前可能判定无网，恢复后应重新走网络）
+    HttpClient.resetNetworkCache();
+    try {
+      await this.loadData(false);
+    } catch (e) {
+      LogStore.log('首页', '下拉刷新', '异常', LogStore.errorOf(e as Object));
+    } finally {
+      // 兜底：无论成功失败、是否卡在会话等待，都确保刷新圈停止（修复下拉刷新一直转圈）
+      this.refreshing = false;
+    }
   }
 
   /** 今日所在自然月（yyyymm，用于日历默认展示） */
@@ -395,7 +558,7 @@ export struct HomeView {
 
   /** 课程无课时随机鼓励文案（三选一） */
   private pickRestText(): string {
-    const opts: string[] = ['好好休息吧~', '放松一下吧~', '做自己想做的事吧！'];
+    const opts: string[] = [T('好好休息吧~'), T('放松一下吧~'), T('做自己想做的事吧！')];
     return opts[Math.floor(Math.random() * opts.length)];
   }
 
@@ -406,7 +569,9 @@ export struct HomeView {
    */
   private findNextFutureCourse(courses: CourseItem[], term: TermInfo): NextFutureCourse | null {
     const todayW: number = DateUtil.weekdayOf(new Date());
-    const cw: number = DateUtil.weekOfTerm(term, new Date());
+    // 周次兜底：学期边界 weekOfTerm 可能返回 0，此前会因 weeks.includes(0) 全 false 而永远查不到下次课
+    const cwRaw: number = DateUtil.weekOfTerm(term, new Date());
+    const cw: number = cwRaw < 1 ? (this.currentWeek > 0 ? this.currentWeek : 1) : cwRaw;
     const nowMin: number = DateUtil.minutesOfNow();
     // 1) 当前周，今天及之后
     for (let w: number = todayW; w <= 7; w++) {
@@ -414,8 +579,7 @@ export struct HomeView {
         if (c.weekday === w && c.weeks.includes(cw)) {
           // 今天的课必须还没结束；明天及之后的课直接命中
           if (w === todayW) {
-            const e: number = Math.max(1, Math.min(Const.SECTION_COUNT, c.endSection));
-            const endMin: number = DateUtil.minutesOf(Const.SECTIONS[e - 1].end);
+            const endMin: number = SectionUtil.endMinCurrent(c.endSection);
             if (nowMin > endMin) {
               continue;
             }
@@ -424,8 +588,8 @@ export struct HomeView {
           return {
             course: c,
             weekdayLabel: Const.WEEK_SHORT[w - 1],
-            weekTag: '本周',
-            timeRange: DateUtil.sectionRange(c.startSection, c.endSection),
+            weekTag: T('本周'),
+            timeRange: SectionUtil.rangeTextCurrent(c.startSection, c.endSection),
             dateLabel: DateUtil.formatCn(dt)
           };
         }
@@ -440,7 +604,7 @@ export struct HomeView {
               course: c,
               weekdayLabel: Const.WEEK_SHORT[w - 1],
               weekTag: `第 ${wk} 周`,
-              timeRange: DateUtil.sectionRange(c.startSection, c.endSection),
+              timeRange: SectionUtil.rangeTextCurrent(c.startSection, c.endSection),
               dateLabel: DateUtil.formatCn(dt)
             };
           }
@@ -496,11 +660,14 @@ export struct HomeView {
     const list: TodayCourse[] = [];
     for (const c of courses) {
       if (c.weekday === weekday && c.weeks.includes(this.currentWeek)) {
-        const startMin: number = DateUtil.minutesOf(Const.SECTIONS[c.startSection - 1].start);
-        const endMin: number = DateUtil.minutesOf(Const.SECTIONS[c.endSection - 1].end);
+        // 节次取分钟统一走 DateUtil 夹取版本：课表存在第 16-17 节等超出作息表的课程，
+        // 直接 Const.SECTIONS[c.startSection-1] 会取到 undefined 并在 @Watch 回填里抛异常，
+        // 导致每次刷新都失败、首页数据永远填不上（日志实测 Cannot read property start of undefined）
+        const startMin: number = SectionUtil.startMinCurrent(c.startSection);
+        const endMin: number = SectionUtil.endMinCurrent(c.endSection);
         list.push({
           course: c,
-          timeRange: DateUtil.sectionRange(c.startSection, c.endSection),
+          timeRange: SectionUtil.rangeTextCurrent(c.startSection, c.endSection),
           finished: nowMin > endMin,
           ongoing: nowMin >= startMin && nowMin <= endMin
         });
@@ -523,12 +690,12 @@ export struct HomeView {
   /** 距离下一节课开始的倒计时文案 */
   private countdownText(item: TodayCourse): string {
     if (item.ongoing) {
-      return '进行中';
+      return T('进行中');
     }
-    const startMin: number = DateUtil.minutesOf(Const.SECTIONS[item.course.startSection - 1].start);
+    const startMin: number = SectionUtil.startMinCurrent(item.course.startSection);
     const diff: number = startMin - DateUtil.minutesOfNow();
     if (diff <= 0) {
-      return '即将开始';
+      return T('即将开始');
     }
     const h: number = Math.floor(diff / 60);
     const m: number = diff % 60;
@@ -555,22 +722,25 @@ export struct HomeView {
   private greeting(): string {
     const h: number = new Date().getHours();
     if (h < 6) {
-      return '夜深了';
+      return T('夜深了');
     }
     if (h < 12) {
-      return '早上好';
+      return T('早上好');
     }
     if (h < 14) {
-      return '中午好';
+      return T('中午好');
     }
     if (h < 19) {
-      return '下午好';
+      return T('下午好');
     }
-    return '晚上好';
+    return T('晚上好');
   }
 
   /** 快捷入口图标（按 key 分配，单色 SVG 随主题色渲染） */
   private quickEntryIcon(key: string): Resource {
+    if (key === 'today') {
+      return $r('app.media.calendar');
+    }
     if (key === 'exam') {
       return $r('app.media.exam_arrange');
     }
@@ -580,12 +750,17 @@ export struct HomeView {
     if (key === 'room') {
       return $r('app.media.map_badge_local');
     }
+    if (key === 'cloud') {
+      return $r('app.media.cloud_class');
+    }
     return $r('app.media.data_icon');
   }
 
   /** 首页功能入口点击分发（跳转对应页面） */
   private onEntryTap(key: string): void {
-    if (key === 'schedule') {
+    if (key === 'today') {
+      AppState.stack.pushPath({ name: Const.ROUTE_TODAY_SCHEDULE });
+    } else if (key === 'schedule') {
       this.onSwitchTab(1);
     } else if (key === 'score') {
       // 成绩查询：学业情况页内的二级页面，直接推入
@@ -598,12 +773,61 @@ export struct HomeView {
     } else if (key === 'jw') {
       // 教务系统：应用内 WebView 打开（复用全局会话 Cookie）
       AppState.webUrl = Const.WEB_PORTAL_URL;
-      AppState.webTitle = '教务系统';
+      AppState.webTitle = T('教务系统');
       AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
+    } else if (key === 'cloud') {
+      // 云课堂（智教云：我的课程 / 课堂实录 / 通知）
+      AppState.stack.pushPath({ name: Const.ROUTE_CLOUD_CLASS });
     } else if (key === 'academic') {
       AppState.stack.pushPath({ name: Const.ROUTE_ACADEMIC });
     } else {
-      this.getUIContext().getPromptAction().showToast({ message: '该功能将在接入教务接口后开放' });
+      this.getUIContext().getPromptAction().showToast({ message: T('该功能将在接入教务接口后开放') });
+    }
+  }
+
+  /** 标题栏整体高度（含状态栏 inset），也是滑动隐藏时的位移量 */
+  private titleBarHeight(): number {
+    return this.getUIContext().px2vp(this.topInsetPx) + 60;
+  }
+
+  /** 首页滚动方向检测：下滑且越过阈值 → 隐藏顶栏/底栏（沉浸浏览），上滑 → 恢复 */
+  private handleHomeScroll(deltaY: number): void {
+    this.scrollOffset += deltaY;
+    // 累计偏移夹在 [0, 阈值*1.5]，避免长时间滚动后数值膨胀导致方向判断迟钝
+    if (this.scrollOffset < 0) {
+      this.scrollOffset = 0;
+    }
+    const threshold: number = 90;
+    if (this.scrollOffset > threshold * 1.5) {
+      this.scrollOffset = threshold * 1.5;
+    }
+    if (deltaY > 0 && this.scrollOffset > threshold) {
+      if (!this.barHidden) {
+        this.barHidden = true;
+        // animateTo 包裹广播：底栏 barBottomMargin 变化平滑过渡，标题栏 translate 也随动画
+        this.getUIContext().animateTo({ duration: 260, curve: Curve.EaseInOut }, () => {
+          AppStorage.setOrCreate<boolean>('homeBarsHidden', true);
+        });
+      }
+    } else if (deltaY < 0) {
+      if (this.barHidden) {
+        this.barHidden = false;
+        this.getUIContext().animateTo({ duration: 260, curve: Curve.EaseInOut }, () => {
+          AppStorage.setOrCreate<boolean>('homeBarsHidden', false);
+        });
+      }
+      if (this.scrollOffset < 0) {
+        this.scrollOffset = 0;
+      }
+    }
+  }
+
+  /** 退出首页/刷新时恢复顶栏底栏显示 */
+  private restoreBars(): void {
+    this.scrollOffset = 0;
+    if (this.barHidden) {
+      this.barHidden = false;
+      AppStorage.setOrCreate<boolean>('homeBarsHidden', false);
     }
   }
 
@@ -621,10 +845,10 @@ export struct HomeView {
         })
         .backgroundBlurStyle(Immersive.blur(BlurStyle.Thin, this.barStyle === 'legacy'))
     Row() {
-      BarTitle({ title: '首页' })
-      // 手动重登模式 + 校历为空：标题右侧显示"重登"胶囊（点击执行自动重新登录）
+      BarTitle({ title: T('首页') })
+      // 会话过期 / 手动重登模式：标题右侧显示胶囊（点击执行重新登录）
       if (this.shouldShowRelogin()) {
-        Text('重登')
+        Text(AppState.sessionExpired ? T('登录已过期 · 重登') : T('重登'))
           .fontSize(11)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
           .fontColor('#FFFFFF')
@@ -691,6 +915,10 @@ export struct HomeView {
     // 内容穿透：整个三层标题栏悬浮最上层、不占布局空间，内容可滚入其下层
     .position({ x: 0, y: 0 })
     .zIndex(2)
+    // 沉浸浏览：下滑隐藏（上移滑出屏幕），上滑恢复；带平滑过渡动画
+    .translate({ y: this.barHidden ? -this.titleBarHeight() : 0 })
+    .opacity(this.barHidden ? 0 : 1)
+    .animation({ duration: 260, curve: Curve.EaseInOut })
   }
 
   /** 学期选择弹层（全局设置）—— 与课程表页 termPickerSheet 完全同构 */
@@ -698,10 +926,10 @@ export struct HomeView {
   termPickerSheet() {
     // 弹窗内容套 MaterialSheetPanel：材质由 Toggle 承载层渲染，bindSheet 必须显式透明底（见外层选项）。
     // SheetSize.FIT_CONTENT（高度随内容）→ panelFillHeight: false；内层 20/8/24vp 内边距原样保留。
-    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false, panelTitle: '选择学年-学期', panelShowClose: true, panelOnClose: (): void => { this.showTermSheet = false; } }) {
+    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false, panelTitle: T('选择学年-学期'), panelShowClose: true, panelOnClose: (): void => { this.showTermSheet = false; } }) {
       Column() {
         if (this.terms.length === 0) {
-          Text('暂无可选学期')
+          Text(T('暂无可选学期'))
             .fontSize(13)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
@@ -738,6 +966,39 @@ export struct HomeView {
     }
   }
 
+  /** 会话过期提示条：一行小胶囊，不遮挡内容、不强制用户重登（可继续浏览离线数据） */
+  @Builder
+  sessionBanner() {
+    Row({ space: 8 }) {
+      Text(T('离线'))
+        .fontSize(10)
+        .fontColor('#FFFFFF')
+        .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+        .backgroundColor('rgba(255,255,255,0.26)')
+        .borderRadius(8)
+      Text(T('登录已过期，显示上次同步数据'))
+        .fontSize(11)
+        .fontColor('rgba(255,255,255,0.92)')
+        .layoutWeight(1)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      Text(T('重登'))
+        .fontSize(11)
+        .fontColor('#FFFFFF')
+        .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+        .backgroundColor('rgba(255,255,255,0.24)')
+        .borderRadius(10)
+        .onClick(() => {
+          this.onReloginClick();
+        })
+    }
+    .width('100%')
+    .padding({ left: 10, right: 8, top: 7, bottom: 7 })
+    .backgroundColor('rgba(224,138,0,0.92)')
+    .borderRadius(10)
+    .margin({ top: 8 })
+  }
+
   @Builder
   avatarCard() {
     // 头像卡片（MaterialCard 承载：材质层是卡片内部底层，材质生效时卡片底色让出）：
@@ -759,8 +1020,8 @@ export struct HomeView {
             .objectFit(ImageFit.Cover)
             .backgroundColor(this.subBg($r('app.color.bg_chip'))).backgroundBlurStyle((AppStorage.get<boolean>('immersiveEffect') ?? false) ? BlurStyle.Thin : BlurStyle.NONE).border({ width: 1, color: 'rgba(255,255,255,0.28)' }).shadow({ radius: 6, color: 'rgba(0,0,0,0.10)', offsetY: 1 }).clip(true)
         } else if (JwApi.USE_MOCK) {
-          // 功能浏览模式：默认头像使用内置资源
-          Image($r('app.media.default_avatar'))
+          // 功能浏览模式：使用内置的演示头像（南小医）
+          Image($r('app.media.mock_avatar'))
             .width(52)
             .height(52)
             .borderRadius(26)
@@ -833,7 +1094,7 @@ export struct HomeView {
           .color(Theme.colorOf(this.themeColor))
           .height(14)
           .margin({ right: 8 })
-        Text('下一节课')
+        Text(T('下一节课'))
           .fontSize(16)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
@@ -956,7 +1217,7 @@ export struct HomeView {
               .fontSize(26)
               .margin({ right: 12 })
             Column() {
-              Text('今日课程已全部结束')
+              Text(T('今日课程已全部结束'))
                 .fontSize(16)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                 .fontColor($r('app.color.text_primary'))
@@ -1080,7 +1341,7 @@ export struct HomeView {
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
                 .layoutWeight(1)
               if (this.nextClass!.ongoing) {
-                TagChip({ text: '进行中', color: $r('app.color.brand_on'), bg: Theme.colorOf(this.themeColor) })
+                TagChip({ text: T('进行中'), color: $r('app.color.brand_on'), bg: Theme.colorOf(this.themeColor) })
               } else {
                 TagChip({
                   text: this.countdownText(this.nextClass!),
@@ -1145,7 +1406,7 @@ export struct HomeView {
   @Builder
   quickEntries() {
     Column() {
-      SectionHeader({ title: '快捷入口', action: '', onAction: () => {} })
+      SectionHeader({ title: T('快捷入口'), action: '', onAction: () => {} })
       // 快捷入口卡（实色底）
       // MaterialCard 承载：材质层是卡片内部底层、与卡片同尺寸同圆角，材质生效时卡片底色让出
       MaterialCard({
@@ -1195,15 +1456,26 @@ export struct HomeView {
               }
             }
           }
+          // 智慧屏/键盘：快捷入口可获焦，遥控器「确定」直接打开
+          .focusable(true)
+          .focusOnTouch(false)
+          .onKeyEvent((event: KeyEvent) => {
+            if (event.type === KeyType.Down &&
+              (event.keyCode === KeyCode.KEYCODE_ENTER || event.keyCode === KeyCode.KEYCODE_DPAD_CENTER)) {
+              this.onEntryTap(item.key);
+              return true;
+            }
+            return false;
+          })
         }, (item: QuickEntry) => item.key)
       }
         .columnsTemplate('1fr 1fr')
-        .rowsTemplate('1fr 1fr')
+        .rowsTemplate('1fr 1fr 1fr')
         .width('100%')
         .padding({ top: 6, bottom: 6 })
       }
       .width('100%')
-      .height(118) // 两行入口卡高（原 64 单行；4 项改为 2×2 布局后加高）
+      .height(176) // 三行入口卡高（4 项 2×2 时 118；5 项 2×3 后加高）
       .padding({ left: 16, right: 16 })
       }
     }
@@ -1214,7 +1486,7 @@ export struct HomeView {
   examSection() {
     Column() {
       SectionHeader({
-        title: '近期考试', action: '全部', onAction: () => {
+        title: T('近期考试'), action: T('全部'), onAction: () => {
           AppState.stack.pushPath({ name: Const.ROUTE_EXAM });
         }
       })
@@ -1227,7 +1499,7 @@ export struct HomeView {
           cardBorderW: GlassMaterial.borderWidth(),
           cardBorderC: GlassMaterial.borderColor()
         }) {
-          EmptyTip({ text: '近期没有考试安排' })
+          EmptyTip({ text: T('近期没有考试安排') })
         }
       } else {
         ForEach(this.exams, (item: ExamItem) => {
@@ -1297,7 +1569,7 @@ export struct HomeView {
   messageSection() {
     Column() {
       SectionHeader({
-        title: '消息', action: '查看更多', onAction: () => {
+        title: T('消息'), action: T('查看更多'), onAction: () => {
           AppState.stack.pushPath({ name: Const.ROUTE_NOTICE });
         }
       })
@@ -1310,7 +1582,7 @@ export struct HomeView {
           cardBorderW: GlassMaterial.borderWidth(),
           cardBorderC: GlassMaterial.borderColor()
         }) {
-          EmptyTip({ text: '暂无消息' })
+          EmptyTip({ text: T('暂无消息') })
         }
       } else {
         MaterialCard({
@@ -1351,7 +1623,7 @@ export struct HomeView {
                   .fontSize(11)
                   .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 Blank()
-                Text('详情 ›')
+                Text(T('详情 ›'))
                   .fontSize(11)
                   .fontColor(Theme.colorOf(this.themeColor))
               }
@@ -1384,10 +1656,10 @@ export struct HomeView {
   @Builder
   noticeSection() {
     Column() {
-      SectionHeader({ title: '官网公告', action: '查看更多', onAction: () => {
+      SectionHeader({ title: T('官网公告'), action: T('查看更多'), onAction: () => {
         // 打开南医大官网「通知公告」栏目（外部链接页）
         AppState.webUrl = Const.JWC_LIST_URL;
-        AppState.webTitle = '官网公告';
+        AppState.webTitle = T('官网公告');
         AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
       } })
       if (this.jwcNotices.length === 0) {
@@ -1399,7 +1671,7 @@ export struct HomeView {
           cardBorderW: GlassMaterial.borderWidth(),
           cardBorderC: GlassMaterial.borderColor()
         }) {
-          EmptyTip({ text: '暂无通知' })
+          EmptyTip({ text: T('暂无通知') })
         }
       } else {
         MaterialCard({
@@ -1433,7 +1705,7 @@ export struct HomeView {
                   .fontSize(11)
                   .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 Blank()
-                Text('阅读 ›')
+                Text(T('阅读 ›'))
                   .fontSize(11)
                   .fontColor(Theme.colorOf(this.themeColor))
               }
@@ -1451,12 +1723,12 @@ export struct HomeView {
               if (item.url.length > 0) {
                 // 功能浏览模式默认禁止打开网页；调试模式开启后允许
                 if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-                  this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+                  this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
                   return;
                 }
                 // 有文章链接：在"外部链接"页面打开南医大官网文章页
                 AppState.webUrl = item.url;
-                AppState.webTitle = '官网公告';
+                AppState.webTitle = T('官网公告');
                 AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
               } else {
                 this.sheetNotice = item;
@@ -1512,7 +1784,7 @@ export struct HomeView {
         Divider()
           .color($r('app.color.divider'))
         Scroll() {
-          Text(this.sheetNotice.content.length > 0 ? this.sheetNotice.content : '暂无详细内容，可在消息页查看完整公告。')
+          Text(this.sheetNotice.content.length > 0 ? this.sheetNotice.content : T('暂无详细内容，可在消息页查看完整公告。'))
             .fontSize(14)
             .lineHeight(24)
             .fontColor($r('app.color.text_primary'))
@@ -1569,11 +1841,16 @@ export struct HomeView {
 
   /**
    * 是否在顶栏显示"重登"胶囊。
-   * 条件：手动重登模式 + 首页底部校历为空 + 数据已加载完 + 真实登录（非功能浏览）。
+   * 条件：会话已过期（任意登录方式，最高优先级）或（手动重登模式 + 校历为空）；
+   *      须已加载完 + 真实登录（非功能浏览）。
    */
   private shouldShowRelogin(): boolean {
     if (JwApi.USE_MOCK) {
       return false;
+    }
+    // 会话过期（接口被重定向到统一身份认证登录页）：任何登录方式都提示重登
+    if (AppState.sessionExpired) {
+      return true;
     }
     if (this.loading) {
       return false;
@@ -1589,7 +1866,7 @@ export struct HomeView {
     if (AppState.onForceRelogin !== null) {
       AppState.onForceRelogin();
     } else {
-      this.getUIContext().getPromptAction().showToast({ message: '重登功能暂不可用' });
+      this.getUIContext().getPromptAction().showToast({ message: T('重登功能暂不可用') });
     }
   }
 
@@ -1819,7 +2096,7 @@ export struct HomeView {
     this.customSemesterLabel = this.labelInput.trim();
     DataStore.put(DataStore.KEY_SEMESTER_LABEL, this.customSemesterLabel);
     this.getUIContext().getPromptAction().showToast({
-      message: this.customSemesterLabel.length > 0 ? '已保存' : '已恢复默认标题'
+      message: this.customSemesterLabel.length > 0 ? T('已保存') : T('已恢复默认标题')
     });
   }
 
@@ -1830,16 +2107,16 @@ export struct HomeView {
     DataStore.setCustomTermStart(AppState.term.id, '');
     DataStore.put(DataStore.KEY_CUSTOM_TERM_END, '');
     this.refreshCalendarState();
-    this.getUIContext().getPromptAction().showToast({ message: '已恢复校历日期' });
+    this.getUIContext().getPromptAction().showToast({ message: T('已恢复校历日期') });
   }
 
   /** 日历设置面板：学期标题 + 开学日 / 结束日自定义 */
   @Builder
   calEditorSheet() {
     // 补上沉浸光感：面板内自绘「日历设置」标题 + 关闭按钮（此前是系统 title 的普通弹层）
-    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false, panelTitle: '日历设置', panelShowClose: true, panelOnClose: (): void => { this.showCalEditor = false; } }) {
+    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false, panelTitle: T('日历设置'), panelShowClose: true, panelOnClose: (): void => { this.showCalEditor = false; } }) {
     Column() {
-      Text('学期标题')
+      Text(T('学期标题'))
         .fontSize(13)
         .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
         .fontColor($r('app.color.text_primary'))
@@ -1851,7 +2128,7 @@ export struct HomeView {
         if (materialActive()) {
           MaterialCardLayer({ layerRadius: $r('sys.float.corner_radius_level12'), layerShadow: false })
         }
-        TextInput({ placeholder: '留空则显示校历原标题', text: this.labelInput })
+        TextInput({ placeholder: T('留空则显示校历原标题'), text: this.labelInput })
           .height(48)
           .enterKeyType(EnterKeyType.Done)
           .borderRadius($r('sys.float.corner_radius_level12'))
@@ -1870,7 +2147,7 @@ export struct HomeView {
       .margin({ top: 6 })
       .borderRadius($r('sys.float.corner_radius_level12'))
       Row() {
-        Text('保存标题')
+        Text(T('保存标题'))
           .fontSize(13)
           .fontColor(Color.White)
           .padding({ left: 16, right: 16, top: 8, bottom: 8 })
@@ -1879,7 +2156,7 @@ export struct HomeView {
           .onClick(() => {
             this.saveCalLabel();
           })
-        Text('恢复默认标题')
+        Text(T('恢复默认标题'))
           .fontSize(13)
           .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .padding({ left: 16, right: 16, top: 8, bottom: 8 })
@@ -1895,15 +2172,15 @@ export struct HomeView {
       .margin({ top: 10 })
 
       Row() {
-        Text('开学日期')
+        Text(T('开学日期'))
           .fontSize(14)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
-        Text(this.effStart().length > 0 ? this.effStart() : '未设置')
+        Text(this.effStart().length > 0 ? this.effStart() : T('未设置'))
           .fontSize(13)
           .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ right: 10 })
-        Text('修改')
+        Text(T('修改'))
           .fontSize(12)
           .fontColor(Theme.colorOf(this.themeColor))
           .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -1918,15 +2195,15 @@ export struct HomeView {
       })
 
       Row() {
-        Text('结束日期')
+        Text(T('结束日期'))
           .fontSize(14)
           .fontColor($r('app.color.text_primary'))
           .layoutWeight(1)
-        Text(this.effEnd().length > 0 ? this.effEnd() : '未设置')
+        Text(this.effEnd().length > 0 ? this.effEnd() : T('未设置'))
           .fontSize(13)
           .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ right: 10 })
-        Text('修改')
+        Text(T('修改'))
           .fontSize(12)
           .fontColor(Theme.colorOf(this.themeColor))
           .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -1940,7 +2217,7 @@ export struct HomeView {
         this.openEndPicker();
       })
 
-      Text('恢复默认日期')
+      Text(T('恢复默认日期'))
         .fontSize(13)
         .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .padding({ left: 16, right: 16, top: 8, bottom: 8 })
@@ -1951,7 +2228,7 @@ export struct HomeView {
           this.restoreCalDates();
         })
 
-      Text('提示：修改开学时间会同时影响课程表的周次推算；学期标题留空即恢复校历原标题。')
+      Text(T('提示：修改开学时间会同时影响课程表的周次推算；学期标题留空即恢复校历原标题。'))
         .fontSize(11)
         .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .width('100%')
@@ -2002,7 +2279,7 @@ export struct HomeView {
   @Builder
   calendar() {
     Column() {
-      SectionHeader({ title: '日历', action: '设置', onAction: () => {
+      SectionHeader({ title: T('日历'), action: T('设置'), onAction: () => {
         this.labelInput = this.customSemesterLabel;
         this.showCalEditor = true;
       } })
@@ -2019,7 +2296,7 @@ export struct HomeView {
       if (this.teachingCal === null) {
         // "加载日历"占位卡：固定高度（不再套 padding，避免卡片被撑高）
         Column() {
-          LoadingTip({ text: '加载日历…' })
+          LoadingTip({ text: T('加载日历…') })
         }
           .width('100%')
           .height(140)
@@ -2044,7 +2321,7 @@ export struct HomeView {
           if (this.isTermStarted()) {
             this.infoChip(`第 ${this.todayTeachingWeek()} 周`, Theme.colorOf(this.themeColor))
           } else {
-            this.infoChip('未开学', $r('app.color.accent_orange'))
+            this.infoChip(T('未开学'), $r('app.color.accent_orange'))
           }
           if (this.effStart().length > 0) {
             // 开生日胶囊小按钮（点击改期）：材质走 MaterialButton 的 Toggle 承载层
@@ -2214,18 +2491,18 @@ export struct HomeView {
 
         // 校历说明（来自校历 PDF 说明区）
         Column() {
-          Text('校历说明')
+          Text(T('校历说明'))
             .fontSize(11)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
-          Text('第一学期 2026年9月7日至2027年1月15日，共19周，寒假5周。2026年9月5日报到注册，9月7日上课，新生另定。')
+          Text(T('第一学期 2026年9月7日至2027年1月15日，共19周，寒假5周。2026年9月5日报到注册，9月7日上课，新生另定。'))
             .fontSize(11)
             .lineHeight(18)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
             .margin({ top: 6 })
-          Text('节假日：中秋 9.25-9.27、国庆 10.1-10.7（9.20/10.10 补班）、元旦 1.1-1.3（1.4 补班）。日历中「休」为放假日，「班」为调休上班日。')
+          Text(T('节假日：中秋 9.25-9.27、国庆 10.1-10.7（9.20/10.10 补班）、元旦 1.1-1.3（1.4 补班）。日历中「休」为放假日，「班」为调休上班日。'))
             .fontSize(11)
             .lineHeight(18)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
@@ -2275,6 +2552,9 @@ export struct HomeView {
               .width('100%')
               .height(this.getUIContext().px2vp(this.topInsetPx) + 60)
             // 头像卡片（始终显示；圆形头像由 showAvatar 开关控制）
+            if (this.sessionExpiredFlag) {
+              this.sessionBanner()
+            }
             this.avatarCard()
 
             Column() {
@@ -2292,12 +2572,12 @@ export struct HomeView {
             this.messageSection()
             this.noticeSection()
             Column() {
-              Text('数据来源: 南京医科大学教务系统').fontSize(11)
+              Text(T('数据来源: 南京医科大学教务系统')).fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
-              Text('南京医科大学教务处').fontSize(11)
+              Text(T('南京医科大学教务处')).fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 3 })
-              Text('"功能浏览"模式为本地模拟数据').fontSize(11)
+              Text(T('"功能浏览"模式为本地模拟数据')).fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 3 })
             }
@@ -2324,6 +2604,10 @@ export struct HomeView {
         .scrollBar(BarState.Off)
         .align(Alignment.Top)
         .edgeEffect(EdgeEffect.Spring)
+        // 沉浸浏览：滚动方向检测 → 隐藏/恢复顶栏与底栏
+        .onScroll((_x: number, y: number) => {
+          this.handleHomeScroll(y);
+        })
         // 通知文章页（教务处官网）挂在内层 Scroll，与根组件的通知弹层分离（同组件多 bindSheet 仅最后一个生效）
         .bindSheet($$this.showWebSheet, this.webSheet(), {
           width: SheetUtil.sheetWidth(),
@@ -2377,6 +2661,9 @@ export struct HomeView {
             Column()
               .width('100%')
               .height(this.getUIContext().px2vp(this.topInsetPx) + 60)
+            if (this.sessionExpiredFlag) {
+              this.sessionBanner()
+            }
             this.avatarCard()
             Column() {
               this.todayCard()
@@ -2423,12 +2710,12 @@ export struct HomeView {
             this.messageSection()
             this.noticeSection()
             Column() {
-              Text('数据来源: 南京医科大学教务系统').fontSize(11)
+              Text(T('数据来源: 南京医科大学教务系统')).fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
-              Text('南京医科大学教务处').fontSize(11)
+              Text(T('南京医科大学教务处')).fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 3 })
-              Text('"功能浏览"模式为本地模拟数据').fontSize(11)
+              Text(T('"功能浏览"模式为本地模拟数据')).fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 3 })
             }

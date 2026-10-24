@@ -1,0 +1,44 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Клиент учебных сервисов NJMU"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Главный экран NJMU Helper"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "NJMU Helper"
+    },
+    {
+      "name": "reason_internet",
+      "value": "Нужен для подключения к учебной системе университета (расписание, оценки)"
+    },
+    {
+      "name": "reason_calendar",
+      "value": "Нужен для добавления экзаменов в календарь и напоминаний"
+    },
+    {
+      "name": "reason_agent_reminder",
+      "value": "Отправляет напоминание перед занятием, даже если приложение закрыто"
+    },
+    {
+      "name": "class_preview_card_name",
+      "value": "Следующее занятие"
+    },
+    {
+      "name": "exam_countdown_card_name",
+      "value": "До экзамена"
+    },
+    {
+      "name": "today_schedule_card_name",
+      "value": "Занятия сегодня"
+    },
+    {
+      "name": "score_card_name",
+      "value": "Успеваемость"
+    }
+  ]
+}

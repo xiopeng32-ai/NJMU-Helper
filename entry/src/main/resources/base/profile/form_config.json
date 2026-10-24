@@ -65,6 +65,29 @@
       "supportDimensions": [
         "2*4"
       ]
+    },
+    {
+      "name": "score_overview_2x2",
+      "displayName": "$string:score_card_name",
+      "description": "$string:score_card_desc",
+      "src": "./ets/widgets/pages/ScoreCard2x2.ets",
+      "uiSyntax": "arkts",
+      "window": {
+        "designWidth": 720,
+        "autoDesignWidth": true
+      },
+      "colorMode": "auto",
+      "isDynamic": true,
+      "enableBlurBackground": true,
+      "isDefault": false,
+      "updateEnabled": true,
+      "scheduledUpdateTime": "08:00",
+      "transparencyEnabled": true,
+      "defaultDimension": "2*2",
+      "supportDimensions": [
+        "2*2",
+        "2*4"
+      ]
     }
   ]
 }

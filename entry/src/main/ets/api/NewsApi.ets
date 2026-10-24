@@ -7,6 +7,7 @@ import { util } from '@kit.ArkTS';
 import { JwApi } from './JwApi';
 import { AppState } from '../common/AppState';
 import { LogStore } from '../common/LogStore';
+import { T } from '../common/I18n';
 
 export class NewsItem {
   title: string = '';
@@ -85,8 +86,9 @@ export class NewsApi {
     }
     return `https://${domain}/`;
   }
-  /** 已下载的图片（避免重复请求），退出时清空 */
+  /** 已下载的图片（避免重复请求）。上限 24 张，超出按插入顺序淘汰并 release */
   private static imgCache: Map<string, image.PixelMap> = new Map<string, image.PixelMap>();
+  private static readonly IMG_CACHE_MAX: number = 24;
 
   /** 抓指定板块列表页（pageIndex 从 1 开始，>1 请求 listN.htm）→ 并行抓每篇详情取第一张图做缩略图 */
   static async fetchPage(section: string, pageIndex: number): Promise<NewsItem[]> {
@@ -94,7 +96,7 @@ export class NewsApi {
     if (JwApi.USE_MOCK && !AppState.debugNetwork) {
       return [];
     }
-    const base: string = NewsApi.SECTION_URLS[section] ?? NewsApi.SECTION_URLS['要闻'];
+    const base: string = NewsApi.SECTION_URLS[section] ?? NewsApi.SECTION_URLS[T('要闻')];
     let url: string = base;
     if (pageIndex > 1) {
       url = base.replace(/list\.htm$/i, `list${pageIndex}.htm`);
@@ -209,7 +211,7 @@ export class NewsApi {
     const src: image.ImageSource = image.createImageSource(buffer);
     const pm: image.PixelMap = await src.createPixelMap();
     src.release();
-    NewsApi.imgCache.set(url, pm);
+    NewsApi.putImg(url, pm);
     return pm;
   }
 
@@ -218,9 +220,35 @@ export class NewsApi {
     return url.startsWith('https://www.njmu.edu.cn') || url.startsWith('http://www.njmu.edu.cn');
   }
 
-  /** 退出应用时清理图片缓存 */
+  /** 退出应用时清理图片缓存（必须 release，Map.clear 只丢引用不回收 Native 内存） */
   static clearCache(): void {
+    for (const pm of NewsApi.imgCache.values()) {
+      try {
+        pm.release();
+      } catch (e) {
+        // ignore
+      }
+    }
     NewsApi.imgCache.clear();
+  }
+
+  /** 写入缩略图缓存，超出上限时淘汰最早的一张并释放 */
+  private static putImg(url: string, pm: image.PixelMap): void {
+    if (NewsApi.imgCache.size >= NewsApi.IMG_CACHE_MAX) {
+      const oldest: string | undefined = NewsApi.imgCache.keys().next().value;
+      if (oldest !== undefined) {
+        const old: image.PixelMap | undefined = NewsApi.imgCache.get(oldest);
+        NewsApi.imgCache.delete(oldest);
+        if (old !== undefined) {
+          try {
+            old.release();
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+    }
+    NewsApi.imgCache.set(url, pm);
   }
 
   /** 站内搜索：POST 官方搜索接口，按页返回（每页 10 条左右） */

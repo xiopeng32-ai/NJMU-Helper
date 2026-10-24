@@ -24,9 +24,12 @@ import { MaterialCardLayer } from './common/MaterialCarrier';
 import { MaterialCard } from './common/MaterialCard';
 import { MaterialButton } from './common/MaterialButton';
 import { DissolveBurst } from './common/DissolveBurst';
+import { T } from '../common/I18n';
 
 @Component
 export struct WallpaperPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 全局壁纸 id（'b1'..'b6' 预置 / 'c:<path>' 自定义 / 'none'=未启用） */
   @StorageProp('wallpaperId') wallpaperId: string = 'none';
   /** 全局字重响应式订阅：表达式读 this.fwMode 才登记依赖，fwValue 声明即订阅 */
@@ -151,7 +154,7 @@ export struct WallpaperPage {
       message: '该效果依赖鸿蒙7（API26+），请确保设备升级至鸿蒙7及以上版本，同时该效果可能导致设备发热、使用应用时卡顿掉帧、部分界面可读性严重降低，请酌情考虑开启！满血沉浸光感需设备为麒麟9020/T92及以上版本的处理器。',
       buttons: [
         { text: '仍要开启', color: Theme.colorOf(this.themeColor) },
-        { text: '取消', color: '#666666' }
+        { text: T('取消'), color: '#666666' }
       ]
     }).then((res) => {
       if (res.index === 0) {
@@ -243,18 +246,18 @@ export struct WallpaperPage {
       return t.toUpperCase();
     }
     if (t === 'red') {
-      return '中国红';
+      return T('中国红');
     }
     if (t === 'blue') {
-      return '天空蓝';
+      return T('天空蓝');
     }
     if (t === 'orange') {
-      return '落日橙';
+      return T('落日橙');
     }
     if (t === 'purple') {
-      return '紫罗兰';
+      return T('紫罗兰');
     }
-    return '南医蓝';
+    return T('南医蓝');
   }
 
   /** 应用主题（三色枚举 / hex） */
@@ -551,7 +554,7 @@ export struct WallpaperPage {
       this.tintOverlayLayer()
     Column() {
       Row() {
-        Text('顶栏主题色')
+        Text(T('顶栏主题色'))
           .fontSize(15)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
@@ -565,7 +568,7 @@ export struct WallpaperPage {
 
       // 顶栏样式：新版（默认渐变）/ 旧版 1.3.1 实色（胶囊按钮走 MaterialButton 沉浸光感）
       Row() {
-        Text('顶栏样式')
+        Text(T('顶栏样式'))
           .fontSize(13)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
           .fontColor($r('app.color.text_primary'))
@@ -579,7 +582,7 @@ export struct WallpaperPage {
 
       // 顶栏副标题文字颜色（自动=跟随顶栏样式）
       Row() {
-        Text('副标题颜色')
+        Text(T('副标题颜色'))
           .fontSize(13)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
           .fontColor($r('app.color.text_primary'))
@@ -596,7 +599,7 @@ export struct WallpaperPage {
 
       // 副标题自定义颜色（#RRGGBB）
       Row() {
-        Text('自定义副标题色')
+        Text(T('自定义副标题色'))
           .fontSize(12)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ right: 10 })
@@ -636,7 +639,7 @@ export struct WallpaperPage {
             this.applySubtitleHex();
           }
         }) {
-          Text('应用')
+          Text(T('应用'))
             .fontSize(13)
             .fontColor(Color.White)
             .padding({ left: 16, right: 16, top: 9, bottom: 9 })
@@ -647,11 +650,11 @@ export struct WallpaperPage {
 
       // 5 个预置色一排、整体居中（紧凑间距，保证窄屏也能放下）
       Row({ space: 12 }) {
-        this.themeSwatch('red', '#C3272B', '中国红')
-        this.themeSwatch('blue', '#3B82F6', '天空蓝')
-        this.themeSwatch('green', '#005BAC', '南医蓝')
-        this.themeSwatch('orange', '#E0603A', '落日橙')
-        this.themeSwatch('purple', '#7C5CE0', '紫罗兰')
+        this.themeSwatch('red', '#C3272B', T('中国红'))
+        this.themeSwatch('blue', '#3B82F6', T('天空蓝'))
+        this.themeSwatch('green', '#005BAC', T('南医蓝'))
+        this.themeSwatch('orange', '#E0603A', T('落日橙'))
+        this.themeSwatch('purple', '#7C5CE0', T('紫罗兰'))
       }
       .width('100%')
       .justifyContent(FlexAlign.Center)
@@ -659,7 +662,7 @@ export struct WallpaperPage {
 
       // 自定义 rrggbb 输入
       Row() {
-        Text('自定义')
+        Text(T('自定义'))
           .fontSize(13)
           .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ right: 10 })
@@ -705,7 +708,7 @@ export struct WallpaperPage {
             this.applyHexTheme();
           }
         }) {
-          Text('应用')
+          Text(T('应用'))
             .fontSize(13)
             .fontColor(Color.White)
             .padding({ left: 16, right: 16, top: 9, bottom: 9 })
@@ -735,20 +738,20 @@ export struct WallpaperPage {
       this.tintOverlayLayer()
       Column() {
         Row() {
-          Text('灰体文本显示增强')
+          Text(T('灰体文本显示增强'))
             .fontSize(15)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
             .fontColor($r('app.color.text_primary'))
           Blank()
           if (this.grayTextMode !== 'default') {
-            Text('已覆盖')
+            Text(T('已覆盖'))
               .fontSize(11)
               .fontColor(Theme.colorOf(this.themeColor))
           }
         }
         .width('100%')
 
-        Text('将全站次要/辅助灰色文字统一替换为所选颜色（自动=跟随深浅色主题）')
+        Text(T('将全站次要/辅助灰色文字统一替换为所选颜色（自动=跟随深浅色主题）'))
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .width('100%')
@@ -759,18 +762,18 @@ export struct WallpaperPage {
           this.grayChip('灰', 'gray')
           this.grayChip('黑', 'black')
           this.grayChip('白', 'white')
-          this.grayChip('自定义', 'custom')
+          this.grayChip(T('自定义'), 'custom')
         }
         .width('100%')
         .margin({ top: 12 })
 
         // 文字样式增强：全站灰字的斜体 / 加粗 / 减细 / 荧光底，便于区分与阅读
         Row() {
-          Text('文字样式')
+          Text(T('文字样式'))
             .fontSize(12)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           Blank()
-          Text('作用于全站次要/辅助文字')
+          Text(T('作用于全站次要/辅助文字'))
             .fontSize(11)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         }
@@ -778,7 +781,7 @@ export struct WallpaperPage {
         .margin({ top: 14 })
 
         Row({ space: 6 }) {
-          this.textStyleChip('默认', '')
+          this.textStyleChip(T('默认'), '')
           this.textStyleChip('斜体', 'italic')
           this.textStyleChip('加粗', 'bold')
           this.textStyleChip('减细', 'thin')
@@ -803,14 +806,14 @@ export struct WallpaperPage {
             .animation({ duration: 220, curve: Curve.Friction }))
         }
 
-        Text('「自动」灰字色按壁纸明暗计算对比度；无壁纸时沿用默认灰。')
+        Text(T('「自动」灰字色按壁纸明暗计算对比度；无壁纸时沿用默认灰。'))
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .width('100%')
           .margin({ top: 10 })
 
         // 红字告知（用户要求）：自动灰字色随壁纸切换暂不能实时刷新，需重进本页才更新
-        Text('由于能力有限，需要重新进入外观设置页面，灰体文本自动调整才会刷新。')
+        Text(T('由于能力有限，需要重新进入外观设置页面，灰体文本自动调整才会刷新。'))
           .fontSize(11)
           .fontColor('#DB5252')
           .width('100%')
@@ -855,7 +858,7 @@ export struct WallpaperPage {
                 this.applyGrayCustom();
               }
             }) {
-              Text('应用')
+              Text(T('应用'))
                 .fontSize(13)
                 .fontColor(Color.White)
                 .padding({ left: 16, right: 16, top: 8, bottom: 8 })
@@ -1025,11 +1028,11 @@ export struct WallpaperPage {
         Column() {
           Row() {
             Column({ space: 3 }) {
-              Text('全局沉浸光感')
+              Text(T('全局沉浸光感'))
                 .fontSize(15)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor($r('app.color.text_primary'))
-              Text('沉浸光感需鸿蒙7及以上版本，开启后提升美观度，搭配壁纸更佳！注：开启后会导致掉帧卡顿和发热，请谨慎选择开启。本效果参考开源项目「鸿米家（miha）」实现，特此致谢——没有它就没有这个效果！')
+              Text(T('沉浸光感需鸿蒙7及以上版本，开启后提升美观度，搭配壁纸更佳！注：开启后会导致掉帧卡顿和发热，请谨慎选择开启。本效果参考开源项目「鸿米家（miha）」实现，特此致谢——没有它就没有这个效果！'))
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             }
@@ -1055,11 +1058,11 @@ export struct WallpaperPage {
           // 背景跟随主题色：光感开启后玻璃会透出底色，绿底/红底观感差 → 可关闭取色
           Row() {
             Column({ space: 3 }) {
-              Text('背景跟随主题色')
+              Text(T('背景跟随主题色'))
                 .fontSize(14)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                 .fontColor($r('app.color.text_primary'))
-              Text('关闭后页面底色不再混入主题色，保持中性底色（避免绿底/红底观感）')
+              Text(T('关闭后页面底色不再混入主题色，保持中性底色（避免绿底/红底观感）'))
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             }
@@ -1080,11 +1083,11 @@ export struct WallpaperPage {
           if (!this.immersiveEffect) {
           Row() {
             Column({ space: 3 }) {
-              Text('卡片降级样式')
+              Text(T('卡片降级样式'))
                 .fontSize(14)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                 .fontColor($r('app.color.text_primary'))
-              Text('关闭沉浸光感后，卡片使用云母磨砂还是实色纯底')
+              Text(T('关闭沉浸光感后，卡片使用云母磨砂还是实色纯底'))
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             }
@@ -1127,11 +1130,11 @@ export struct WallpaperPage {
         Column() {
           Row() {
             Column({ space: 3 }) {
-              Text('卡片沾色')
+              Text(T('卡片沾色'))
                 .fontSize(14)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                 .fontColor($r('app.color.text_primary'))
-              Text('开启后所有卡片底色混入 10% 主题色')
+              Text(T('开启后所有卡片底色混入 10% 主题色'))
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             }
@@ -1153,11 +1156,11 @@ export struct WallpaperPage {
 
           Row() {
             Column({ space: 3 }) {
-              Text('主题色流光')
+              Text(T('主题色流光'))
                 .fontSize(14)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                 .fontColor($r('app.color.text_primary'))
-              Text('按压卡片的流光与光晕改用主题色；关闭后为系统默认白光')
+              Text(T('按压卡片的流光与光晕改用主题色；关闭后为系统默认白光'))
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             }
@@ -1179,11 +1182,11 @@ export struct WallpaperPage {
 
           Row() {
             Column({ space: 3 }) {
-              Text('卡片流光触感')
+              Text(T('卡片流光触感'))
                 .fontSize(14)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                 .fontColor($r('app.color.text_primary'))
-              Text('开启后按压卡片出现跟手流光；关闭只有卡间缝隙的环境光')
+              Text(T('开启后按压卡片出现跟手流光；关闭只有卡间缝隙的环境光'))
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             }
@@ -1205,11 +1208,11 @@ export struct WallpaperPage {
 
           Row() {
             Column({ space: 3 }) {
-              Text('高权限自定义主题色')
+              Text(T('高权限自定义主题色'))
                 .fontSize(14)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                 .fontColor($r('app.color.text_primary'))
-              Text('默认只有内置主题色会染到页面背景；开启后自定义颜色也会')
+              Text(T('默认只有内置主题色会染到页面背景；开启后自定义颜色也会'))
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             }
@@ -1294,18 +1297,18 @@ export struct WallpaperPage {
         // 字体管理入口（上传 / 选择中英文字体 / 删除）
         Row() {
           Column({ space: 3 }) {
-            Text('字体管理')
+            Text(T('字体管理'))
               .fontSize(15)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
               .fontColor($r('app.color.text_primary'))
-            Text('上传字体 / 选择中英文字体 / 删除已上传字体')
+            Text(T('上传字体 / 选择中英文字体 / 删除已上传字体'))
               .fontSize(11)
               .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           }
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1)
 
-          Text('前往 ›')
+          Text(T('前往 ›'))
             .fontSize(13)
             .fontColor(Theme.colorOf(this.themeColor))
         }
@@ -1320,7 +1323,7 @@ export struct WallpaperPage {
           .margin({ top: 12, bottom: 12 })
 
         // 字重模式（跟随 / 细 / 轻 / 常规 / 中等 / 粗）
-        Text('字体粗细')
+        Text(T('字体粗细'))
           .fontSize(13)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
           .fontColor($r('app.color.text_primary'))
@@ -1330,7 +1333,7 @@ export struct WallpaperPage {
           this.fontWeightChip('thin', '细')
           this.fontWeightChip('light', '轻')
           this.fontWeightChip('regular', '常规')
-          this.fontWeightChip('medium', '中等')
+          this.fontWeightChip('medium', T('中等'))
           this.fontWeightChip('bold', '粗')
         }
         .width('100%')
@@ -1342,14 +1345,14 @@ export struct WallpaperPage {
 
         // 字号模式
         Row() {
-          Text('字体大小')
+          Text(T('字体大小'))
             .fontSize(13)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary'))
           Blank()
           Row({ space: 8 }) {
-            this.fontSizeChip('follow', '跟随系统')
-            this.fontSizeChip('custom', '自定义')
+            this.fontSizeChip('follow', T('跟随系统'))
+            this.fontSizeChip('custom', T('自定义'))
           }
         }
         .width('100%')
@@ -1358,7 +1361,7 @@ export struct WallpaperPage {
         // 自定义字号滑杆（12~28，基准 16，应用级缩放即时生效）
         if (this.fontSizeMode === 'custom') {
           Row() {
-            Text('字号')
+            Text(T('字号'))
               .fontSize(12)
               .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
               .margin({ right: 10 })
@@ -1409,11 +1412,11 @@ export struct WallpaperPage {
       Column() {
         Row() {
           Column({ space: 3 }) {
-            Text('页面平滑切换')
+            Text(T('页面平滑切换'))
               .fontSize(15)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
               .fontColor($r('app.color.text_primary'))
-            Text('底部页签切换时页面平滑滑动过渡，关闭后立即切换')
+            Text(T('底部页签切换时页面平滑滑动过渡，关闭后立即切换'))
               .fontSize(11)
               .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           }
@@ -1466,7 +1469,7 @@ export struct WallpaperPage {
               }
               this.tintOverlayLayer()
               Column() {
-              Text('全局壁纸')
+              Text(T('全局壁纸'))
                 .fontSize(15)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor($r('app.color.text_primary'))
@@ -1474,7 +1477,7 @@ export struct WallpaperPage {
                 .margin({ bottom: 10 })
             // 自定义壁纸（已启用时预览）
             if (this.wallpaperId.startsWith('c:')) {
-              Text('自定义壁纸')
+              Text(T('自定义壁纸'))
                 .fontSize(15)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor($r('app.color.text_primary'))
@@ -1488,7 +1491,7 @@ export struct WallpaperPage {
                 .borderRadius(12)
                 .backgroundColor($r('app.color.bg_chip'))
 
-              Text('已使用自定义壁纸')
+              Text(T('已使用自定义壁纸'))
                 .fontSize(12)
                 .fontColor(Theme.colorOf(this.themeColor))
                 .width('100%')
@@ -1509,7 +1512,7 @@ export struct WallpaperPage {
                   this.openCropPage();
                 }
               }) {
-                Text('选择图片并裁剪')
+                Text(T('选择图片并裁剪'))
                   .fontSize(14)
                   .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                   // 彩底按钮固定白字（用户要求：浅色模式下黑字不合适）
@@ -1538,7 +1541,7 @@ export struct WallpaperPage {
                   this.cancelWallpaper();
                 }
               }) {
-                Text('取消壁纸')
+                Text(T('取消壁纸'))
                   .fontSize(14)
                   .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                   .fontColor(Color.White)
@@ -1553,11 +1556,11 @@ export struct WallpaperPage {
             // 壁纸蒙版开关：关闭后不叠加可读性遮罩（文字仍会自动适配颜色）
             Row() {
               Column() {
-                Text('壁纸蒙版')
+                Text(T('壁纸蒙版'))
                   .fontSize(13)
                   .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                   .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
-                Text('在壁纸上叠加可读性遮罩，保证文字清晰')
+                Text(T('在壁纸上叠加可读性遮罩，保证文字清晰'))
                   .fontSize(11)
                   .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                   .margin({ top: 2 })
@@ -1613,7 +1616,7 @@ export struct WallpaperPage {
                   this.importByUrl();
                 }
               }) {
-                Text('保存')
+                Text(T('保存'))
                   .fontSize(14)
                   .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                   // 彩底按钮固定白字（用户要求：浅色模式下黑字不合适）
@@ -1627,7 +1630,7 @@ export struct WallpaperPage {
             .margin({ top: 12 })
             .alignItems(VerticalAlign.Center)
             // URL 行上移到提示文本上方；提示放其下
-            Text('提示：壁纸应用在主界面五个 Tab 与多数二级页背景，切换后即时生效；课程表页保持纯色底不受影响；各功能卡片保持原有底色以保证可读性。取消壁纸即恢复默认纯色背景。')
+            Text(T('提示：壁纸应用在主界面五个 Tab 与多数二级页背景，切换后即时生效；课程表页保持纯色底不受影响；各功能卡片保持原有底色以保证可读性。取消壁纸即恢复默认纯色背景。'))
               .fontSize(11)
               .lineHeight(18)
               .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
@@ -1660,7 +1663,7 @@ export struct WallpaperPage {
               this.tintOverlayLayer()
               Column() {
             // ── 主题组合：保存/应用（背景 + 顶栏颜色 + 副标题颜色）──
-            Text('主题组合')
+            Text(T('主题组合'))
               .fontSize(15)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
               .fontColor($r('app.color.text_primary'))
@@ -1701,7 +1704,7 @@ export struct WallpaperPage {
                   this.saveCombo();
                 }
               }) {
-                Text('保存当前组合')
+                Text(T('保存当前组合'))
                   .fontSize(14)
                   .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                   .fontColor(Color.White)
@@ -1762,7 +1765,7 @@ export struct WallpaperPage {
                 }
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
-                Text('应用')
+                Text(T('应用'))
                   .fontSize(12)
                   .fontColor(Color.White)
                   .padding({ left: 12, right: 12, top: 5, bottom: 5 })
@@ -1771,7 +1774,7 @@ export struct WallpaperPage {
                   .onClick(() => {
                     this.applyCombo(c);
                   })
-                Text('删除')
+                Text(T('删除'))
                   .fontSize(12)
                   .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                   .padding({ left: 12, right: 12, top: 5, bottom: 5 })
@@ -1826,7 +1829,7 @@ export struct WallpaperPage {
 
         // 顶栏悬浮（最上层）：正文顶部已让位，上滑可滚入其渐变下层透出
         PageHeader({
-          title: '外观设置',
+          title: T('外观设置'),
           subtitle: '主题色 · 壁纸 · 光感 · 字体',
           onBack: () => {
             AppState.stack.pop();

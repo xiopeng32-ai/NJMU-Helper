@@ -22,6 +22,7 @@ import { PageHeader } from './common/UiKit';
 import { WallpaperFill } from './common/WallpaperFill';
 import { mediaquery } from '@kit.ArkUI';
 import { ResponsiveUtil } from '../common/ResponsiveUtil';
+import { T } from '../common/I18n';
 
 /** 公众号条目（homeUrl 非空 = 点「去关注」弹出二维码面板：码内容为该链接 + 复制链接兜底；
  *  homeUrl 空 = 复制名称 → 弹窗确认后拉起微信搜索） */
@@ -45,9 +46,9 @@ function homeUrlOf(biz: string): string {
  *  点击「去关注」走「复制名称 → 微信搜索」兜底路径。 */
 const OA_LIST: OAItem[] = [
   // ── 通用 ──
-  { name: '南京医科大学', homeUrl: '', group: '通用' },
+  { name: T('南京医科大学'), homeUrl: '', group: '通用' },
   { name: '南京医科大学研究生院', homeUrl: '', group: '通用' },
-  { name: '南京医科大学教务处', homeUrl: '', group: '通用' },
+  { name: T('南京医科大学教务处'), homeUrl: '', group: '通用' },
   { name: '南京医科大学图书馆', homeUrl: '', group: '通用' },
   { name: '南京医科大学学生会', homeUrl: '', group: '通用' },
   // ── 学院（南医大各学院官方号 biz 待接入，暂列名称）──
@@ -61,6 +62,8 @@ const OA_LIST: OAItem[] = [
 
 @Component
 export struct WechatOAPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   @StorageProp('bottomInsetPx') bottomInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖 */
@@ -90,6 +93,16 @@ export struct WechatOAPage {
 
   /** 页面消失：注销监听 */
   aboutToDisappear(): void {
+    // 注销 MediaQuery 监听（只置 null 不会取消注册，回调会持续持有已销毁的组件）
+    if (this.landscapeListener !== null) {
+      this.landscapeListener.off('change');
+      this.landscapeListener = null;
+    }
+    if (this.wideListener !== null) {
+      this.wideListener.off('change');
+      this.wideListener = null;
+    }
+
     this.landscapeListener = null;
     this.wideListener = null;
   }
@@ -142,7 +155,7 @@ export struct WechatOAPage {
         ? '已复制链接。是否打开微信？在微信任意聊天窗口粘贴并打开该链接'
         : `已复制「${copyText}」。是否打开微信？在微信搜索粘贴即可关注`,
       buttons: [
-        { text: '取消', color: '#888888' },
+        { text: T('取消'), color: '#888888' },
         { text: '打开微信', color: '#005BAC', primary: true }
       ]
     }).then((res) => {
@@ -213,7 +226,7 @@ export struct WechatOAPage {
           .margin({ top: 12 })
 
           // 微信无公开「携带 URL 拉起」scheme，链接仅微信内可打开 → 扫码是最直接路径
-          Text('微信限制无法从外部直接打开链接，请用微信「扫一扫」扫描上方二维码')
+          Text(T('微信限制无法从外部直接打开链接，请用微信「扫一扫」扫描上方二维码'))
             .fontSize(12)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
@@ -236,7 +249,7 @@ export struct WechatOAPage {
               }
             }
           }) {
-            Text('复制链接并打开微信')
+            Text(T('复制链接并打开微信'))
               .fontSize(14)
               .fontColor($r('sys.color.font_primary'))
               .width('100%')
@@ -312,7 +325,7 @@ export struct WechatOAPage {
                   this.follow(item);
                 }
               }) {
-                Text('去关注')
+                Text(T('去关注'))
                   .fontSize(12)
                   .fontColor(Color.White)
                   .padding({ left: 12, right: 12, top: 7, bottom: 7 })
@@ -356,11 +369,11 @@ export struct WechatOAPage {
               cardShadow: GlassMaterial.cardShadowStyle()
             }) {
               Column({ space: 6 }) {
-                Text('关注学校官方公众号')
+                Text(T('关注学校官方公众号'))
                   .fontSize(15)
                   .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                   .fontColor($r('app.color.text_primary'))
-                Text('点击「去关注」弹出二维码：打开微信「扫一扫」扫码直达公众号主页；也可复制主页链接在微信内粘贴打开（大部分公众号已收录主页直达链接）。列表按「通用 / 学院」自动分组。')
+                Text(T('点击「去关注」弹出二维码：打开微信「扫一扫」扫码直达公众号主页；也可复制主页链接在微信内粘贴打开（大部分公众号已收录主页直达链接）。列表按「通用 / 学院」自动分组。'))
                   .fontSize(12)
                   .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                   .lineHeight(18)

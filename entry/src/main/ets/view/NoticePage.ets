@@ -25,9 +25,12 @@ import { MaterialCard } from './common/MaterialCard';
 import { MaterialCardLayer } from './common/MaterialCarrier';
 import { materialAvailable } from '../common/SystemMaterial';
 import { AppearanceStore } from '../common/AppearanceStore';
+import { T } from '../common/I18n';
 
 @Component
 export struct NoticePage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -197,8 +200,8 @@ export struct NoticePage {
         } else if (this.notices.length === 0) {
           Scroll() {
             Column() {
-              EmptyTip({ text: '暂无消息' })
-              Text('消息来源: 教务系统消息中心（下拉可重新加载）')
+              EmptyTip({ text: T('暂无消息') })
+              Text(T('消息来源: 教务系统消息中心（下拉可重新加载）'))
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 .margin({ top: 16, bottom: 24 })
@@ -241,6 +244,8 @@ export struct NoticePage {
 /** 消息详情 */
 @Component
 export struct NoticeDetailPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -379,7 +384,7 @@ export struct NoticeDetailPage {
                   .width('100%')
                   .margin({ top: 16 })
               } else if (this.notice.content.length === 0) {
-                Text('暂无详细内容，点击消息查看完整公告。')
+                Text(T('暂无详细内容，点击消息查看完整公告。'))
                   .fontSize(14)
                   .lineHeight(26)
                   .fontColor($r('app.color.text_primary'))

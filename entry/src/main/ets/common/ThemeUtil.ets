@@ -1,11 +1,13 @@
-import { DataStore } from './DataStore';
-import { AppearanceStore } from './AppearanceStore';
-
 /**
  * 主题工具：顶栏主题色（中国红 / 天空蓝 / 南医蓝 / 自定义 #RRGGBB）
  * AppStorage key: themeColor（'green' | 'red' | 'blue' | 'orange' | 'purple' | '#RRGGBB'，默认 'green'）
  * 顶栏样式 barStyle：'new'=主题色透明渐变 / 'legacy'=1.3.1 旧版实色
  */
+
+import { DataStore } from './DataStore';
+import { AppearanceStore } from './AppearanceStore';
+import { T } from './I18n';
+
 export class Theme {
   static readonly KEY_DS: string = 'theme_color';
 
@@ -115,18 +117,18 @@ export class Theme {
       return t.toUpperCase();
     }
     if (t === 'red') {
-      return '中国红';
+      return T('中国红');
     }
     if (t === 'blue') {
-      return '天空蓝';
+      return T('天空蓝');
     }
     if (t === 'orange') {
-      return '落日橙';
+      return T('落日橙');
     }
     if (t === 'purple') {
-      return '紫罗兰';
+      return T('紫罗兰');
     }
-    return '南医蓝';
+    return T('南医蓝');
   }
 
   /** 切换主题并写入 AppStorage + 持久化 */

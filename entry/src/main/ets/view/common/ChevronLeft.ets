@@ -7,6 +7,8 @@
  */
 @Component
 export struct ChevronLeft {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 视觉边长（正方形） */
   @Prop iconSize: number = 12;
   @StorageProp('isDarkMode') isDarkMode: boolean = false;

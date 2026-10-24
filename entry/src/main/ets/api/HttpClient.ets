@@ -9,14 +9,24 @@
  *  - 手动维护会话 Cookie，登录后带上，保证课表/成绩/考试等接口可用。
  */
 import { http } from '@kit.NetworkKit';
+import { connection } from '@kit.NetworkKit';
 import { util } from '@kit.ArkTS';
 import { AppState } from '../common/AppState';
 import { LogStore } from '../common/LogStore';
+import { T } from '../common/I18n';
 
 export interface HttpResult {
   code: number;
   body: string;
   cookie: string;
+}
+
+/** 教务会话过期（接口被重定向到统一身份认证登录页）时抛出 */
+export class SessionExpiredError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = 'SessionExpiredError';
+  }
 }
 
 /** 二进制响应结果（导出 Excel 等）：data 为空表示失败，code/body 用于诊断 */
@@ -36,6 +46,53 @@ export class HttpClient {
   /** 设置离线模式（功能浏览模式启用，HttpClient 所有请求直接返回空结果） */
   static setOfflineMode(value: boolean): void {
     HttpClient.offlineMode = value;
+  }
+
+  /** 网络可用性缓存（5 秒内复用，避免每个请求都探测） */
+  private static netOk: boolean = true;
+  private static netCheckedAt: number = 0;
+
+  /** 当前是否有可用网络（探测失败按"有网"处理，避免误杀） */
+  private static hasNetwork(): boolean {
+    const now: number = Date.now();
+    if (now - HttpClient.netCheckedAt < 5000) {
+      return HttpClient.netOk;
+    }
+    HttpClient.netCheckedAt = now;
+    try {
+      const net: connection.NetHandle = connection.getDefaultNetSync();
+      HttpClient.netOk = net !== null && net.netId !== 0;
+    } catch (e) {
+      HttpClient.netOk = true;
+    }
+    return HttpClient.netOk;
+  }
+
+  /** 主动使网络状态缓存失效（网络恢复/切换时调用，让下次请求立即重新探测） */
+  static resetNetworkCache(): void {
+    HttpClient.netCheckedAt = 0;
+  }
+
+  /** 响应体是否为统一身份认证登录页（教务会话已失效的特征） */
+  static isCasLoginPage(body: string): boolean {
+    if (body.length === 0 || body.indexOf('<') < 0) {
+      return false;
+    }
+    return body.indexOf('统一身份认证平台') >= 0 || body.indexOf('/authserver/login') >= 0;
+  }
+
+  /** 标记会话已过期（广播给界面显示重登入口），同一过期周期只记一次日志 */
+  static markSessionExpired(url: string): void {
+    AppStorage.setOrCreate<boolean>('sessionExpired', true);
+    AppState.sessionExpired = true;
+  }
+
+  /** 清除会话过期标记（重新登录成功或刷新拿到真实数据后调用） */
+  static clearSessionExpired(): void {
+    if (AppStorage.get<boolean>('sessionExpired') === true) {
+      AppStorage.setOrCreate<boolean>('sessionExpired', false);
+    }
+    AppState.sessionExpired = false;
   }
 
   /** 设置请求会话 Cookie（登录成功后保存，供后续接口携带） */
@@ -130,6 +187,12 @@ export class HttpClient {
     if (HttpClient.offlineMode && !AppState.debugNetwork) {
       return { code: 0, body: '', cookie: HttpClient.cookie };
     }
+    // 无网络时立即失败（不等 15s 连接超时）：上层随即回退本地缓存，
+    // 否则断网场景每个接口都要空转 20 秒，页面长时间空白（离线数据"部分不显示"的主因）
+    if (!HttpClient.hasNetwork()) {
+      LogStore.log('网络', '请求', '无网络', `${url} → 立即回退本地缓存`);
+      return { code: 0, body: '', cookie: HttpClient.cookie };
+    }
     const t0: number = Date.now();
     const client: http.HttpRequest = http.createHttp();
     try {
@@ -163,9 +226,22 @@ export class HttpClient {
         text = JSON.stringify(response.result);
       }
       const cost: number = Date.now() - t0;
+      // ★ 会话失效检测：教务会话过期时接口会 302 到统一身份认证登录页并返回 200 HTML，
+      //   上层 JSON.parse 只会得到误导性的 SyntaxError，用户看到的是"数据回退缓存"的假象。
+      //   这里识别登录页并广播「登录已过期」，让界面给出重登入口。
+      if (HttpClient.isCasLoginPage(text)) {
+        HttpClient.markSessionExpired(url);
+        LogStore.logNet(T('网络'), '请求', '会话失效',
+          {
+            method: HttpClient.methodName(method), url: url, status: `${response.responseCode}`,
+            cost: `${cost}ms`, body: text,
+            detail: '响应为统一身份认证登录页：教务会话已过期，需重新登录'
+          });
+        throw new SessionExpiredError('登录已过期，请重新登录');
+      }
       // 日志调试：对齐开发者工具网络面板——URL / Method / 状态 / 请求头 / 响应头 / 耗时 / 响应片段
       const reqHeaders: Record<string, string> = HttpClient.buildHeader(extraHeader);
-      LogStore.logNet('网络', '请求', '成功',
+      LogStore.logNet(T('网络'), '请求', T('成功'),
         {
           method: HttpClient.methodName(method),
           url: url,
@@ -177,12 +253,16 @@ export class HttpClient {
         });
       return { code: response.responseCode as number, body: text, cookie: HttpClient.cookie };
     } catch (e) {
+      // 会话过期已单独记录「会话失效」日志，直接上抛，不再记为网络异常
+      if (e instanceof SessionExpiredError) {
+        throw e as Error;
+      }
       const cost: number = Date.now() - t0;
       // 日志调试：增强网络异常诊断——区分超时类型、记录网络模式与超时配置，便于定位"无法登录/无数据"根因
       const errCode: string = String((e as Record<string, Object>)['code'] ?? '');
       const errMsg: string = String((e as Record<string, Object>)['message'] ?? '');
       // 2300028=Operation timeout（连接/读取超时）；2300006/2300007=网络不可达；2300041=DNS 解析失败
-      let errKind: string = '网络异常';
+      let errKind: string = T('网络异常');
       if (errCode === '2300028') {
         errKind = '请求超时（连接或读取超时，20s）——多为网络不通/网关拦截/服务器慢';
       } else if (errCode === '2300006' || errCode === '2300007') {
@@ -192,7 +272,7 @@ export class HttpClient {
       }
       const netMode: string = HttpClient.offlineMode ?
         (AppState.debugNetwork ? '功能浏览-调试联网' : '功能浏览-断网') : '真实联网';
-      LogStore.logNet('网络', '请求', '异常',
+      LogStore.logNet(T('网络'), '请求', T('异常'),
         {
           method: HttpClient.methodName(method),
           url: url,
@@ -301,7 +381,7 @@ export class HttpClient {
     extraHeader: Record<string, string>): Promise<HttpResult> {
     const url: string = path.startsWith('http') ? path : `${HttpClient.baseUrl}${path}`;
     // 日志调试：记录脱敏表单参数（密码/账号打码），便于复现请求
-    LogStore.logNet('网络', '表单', '提交',
+    LogStore.logNet(T('网络'), '表单', '提交',
       {
         method: 'POST',
         url: url,
@@ -372,7 +452,7 @@ export class HttpClient {
         // 日志调试：记录二进制请求成功（导出 xlsx 是否真正下载到数据）
         try {
           const arr: ArrayBuffer = response.result as ArrayBuffer;
-          LogStore.logNet('网络', '二进制', '成功',
+          LogStore.logNet(T('网络'), '二进制', T('成功'),
             {
               method: 'POST',
               url: url,
@@ -392,7 +472,7 @@ export class HttpClient {
       }
       // 日志调试：记录二进制请求失败的状态码与响应片段（导出 Excel 失败时用于定位网关/会话问题）
       try {
-        LogStore.logNet('网络', '二进制', '失败',
+        LogStore.logNet(T('网络'), '二进制', T('失败'),
           {
             method: 'POST',
             url: url,

@@ -1,0 +1,76 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "南醫大教務微服務用戶端"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "教務助手主入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "南醫助手"
+    },
+    {
+      "name": "reason_internet",
+      "value": "用於連接學校教務系統取得課表、成績等資料"
+    },
+    {
+      "name": "reason_calendar",
+      "value": "用於將考試安排寫入系統行事曆，便於提醒"
+    },
+    {
+      "name": "EntryFormAbility_label",
+      "value": "課程預告"
+    },
+    {
+      "name": "EntryFormAbility_desc",
+      "value": "桌面卡片：今日課程預告與考試倒數"
+    },
+    {
+      "name": "class_preview_card_name",
+      "value": "課程預告"
+    },
+    {
+      "name": "class_preview_card_desc",
+      "value": "今日／明日課程一屏速覽"
+    },
+    {
+      "name": "exam_countdown_card_name",
+      "value": "考試倒數"
+    },
+    {
+      "name": "exam_countdown_card_desc",
+      "value": "最近一場考試倒數提醒"
+    },
+    {
+      "name": "today_schedule_card_name",
+      "value": "今日課程"
+    },
+    {
+      "name": "today_schedule_card_desc",
+      "value": "顯示今天要上的課程"
+    },
+    {
+      "name": "score_card_name",
+      "value": "學業成績"
+    },
+    {
+      "name": "score_card_desc",
+      "value": "顯示 GPA、排名與已修學分"
+    },
+    {
+      "name": "reason_agent_reminder",
+      "value": "用於在上課前推送課程提醒，即使應用程式未開啟也能準時提醒"
+    },
+    {
+      "name": "BackgroundWorkAbility_label",
+      "value": "課表與成績後台同步"
+    },
+    {
+      "name": "BackgroundWorkAbility_desc",
+      "value": "定期在後台檢查新成績與教務公告，並在有更新時通知"
+    }
+  ]
+}

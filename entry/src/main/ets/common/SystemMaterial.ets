@@ -23,6 +23,7 @@
  */
 import { uiMaterial } from '@kit.ArkUI';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { T } from './I18n';
 
 // ── 模块级状态（惰性构造，避免低版本启动即解引用 API 26 接口）──
 
@@ -293,7 +294,7 @@ export function materialDiagnostics(themedLightOn: boolean = false, accentColor:
   const stateText: string = state === 'DISABLE' ? 'DISABLE(应用级关闭)' : `非DISABLE`;
   const on: string = immersiveOn() ? '开' : '关';
   const light: string = pressLightColor(themedLightOn, accentColor);
-  const lightText: string = light.length > 0 ? light : '默认';
+  const lightText: string = light.length > 0 ? light : T('默认');
   const carrier: string = materialActive() ? '下发材质' : '降级毛玻璃';
   const err: string = lastError.length > 0 ? ` 错误=${lastError.substring(0, 60)}` : '';
   return `${api} 材质=${built} 状态=${stateText}(${state}) 开关=${on} 流光=${lightText} 承载=${carrier}${err}`;

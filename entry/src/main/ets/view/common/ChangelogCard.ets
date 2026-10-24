@@ -14,9 +14,12 @@ import { MaterialButton } from './MaterialButton';
 import { AppearanceStore } from '../../common/AppearanceStore';
 import { Theme } from '../../common/ThemeUtil';
 import { pasteboard } from '@kit.BasicServicesKit';
+import { T } from '../../common/I18n';
 
 @Component
 export struct ChangelogCard {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop version: string = '';
   @Prop date: string = '';
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
@@ -81,7 +84,7 @@ export struct ChangelogCard {
             btnBorderC: GlassMaterial.borderColor(),
             btnOnClick: () => { this.copyLogs(); }
           }) {
-            Text('复制')
+            Text(T('复制'))
               .fontSize(11)
               .fontColor(Theme.colorOf(this.themeColor))
               .padding({ left: 10, right: 10, top: 4, bottom: 4 })

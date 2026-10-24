@@ -8,6 +8,8 @@
  *
  * 点击跳转到应用内"课程表"页面（按 open='schedule'）。
  */
+
+import { T } from '../../common/I18n';
 let localStorage2x2 = new LocalStorage();
 
 @Entry(localStorage2x2)
@@ -27,8 +29,8 @@ struct ClassPreviewCard2x2 {
   @LocalStorageProp('nextDayCount') nextDayCount: number = 0;
   @LocalStorageProp('weekLabel') weekLabel: string = '';
   @LocalStorageProp('dateLabel') dateLabel: string = '';
-  @LocalStorageProp('dayLabel') dayLabel: string = '今天';
-  @LocalStorageProp('dayLabelTomorrow') dayLabelTomorrow: string = '明天';
+  @LocalStorageProp('dayLabel') dayLabel: string = T('今天');
+  @LocalStorageProp('dayLabelTomorrow') dayLabelTomorrow: string = T('明天');
   @LocalStorageProp('dayLabelNextDay') dayLabelNextDay: string = '';
   @LocalStorageProp('lastRefresh') lastRefresh: string = '';
   @LocalStorageProp('isEmpty') isEmpty: boolean = true;
@@ -78,12 +80,12 @@ struct ClassPreviewCard2x2 {
   /** 当前视图对应的日期胶囊文字 */
   private curDayLabel(): string {
     if (this.currentView === 0) {
-      return this.dayLabel.length > 0 ? this.dayLabel : '今天';
+      return this.dayLabel.length > 0 ? this.dayLabel : T('今天');
     }
     if (this.currentView === 1) {
-      return this.dayLabelTomorrow.length > 0 ? this.dayLabelTomorrow : '明天';
+      return this.dayLabelTomorrow.length > 0 ? this.dayLabelTomorrow : T('明天');
     }
-    return this.dayLabelNextDay.length > 0 ? this.dayLabelNextDay : 'M月D日';
+    return this.dayLabelNextDay.length > 0 ? this.dayLabelNextDay : T('M月D日');
   }
 
   /**
@@ -131,7 +133,7 @@ struct ClassPreviewCard2x2 {
       Row() {
         // 标题区
         Row() {
-          Text('课程预告')
+          Text(T('课程预告'))
             .fontSize(13)
             .fontWeight(FontWeight.Bold)
             .fontColor('#1A1D1C')
@@ -182,10 +184,10 @@ struct ClassPreviewCard2x2 {
       if (this.isEmpty) {
         // 空态：突出提示，点击进入应用课程表
         Column() {
-          Text('暂无课程数据')
+          Text(T('暂无课程数据'))
             .fontSize(11)
             .fontColor('#999999')
-          Text('点击进入应用课程表')
+          Text(T('点击进入应用课程表'))
             .fontSize(8)
             .fontColor('#BBBBBB')
             .margin({ top: 2 })

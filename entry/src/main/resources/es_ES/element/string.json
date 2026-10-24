@@ -1,0 +1,44 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Cliente de servicios académicos del NJMU"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Pantalla principal de NJMU Helper"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "NJMU Helper"
+    },
+    {
+      "name": "reason_internet",
+      "value": "Se usa para conectar con el sistema académico de la universidad (horario y notas)"
+    },
+    {
+      "name": "reason_calendar",
+      "value": "Se usa para añadir exámenes al calendario del sistema y recibir recordatorios"
+    },
+    {
+      "name": "reason_agent_reminder",
+      "value": "Envía un recordatorio antes de clase, aunque la aplicación esté cerrada"
+    },
+    {
+      "name": "class_preview_card_name",
+      "value": "Próxima clase"
+    },
+    {
+      "name": "exam_countdown_card_name",
+      "value": "Cuenta atrás"
+    },
+    {
+      "name": "today_schedule_card_name",
+      "value": "Clases de hoy"
+    },
+    {
+      "name": "score_card_name",
+      "value": "Expediente"
+    }
+  ]
+}

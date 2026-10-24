@@ -36,9 +36,12 @@ import { AppearanceStore } from '../common/AppearanceStore';
 import { LoginResult } from '../model/Models';
 import { LogPage } from './LogPage';
 import { WebSurface } from './WebSurface';
+import { T } from '../common/I18n';
 
 @Component
 export struct LoginView {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -213,10 +216,20 @@ export struct LoginView {
 
   /** 页面消失（侧滑返回 / 路由离开）：若登录进行中则取消登录（方便收集日志，避免后台残留请求） */
   aboutToDisappear(): void {
+    // 注销 MediaQuery 监听（只置 null 不会取消注册，回调会持续持有已销毁的组件）
+    if (this.landscapeListener !== null) {
+      this.landscapeListener.off('change');
+      this.landscapeListener = null;
+    }
+    if (this.wideListener !== null) {
+      this.wideListener.off('change');
+      this.wideListener = null;
+    }
+
     this.landscapeListener = null;
     this.wideListener = null;
     if (this.loading) {
-      this.cancelLogin('页面返回取消登录');
+      this.cancelLogin(T('页面返回取消登录'));
     }
   }
 
@@ -314,16 +327,23 @@ export struct LoginView {
       this.loginMode = 'auto';
     }
     if (this.account.trim().length === 0) {
-      this.getUIContext().getPromptAction().showToast({ message: '请输入学号' });
+      this.getUIContext().getPromptAction().showToast({ message: T('请输入学号') });
       return;
     }
     if (this.password.length === 0) {
-      this.getUIContext().getPromptAction().showToast({ message: '请输入密码' });
+      this.getUIContext().getPromptAction().showToast({ message: T('请输入密码') });
       return;
     }
     // 真实登录：强制走真实接口，关闭离线模式
+    // 若上一次是功能浏览模式，先清掉被演示数据污染的缓存（否则首页会显示演示学生数据）
+    if (JwApi.USE_MOCK) {
+      JwApi.clearMockPollutedCache();
+    }
     JwApi.USE_MOCK = false;
     HttpClient.setOfflineMode(false);
+    // 清掉功能浏览模式残留的演示周次，否则首页会按演示周次匹配真实课表（课全不显示）
+    AppState.mockCurrentWeek = 0;
+    HttpClient.clearSessionExpired();
     this.loading = true;
     this.loginCancelled = false;
     // 登录超时保护（分两阶段，避免"服务大厅网页已登录、应用却提示超时"的状态冲突）：
@@ -337,17 +357,17 @@ export struct LoginView {
         return;
       }
       if (JwApi.stage() === 'profile') {
-        this.getUIContext().getPromptAction().showToast({ message: '服务大厅已登录，正在完成登录…', duration: 2000 });
+        this.getUIContext().getPromptAction().showToast({ message: T('服务大厅已登录，正在完成登录…'), duration: 2000 });
         this.loginTimer = setTimeout(() => {
           if (this.loading) {
-            this.cancelLogin('登录收尾超时（会话已建立、资料校验未完成），已自动取消');
-            this.getUIContext().getPromptAction().showToast({ message: '登录收尾超时，请重试' });
+            this.cancelLogin(T('登录收尾超时（会话已建立、资料校验未完成），已自动取消'));
+            this.getUIContext().getPromptAction().showToast({ message: T('登录收尾超时，请重试') });
           }
         }, 30000);
         return;
       }
-      this.cancelLogin('登录等待超时（20s），已自动取消');
-      this.getUIContext().getPromptAction().showToast({ message: '登录超时，已自动取消' });
+      this.cancelLogin(T('登录等待超时（20s），已自动取消'));
+      this.getUIContext().getPromptAction().showToast({ message: T('登录超时，已自动取消') });
     }, 20000);
     const captchaVal: string = this.showCaptcha ? this.captchaInput.trim() : '';
     let result: LoginResult;
@@ -370,13 +390,13 @@ export struct LoginView {
           this.captchaImage = e.captchaImage;
           this.captchaInput = '';
           this.saveCaptchaAttachment(e.captchaImage);
-          this.getUIContext().getPromptAction().showToast({ message: '请输入图形验证码后重试', duration: 2000 });
+          this.getUIContext().getPromptAction().showToast({ message: T('请输入图形验证码后重试'), duration: 2000 });
         } else {
-          this.getUIContext().getPromptAction().showToast({ message: '该账号需要验证码，正在打开网页登录…', duration: 2000 });
+          this.getUIContext().getPromptAction().showToast({ message: T('该账号需要验证码，正在打开网页登录…'), duration: 2000 });
           this.openWebLogin();
         }
       } else {
-        this.getUIContext().getPromptAction().showToast({ message: '登录失败，请检查账号密码或网络', duration: 2500 });
+        this.getUIContext().getPromptAction().showToast({ message: T('登录失败，请检查账号密码或网络'), duration: 2500 });
       }
       return;
     }
@@ -405,7 +425,7 @@ export struct LoginView {
       if (this.loginSystem === 'original') {
         DataStore.setLoginMethod('pwd');
       }
-      this.getUIContext().getPromptAction().showToast({ message: '登录成功' });
+      this.getUIContext().getPromptAction().showToast({ message: T('登录成功') });
       this.onSuccess();
     } else {
       // 只有服务端要求验证码，才显示验证码输入框并推送图片
@@ -435,8 +455,13 @@ export struct LoginView {
     const loginPwd: string = this.password;
     AppState.onWebLogin = () => {
       // 网页登录成功＝真实登录：退出 mock/离线模式，让真实会话立即生效
+      if (JwApi.USE_MOCK) {
+        JwApi.clearMockPollutedCache();
+      }
       JwApi.USE_MOCK = false;
       HttpClient.setOfflineMode(false);
+      AppState.mockCurrentWeek = 0;
+      HttpClient.clearSessionExpired();
       // 记录登录账号 + 密码（网页登录成功后，密码可信，供历史账号自动填充）
       if (loginAcct.length > 0) {
         DataStore.addAccount(loginAcct, loginPwd.length > 0 ?
@@ -458,7 +483,7 @@ export struct LoginView {
     // 南医大统一身份认证：打开 authserver 登录页，service 指向教务 SSO 端点
     AppState.webUrl = Const.CAS_LOGIN_URL +
       '?service=' + encodeURIComponent(Const.JW_SSO_BRIDGE_URL);
-    AppState.webTitle = '网页登录';
+    AppState.webTitle = T('网页登录');
     this.showWeb = true;
   }
 
@@ -478,12 +503,12 @@ export struct LoginView {
 
   /** 当前重登方式文案（自动重登 / 手动重登） */
   private loginModeText(): string {
-    return this.loginMode === 'auto' ? '自动重登' : '手动重登';
+    return this.loginMode === 'auto' ? T('自动重登') : T('手动重登');
   }
 
   /** 当前登录系统文案（统一身份认证 / 教务系统直登） */
   private loginSystemText(): string {
-    return this.loginSystem === 'service' ? '统一身份认证' : '教务系统直登';
+    return this.loginSystem === 'service' ? T('统一身份认证') : T('教务系统直登');
   }
 
   /** 切换登录系统（service=统一身份认证 CAS / original=教务系统 RSA 直登），切换后实时刷新显示
@@ -509,18 +534,18 @@ export struct LoginView {
     this.getUIContext().getPromptAction().showActionMenu({
       title: `选择重登方式（当前：${current}）`,
       buttons: [
-        { text: '自动重登', color: '#005BAC' },
-        { text: '手动重登', color: '#888888' }
+        { text: T('自动重登'), color: '#005BAC' },
+        { text: T('手动重登'), color: '#888888' }
       ]
     }).then((res: promptAction.ActionMenuSuccessResponse) => {
       if (res.index === 0) {
         DataStore.setLoginMode('auto');
         this.loginMode = 'auto';
-        this.getUIContext().getPromptAction().showToast({ message: '已切换为自动重登' });
+        this.getUIContext().getPromptAction().showToast({ message: T('已切换为自动重登') });
       } else if (res.index === 1) {
         DataStore.setLoginMode('legacy');
         this.loginMode = 'legacy';
-        this.getUIContext().getPromptAction().showToast({ message: '已切换为手动重登' });
+        this.getUIContext().getPromptAction().showToast({ message: T('已切换为手动重登') });
       }
     }).catch(() => {
       // 取消选择
@@ -533,16 +558,16 @@ export struct LoginView {
     this.getUIContext().getPromptAction().showActionMenu({
       title: `选择登录方式（当前：${current}）`,
       buttons: [
-        { text: '统一身份认证', color: '#005BAC' },
-        { text: '教务系统直登', color: '#888888' }
+        { text: T('统一身份认证'), color: '#005BAC' },
+        { text: T('教务系统直登'), color: '#888888' }
       ]
     }).then((res: promptAction.ActionMenuSuccessResponse) => {
       if (res.index === 0) {
         this.setLoginSystem('service');
-        this.getUIContext().getPromptAction().showToast({ message: '已切换为统一身份认证' });
+        this.getUIContext().getPromptAction().showToast({ message: T('已切换为统一身份认证') });
       } else if (res.index === 1) {
         this.setLoginSystem('original');
-        this.getUIContext().getPromptAction().showToast({ message: '已切换为教务系统直登' });
+        this.getUIContext().getPromptAction().showToast({ message: T('已切换为教务系统直登') });
       }
     }).catch(() => {
       // 取消选择
@@ -552,7 +577,7 @@ export struct LoginView {
   /** 弹窗说明两种重登方式的区别（问号图标点击） */
   private showLoginModeInfo(): void {
     this.getUIContext().getPromptAction().showDialog({
-      title: '重登方式说明',
+      title: T('重登方式说明'),
       message: '「教务登录」默认自动重登：每次重新打开应用用保存的账号密码自动登录教务系统，免去手动点击。\n\n「服务大厅登录」为手动重登：教务系统会话不可持久化，重新打开应用会自动从服务大厅重新打开教务系统刷新（无需重新输入密码）；仅当该刷新失败时才需在首页点击「重登」按钮。\n\n重登方式可在下方随时手动更改。',
       buttons: [
         { text: '我知道了', color: '#005BAC', primary: true }
@@ -590,11 +615,11 @@ export struct LoginView {
     if (AppState.logEnabled) {
       // 已开启：询问是否退出（同时关闭功能浏览联网，清除已收集日志与附件）
       this.getUIContext().getPromptAction().showDialog({
-        title: '日志调试已开启',
-        message: '当前正在收集登录与使用日志，且功能浏览模式允许联网。是否退出调试模式？',
+        title: T('日志调试已开启'),
+        message: T('当前正在收集登录与使用日志，且功能浏览模式允许联网。是否退出调试模式？'),
         buttons: [
-          { text: '取消', color: '#888888' },
-          { text: '退出调试模式', color: '#DB5252', primary: true }
+          { text: T('取消'), color: '#888888' },
+          { text: T('退出调试模式'), color: '#DB5252', primary: true }
         ]
       }).then((res) => {
         if (res.index === 1) {
@@ -614,19 +639,19 @@ export struct LoginView {
   /** 提交日志调试密码：admin（登录页入口——开启日志收集，并同时允许功能浏览模式联网） */
   private submitLogPwd(): void {
     if (this.logPwd !== 'admin') {
-      this.getUIContext().getPromptAction().showToast({ message: '密码错误' });
+      this.getUIContext().getPromptAction().showToast({ message: T('密码错误') });
       return;
     }
     this.showLogSheet = false;
     if (AppState.logEnabled) {
-      this.getUIContext().getPromptAction().showToast({ message: '日志调试已开启' });
+      this.getUIContext().getPromptAction().showToast({ message: T('日志调试已开启') });
       return;
     }
     AppState.logEnabled = true;
     // 功能浏览模式允许联网（debugNetwork）：进入功能浏览时网络请求不再被离线模式拦截
     AppState.debugNetwork = true;
     LogStore.log('日志调试', '开启', '成功', '登录页入口开启（日志收集 + 功能浏览允许联网）');
-    this.getUIContext().getPromptAction().showToast({ message: '日志调试已开启，开始收集登录与使用日志' });
+    this.getUIContext().getPromptAction().showToast({ message: T('日志调试已开启，开始收集登录与使用日志') });
   }
 
   /** 日志调试密码输入弹窗 */
@@ -638,14 +663,14 @@ export struct LoginView {
     // TextInput 属表单控件，走 Stack 承载层画沉浸光感（见输入行注释）。
     MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false, panelShowClose: true, panelOnClose: (): void => { this.showLogSheet = false; } }) {
       Column() {
-        Text('日志调试')
+        Text(T('日志调试'))
           .fontSize(17)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
           .width('100%')
           .margin({ top: 16, bottom: 8 })
 
-        Text('输入密码以开启日志调试（收集登录与使用日志，用于定位登录失败等问题的原因）')
+        Text(T('输入密码以开启日志调试（收集登录与使用日志，用于定位登录失败等问题的原因）'))
           .fontSize(12)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .width('100%')
@@ -658,7 +683,7 @@ export struct LoginView {
           if (materialAvailable()) {
             MaterialCardLayer({ layerRadius: $r('sys.float.corner_radius_level12'), layerShadow: false })
           }
-          TextInput({ text: this.logPwd, placeholder: '请输入密码' })
+          TextInput({ text: this.logPwd, placeholder: T('请输入密码') })
             .height(48)
             .enterKeyType(EnterKeyType.Done)
             .borderRadius($r('sys.float.corner_radius_level12'))
@@ -680,7 +705,7 @@ export struct LoginView {
         .width('100%')
         .borderRadius($r('sys.float.corner_radius_level12'))
 
-        Button('确认')
+        Button(T('确认'))
           .fontSize(14)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
           .fontColor(Color.White)
@@ -708,7 +733,7 @@ export struct LoginView {
     if (result.success && result.profile !== null) {
       AppState.profile = result.profile;
       AppState.account = 'demo';
-      this.getUIContext().getPromptAction().showToast({ message: '已进入功能浏览模式' });
+      this.getUIContext().getPromptAction().showToast({ message: T('已进入功能浏览模式') });
       this.onSuccess();
     } else {
       this.getUIContext().getPromptAction().showToast({ message: '功能浏览启动失败，请重试' });
@@ -925,7 +950,7 @@ export struct LoginView {
           MaterialCardLayer({ layerRadius: $r('sys.float.corner_radius_level12'), layerShadow: false, layerForce: true })
         }
         Row() {
-          TextInput({ placeholder: '验证码', text: this.captchaInput })
+          TextInput({ placeholder: T('验证码'), text: this.captchaInput })
             .height(48)
             .enterKeyType(EnterKeyType.Done)
             .fontSize($r('sys.float.Body_L'))
@@ -975,7 +1000,7 @@ export struct LoginView {
             this.loadCaptcha();
           })
       } else {
-        Text('点击获取验证码')
+        Text(T('点击获取验证码'))
           .fontSize(13)
           .fontColor($r('app.color.brand'))
           .backgroundColor(GlassMaterial.cardSurface(AppStorage.get<boolean>('isDarkMode') ?? false)).backgroundBlurStyle(BlurStyle.Thin).border({ width: 1, color: GlassMaterial.borderColor() }).shadow(GlassMaterial.capsuleShadow()).clip(true)
@@ -998,12 +1023,12 @@ export struct LoginView {
   historyPanel() {
     Column() {
       Row() {
-        Text('历史账号')
+        Text(T('历史账号'))
           .fontSize(13)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
           .fontColor($r('app.color.text_primary'))
         Blank()
-        Text('清空')
+        Text(T('清空'))
           .fontSize(11)
           .fontColor($r('app.color.brand'))
           .onClick(() => {
@@ -1020,7 +1045,7 @@ export struct LoginView {
             Stack() {
             Row() {
               if (index === 0) {
-                Text('最近')
+                Text(T('最近'))
                   .fontSize(10)
                   .fontColor($r('app.color.brand_on'))
                   .backgroundColor($r('app.color.brand'))
@@ -1033,7 +1058,7 @@ export struct LoginView {
                 Text(item['account'] ?? '')
                   .fontSize(14)
                   .fontColor($r('app.color.text_primary'))
-                Text(item['password'] !== undefined && item['password'].length > 0 ? '已保存密码' : '无密码')
+                Text(item['password'] !== undefined && item['password'].length > 0 ? '已保存密码' : T('无密码'))
                   .fontSize(10)
                   .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                   .margin({ top: 2 })
@@ -1041,7 +1066,7 @@ export struct LoginView {
               .alignItems(HorizontalAlign.Start)
               .layoutWeight(1)
 
-              Button('使用')
+              Button(T('使用'))
                 .fontSize(12)
                 .fontColor($r('app.color.brand_on'))
                 .backgroundColor($r('app.color.brand'))
@@ -1074,7 +1099,7 @@ export struct LoginView {
       .scrollBar(BarState.Off)
       .constraintSize({ maxHeight: 340 })
 
-      Text('密码仅保存在本机（加密），不上传任何服务器。')
+      Text(T('密码仅保存在本机（加密），不上传任何服务器。'))
         .fontSize(10)
         .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .margin({ top: 4 })
@@ -1090,7 +1115,7 @@ export struct LoginView {
   @Builder
   swipeDeleteButton(index: number) {
     Row() {
-      Text('删除')
+      Text(T('删除'))
         .fontSize(13)
         .fontColor('#FFFFFF')
     }
@@ -1155,23 +1180,23 @@ export struct LoginView {
                 MaterialCardLayer({ layerRadius: 20, layerShadow: true, layerForce: true })
               }
               Column() {
-              Text('教务系统登录')
+              Text(T('教务系统登录'))
                 .fontSize(17)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor($r('app.color.text_primary'))
                 .width('100%')
                 .margin({ bottom: 4 })
-              Text('南医大统一身份认证需验证码，请在网页中登录（学号已自动预填）')
+              Text(T('南医大统一身份认证需验证码，请在网页中登录（学号已自动预填）'))
                 .fontSize(12)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 .width('100%')
                 .margin({ bottom: 18 })
 
-              this.inputRow('学号', this.account, (v: string) => {
+              this.inputRow(T('学号'), this.account, (v: string) => {
                 this.account = v;
               }, this.accountController)
               // 密码行内部直接绑定 this.password（避免值参数快照导致切换明文时清空）
-              this.passwordRow('密码', this.passwordController)
+              this.passwordRow(T('密码'), this.passwordController)
 
               if (this.showCaptcha) {
                 this.captchaRow()
@@ -1188,7 +1213,7 @@ export struct LoginView {
                     // 持久化勾选状态：退出登录/重启后仍记住，可自动填充已保存密码
                     DataStore.saveRemember(checked);
                   })
-                Text('记住密码')
+                Text(T('记住密码'))
                   .fontSize(12)
                   .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                   .margin({ left: 4 })
@@ -1204,13 +1229,13 @@ export struct LoginView {
                       this.remember7d = checked;
                       AppState.remember7d = checked;
                     })
-                  Text('7天免登录')
+                  Text(T('7天免登录'))
                     .fontSize(12)
                     .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                     .margin({ left: 4 })
                 }
                 Blank()
-                Text('忘记密码？')
+                Text(T('忘记密码？'))
                   .fontSize(12)
                   .fontColor($r('app.color.brand'))
                   .onClick(() => {
@@ -1242,7 +1267,7 @@ export struct LoginView {
                           .width(16)
                           .height(16)
                           .fillColor($r('app.color.text_secondary'))
-                        Text('返回')
+                        Text(T('返回'))
                           .fontSize(16)
                           .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                           .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
@@ -1276,7 +1301,7 @@ export struct LoginView {
                     }
                   }) {
                     Row() {
-                      Text('网页登录（推荐）')
+                      Text(T('网页登录（推荐）'))
                         .fontSize(16)
                         .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                         // 按钮底为主题色（彩色玻璃/实底），深浅色模式下都用白色保证对比
@@ -1293,7 +1318,7 @@ export struct LoginView {
 
               // 原生登录兜底入口（次要）：南医大原生 CAS 登录已废弃（ST 交换失败），保留供诊断/回退
               Row() {
-                Text('使用账号密码原生登录（可能失败）')
+                Text(T('使用账号密码原生登录（可能失败）'))
                   .fontSize(12)
                   .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
               }
@@ -1361,7 +1386,7 @@ export struct LoginView {
                   .onClick(() => {
                     this.showLoginModeInfo();
                   })
-                Text('重登方式')
+                Text(T('重登方式'))
                   .fontSize(13)
                   .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 Blank()
@@ -1390,7 +1415,7 @@ export struct LoginView {
                   .onClick(() => {
                     this.showLoginModeInfo();
                   })
-                Text('登录方式')
+                Text(T('登录方式'))
                   .fontSize(13)
                   .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 Blank()
@@ -1425,7 +1450,7 @@ export struct LoginView {
                   }
                 }) {
                   Row() {
-                    Text('网页登录')
+                    Text(T('网页登录'))
                       .fontSize(15)
                       .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                       .fontColor($r('app.color.brand'))
@@ -1453,7 +1478,7 @@ export struct LoginView {
                   }
                 }) {
                   Row() {
-                    Text('功能浏览')
+                    Text(T('功能浏览'))
                       .fontSize(15)
                       .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                       .fontColor($r('app.color.brand'))
@@ -1470,7 +1495,7 @@ export struct LoginView {
               // （开启方式：连点顶部应用图标 5 次 + 密码 admin；真实登录/功能浏览模式均收集日志）
               if (this.logEnabled) {
                 Row() {
-                  Text('日志调试')
+                  Text(T('日志调试'))
                     .fontSize(13)
                     .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                   Blank()
@@ -1490,7 +1515,7 @@ export struct LoginView {
                 })
               }
 
-              Text('"功能浏览"使用虚拟数据，用以展示相关功能效果。\n若多次登录失败，可尝试使用网页教务系统进行登录。')
+              Text(T('"功能浏览"使用虚拟数据，用以展示相关功能效果。\n若多次登录失败，可尝试使用网页教务系统进行登录。'))
                 .fontSize(11)
                 .lineHeight(18)
                 .textAlign(TextAlign.Center)
@@ -1583,7 +1608,7 @@ export struct LoginView {
       // 自动重登提示：居中弹窗样式（不遮罩页面、不拦截点击）
       if (this.autoRelogin && this.loading) {
         Column() {
-          Text('正在自动登录…')
+          Text(T('正在自动登录…'))
             .fontSize(14)
             .fontColor($r('app.color.text_primary'))
         }
@@ -1638,7 +1663,7 @@ export struct LoginView {
       onLoadFail: (): void => {
         // 主文档加载失败：给出可行动的提示
         this.getUIContext().getPromptAction().showToast({
-          message: '网络状态不佳，请检查网络，若仍无法访问，则可能是学校服务器维护中，请稍后再试。',
+          message: T('网络状态不佳，请检查网络，若仍无法访问，则可能是学校服务器维护中，请稍后再试。'),
           duration: 3500
         });
       },
@@ -1662,10 +1687,10 @@ export struct LoginView {
         btnBorderC: GlassMaterial.borderColor(),
         btnOnClick: (): void => {
           this.webScanSeq++;
-          this.getUIContext().getPromptAction().showToast({ message: '正在识别登录状态…' });
+          this.getUIContext().getPromptAction().showToast({ message: T('正在识别登录状态…') });
         }
       }) {
-        Text('识别登录状态')
+        Text(T('识别登录状态'))
           .fontSize(13)
           .fontColor($r('app.color.brand'))
           .padding({ left: 14, right: 14, top: 6, bottom: 6 })
@@ -1673,7 +1698,7 @@ export struct LoginView {
       Blank()
       if (AppState.webLoginMode) {
         Row() {
-          Text('服务大厅')
+          Text(T('服务大厅'))
             .fontSize(13)
             .fontColor(this.webLoginTarget === 'hall' ? $r('app.color.brand_on') : $r('app.color.text_secondary'))
             .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -1682,7 +1707,7 @@ export struct LoginView {
             .onClick(() => {
               this.switchWebTarget('hall');
             })
-          Text('教务系统')
+          Text(T('教务系统'))
             .fontSize(13)
             .fontColor(this.webLoginTarget === 'jw' ? $r('app.color.brand_on') : $r('app.color.text_secondary'))
             .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -1709,7 +1734,7 @@ export struct LoginView {
   @Builder
   privacySheet() {
     Column() {
-      Text('隐私政策')
+      Text(T('隐私政策'))
         .fontSize(20)
         .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
         .fontColor($r('app.color.text_primary'))
@@ -1727,7 +1752,7 @@ export struct LoginView {
             const url: string = event.data.getRequestUrl();
             if (url.startsWith('http://') || url.startsWith('https://')) {
               AppState.webUrl = url;
-              AppState.webTitle = 'GitHub 开源仓库';
+              AppState.webTitle = T('GitHub 开源仓库');
               AppState.webLoginMode = false;
               AppState.onWebLogin = null;
               this.showWeb = true;
@@ -1741,14 +1766,14 @@ export struct LoginView {
       Column() {
         // 已同意时间（未同意时显示提示）
         if (this.privacyAgreedAt.length > 0) {
-          Text('已签订时间: ' + this.privacyAgreedAt)
+          Text(T('已签订时间: ') + this.privacyAgreedAt)
             .fontSize(11)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
             .textAlign(TextAlign.End)
             .margin({ bottom: 8 })
         } else {
-          Text('未同意将无法使用账号登录，仅可使用"功能浏览"')
+          Text(T('未同意将无法使用账号登录，仅可使用"功能浏览"'))
             .fontSize(11)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
@@ -1756,7 +1781,7 @@ export struct LoginView {
             .margin({ bottom: 8 })
         }
         Row() {
-          Button('暂不同意')
+          Button(T('暂不同意'))
             .fontSize(14)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .backgroundColor(GlassMaterial.cardSurface(AppStorage.get<boolean>('isDarkMode') ?? false)).backgroundBlurStyle(BlurStyle.Thin).border({ width: 1, color: GlassMaterial.borderColor() }).shadow(GlassMaterial.capsuleShadow()).clip(true)
@@ -1766,7 +1791,7 @@ export struct LoginView {
             .onClick(() => {
               this.declinePrivacy();
             })
-          Button('同意并继续')
+          Button(T('同意并继续'))
             .fontSize(14)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.brand_on'))
@@ -1799,7 +1824,7 @@ export struct LoginView {
       Column() {
         // 标题
         Row() {
-          Text('开发者声明')
+          Text(T('开发者声明'))
             .fontSize(18)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
             .fontColor($r('app.color.text_primary'))
@@ -1838,7 +1863,7 @@ export struct LoginView {
 
         // 底部操作行：上一步（回隐私协议）+ 我已知晓
         Row() {
-          Button('上一步')
+          Button(T('上一步'))
             .fontSize(14)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .backgroundColor(GlassMaterial.cardSurface(AppStorage.get<boolean>('isDarkMode') ?? false)).backgroundBlurStyle(BlurStyle.Thin).border({ width: 1, color: GlassMaterial.borderColor() }).shadow(GlassMaterial.capsuleShadow()).clip(true)
@@ -1852,7 +1877,7 @@ export struct LoginView {
                 this.showPrivacy = true;
               }, 300);
             })
-          Button('我已知晓')
+          Button(T('我已知晓'))
             .fontSize(14)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.brand_on'))
@@ -1888,7 +1913,7 @@ export struct LoginView {
       Column() {
         // 标题
         Row() {
-          Text('账号风控提醒')
+          Text(T('账号风控提醒'))
             .fontSize(18)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
             .fontColor($r('app.color.text_primary'))
@@ -1899,7 +1924,7 @@ export struct LoginView {
 
         // 提醒正文（居中排版，聚焦提示内容）
         Column() {
-          Text('请勿频繁登录与退出教务系统，以免导致账号风控无法使用！' +
+          Text(T('请勿频繁登录与退出教务系统，以免导致账号风控无法使用！') +
             '建议将应用锁定在后台，以免被清除。\n\n' +
             '若账号风控导致应用无法使用，请清除应用数据，等待24小时及以上，风控将自动解除。\n\n' +
             '若此时应用还是无法登录，则可能是学校服务器更新，应用不一定还能登录，' +
@@ -1916,7 +1941,7 @@ export struct LoginView {
 
         // 底部操作行：上一步（回开发者声明）+ 我知道了
         Row() {
-          Button('上一步')
+          Button(T('上一步'))
             .fontSize(14)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .backgroundColor(GlassMaterial.cardSurface(AppStorage.get<boolean>('isDarkMode') ?? false)).backgroundBlurStyle(BlurStyle.Thin).border({ width: 1, color: GlassMaterial.borderColor() }).shadow(GlassMaterial.capsuleShadow()).clip(true)
@@ -1930,7 +1955,7 @@ export struct LoginView {
                 this.showDeclaration = true;
               }, 300);
             })
-          Button('我知道了')
+          Button(T('我知道了'))
             .fontSize(14)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.brand_on'))

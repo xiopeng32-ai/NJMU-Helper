@@ -18,6 +18,7 @@ import { MaterialSheetPanel } from './common/MaterialCard';
 import { MaterialButton } from './common/MaterialButton';
 import { materialActive, sheetBlurStyle } from '../common/SystemMaterial';
 import { MaterialCardLayer } from './common/MaterialCarrier';
+import { T } from '../common/I18n';
 
 const BG_PALETTE: string[] = [
   '#FFFFFF', '#FAF9F6', '#F0F0F0', '#F5F0E1', '#E8F0FE', '#E3F9E5',
@@ -37,6 +38,8 @@ const COLOR_PALETTE: string[] = [
 /** 颜色选择器独立组件 —— 对标 CourseDetailPanel 的圆点色盘 */
 @Component
 struct ColorPickCell {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Link hex: string;
   @StorageProp('themeColor') themeColor: string = 'green';
   /** 全局字重响应式订阅：表达式读 this.fwMode 才登记依赖，fwValue 声明即订阅 */
@@ -124,6 +127,8 @@ struct ColorPickCell {
 
 @Component
 export struct ScheduleSettingsPanel {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('themeColor') themeColor: string = 'green';
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -319,7 +324,7 @@ export struct ScheduleSettingsPanel {
       message: '该效果依赖鸿蒙7（API26+），请确保设备升级至鸿蒙7及以上版本，同时该效果可能导致设备发热、使用应用时卡顿掉帧、部分界面可读性严重降低，请酌情考虑开启！满血沉浸光感需设备为麒麟9020/T92及以上版本的处理器。',
       buttons: [
         { text: '仍要开启', color: Theme.colorOf(this.themeColor) },
-        { text: '取消', color: '#666666' }
+        { text: T('取消'), color: '#666666' }
       ]
     }).then((res) => {
       if (res.index === 0) {
@@ -415,7 +420,7 @@ export struct ScheduleSettingsPanel {
   secSheetMain() {
     Column() {
       Row() {
-        Text('课程节数').fontSize(14).fontColor($r('app.color.text_primary')).layoutWeight(1)
+        Text(T('课程节数')).fontSize(14).fontColor($r('app.color.text_primary')).layoutWeight(1)
         // 「－」减节数圆角小按钮：材质走 MaterialButton（光感关闭回落原淡灰玻璃底）
         MaterialButton({
           btnRadius: 8,
@@ -491,7 +496,7 @@ export struct ScheduleSettingsPanel {
             btnBorderC: GlassMaterial.borderColor(),
             btnOnClick: () => { this.resetSectionEditor(); }
           }) {
-            Text('恢复默认')
+            Text(T('恢复默认'))
               .fontSize(14).fontColor(Theme.colorOf(this.themeColor))
               .height(42).width('100%').textAlign(TextAlign.Center)
           }
@@ -506,7 +511,7 @@ export struct ScheduleSettingsPanel {
             btnTintRatio: 0.85,
             btnOnClick: () => { this.saveSectionEditor(); }
           }) {
-            Text('保存')
+            Text(T('保存'))
               .fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor(Color.White)
               .height(42).width('100%').textAlign(TextAlign.Center)
           }
@@ -546,7 +551,7 @@ export struct ScheduleSettingsPanel {
 
       Column() {
         Row() {
-          Text('上课时间').fontSize(13).fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).width(72)
+          Text(T('上课时间')).fontSize(13).fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).width(72)
           // 时间输入框：TextInput 属表单控件、不能走 Toggle 承载层 → Stack 兄弟结构（承载层画沉浸光感，
           // 受全局开关控制；材质关闭回落原 comp_background_tertiary 实色底）。原 layoutWeight(1) 由外壳承担。
           Stack() {
@@ -573,7 +578,7 @@ export struct ScheduleSettingsPanel {
         .width('100%').margin({ top: 12 }).alignItems(VerticalAlign.Center)
 
         Row() {
-          Text('下课时间').fontSize(13).fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).width(72)
+          Text(T('下课时间')).fontSize(13).fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).width(72)
           // 同「上课时间」输入框：Stack 兄弟结构承载沉浸光感
           Stack() {
             if (materialActive()) {
@@ -598,7 +603,7 @@ export struct ScheduleSettingsPanel {
         }
         .width('100%').margin({ top: 14 }).alignItems(VerticalAlign.Center)
 
-        Text('时间格式：HH:MM，例如 08:00 ~ 08:45')
+        Text(T('时间格式：HH:MM，例如 08:00 ~ 08:45'))
           .fontSize(11).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .width('100%').margin({ top: 10 })
 
@@ -615,7 +620,7 @@ export struct ScheduleSettingsPanel {
             });
           }
         }) {
-          Text('返回列表')
+          Text(T('返回列表'))
             .fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor(Color.White)
             .height(42).width('100%').textAlign(TextAlign.Center)
         }
@@ -665,14 +670,14 @@ export struct ScheduleSettingsPanel {
       Scroll() {
       Column() {
         // ===== 整体 =====
-        Text('整体').fontSize(17).fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold)).fontColor(Theme.colorOf(this.themeColor))
+        Text(T('整体')).fontSize(17).fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold)).fontColor(Theme.colorOf(this.themeColor))
           .width('100%').textAlign(TextAlign.Start).margin({ top: 16, bottom: 8 })
 
         // 开学时间来源（跟随教务系统 / 使用自定义时间）——选「使用自定义时间」后，
         // 后续每次同步课程表都沿用该学期的自定义开学日（不被教务值覆盖）
         Divider().color($r('app.color.divider')).margin({ top: 12, bottom: 12 })
         Row() {
-          Text('开学时间来源').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('开学时间来源')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Row() {
             this.termStartModeChip('跟随教务系统', 'auto')
@@ -683,7 +688,7 @@ export struct ScheduleSettingsPanel {
         // 自定义开学时间（覆盖默认 9-01/3-01 推算，用于修正周次）
         Divider().color($r('app.color.divider')).margin({ top: 12, bottom: 12 })
         Row() {
-          Text('自定义开学时间').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('自定义开学时间')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           if (this.currentTermStart.length > 0 && this.currentTermStart !== DateUtil.defaultTermStart(this.currentTermId)) {
             // 「恢复默认」淡红小胶囊：材质走 MaterialButton，btnTint 叠回警示红（比例 0.35，保持淡红观感）
@@ -694,7 +699,7 @@ export struct ScheduleSettingsPanel {
               btnTintRatio: 0.35,
               btnOnClick: () => { this.onTermStartChange(''); }
             }) {
-              Text('恢复默认')
+              Text(T('恢复默认'))
                 .fontSize(12).fontColor('#F0524D')
                 .padding({ left: 8, right: 8, top: 3, bottom: 3 })
             }
@@ -718,7 +723,7 @@ export struct ScheduleSettingsPanel {
         // 课程节数
         Divider().color($r('app.color.divider')).margin({ top: 12, bottom: 12 })
         Row() {
-          Text('课程节数').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('课程节数')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Text(`${this.secCount} 节`).fontSize(13).fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           ChevronRight({ iconSize: 14 }).margin({ left: 6 })
@@ -728,7 +733,7 @@ export struct ScheduleSettingsPanel {
         // 每节课上课时间
         Divider().color($r('app.color.divider')).margin({ top: 12, bottom: 12 })
         Row() {
-          Text('每节课时间').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('每节课时间')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Text(this.secTimeText.length > 0 ? '已自定义' : '默认作息').fontSize(13)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
@@ -739,7 +744,7 @@ export struct ScheduleSettingsPanel {
         // 背景图（第一位）
         Divider().color($r('app.color.divider')).margin({ top: 12, bottom: 12 })
         Row() {
-          Text('背景图').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('背景图')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           if (this.scheduleBg.length > 0) {
             // 「清除」淡红小胶囊：同「恢复默认」，btnTint 叠回警示红（比例 0.35）
@@ -750,7 +755,7 @@ export struct ScheduleSettingsPanel {
               btnTintRatio: 0.35,
               btnOnClick: () => { this.onClearBg(); }
             }) {
-              Text('清除')
+              Text(T('清除'))
                 .fontSize(12).fontColor('#F0524D')
                 .padding({ left: 8, right: 8, top: 3, bottom: 3 })
             }
@@ -784,7 +789,7 @@ export struct ScheduleSettingsPanel {
         // 网格
         Divider().color($r('app.color.divider'))
         Row() {
-          Text('网格辅助线').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('网格辅助线')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.gridOn })
             .selectedColor(Theme.colorOf(this.themeColor))
@@ -800,7 +805,7 @@ export struct ScheduleSettingsPanel {
         if (this.gridOn) {
           Column() {
             Row() {
-              Text('线宽').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
+              Text(T('线宽')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
               Blank()
               Text(`${this.gridW}vp`).fontSize(12).fontColor(Theme.colorOf(this.themeColor))
             }.width('100%')
@@ -815,20 +820,20 @@ export struct ScheduleSettingsPanel {
             .combine(TransitionEffect.translate({ y: -6 }).animation({ duration: 250 })))
 
           Row() {
-            Text('线型').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+            Text(T('线型')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
               .fontColor($r('app.color.text_primary')).layoutWeight(1)
             Row({ space: 16 }) {
               Row({ space: 4 }) {
                 Radio({ value: 'solid', group: 'line' }).checked(this.lineStyle === 0)
                   .radioStyle({ checkedBackgroundColor: Theme.colorOf(this.themeColor) })
                   .onChange(() => { this.lineStyle = 0; this.apply(); })
-                Text('实线').fontSize(13).fontColor($r('app.color.text_primary'))
+                Text(T('实线')).fontSize(13).fontColor($r('app.color.text_primary'))
               }
               Row({ space: 4 }) {
                 Radio({ value: 'dash', group: 'line' }).checked(this.lineStyle === 1)
                   .radioStyle({ checkedBackgroundColor: Theme.colorOf(this.themeColor) })
                   .onChange(() => { this.lineStyle = 1; this.apply(); })
-                Text('虚线').fontSize(13).fontColor($r('app.color.text_primary'))
+                Text(T('虚线')).fontSize(13).fontColor($r('app.color.text_primary'))
               }
             }
           }.width('100%').margin({ top: 12, bottom: 12 })
@@ -846,7 +851,7 @@ export struct ScheduleSettingsPanel {
 
         Column() {
           Row() {
-            Text('表头文字大小').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
+            Text(T('表头文字大小')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
             Blank()
             Text(`${this.hdrSize}`).fontSize(12).fontColor(Theme.colorOf(this.themeColor))
           }.width('100%')
@@ -860,7 +865,7 @@ export struct ScheduleSettingsPanel {
         // 节次 / 周末 / 下周
         Divider().color($r('app.color.divider'))
         Row() {
-          Text('节次栏显示时间').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('节次栏显示时间')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.secTime })
             .selectedColor(Theme.colorOf(this.themeColor))
@@ -868,10 +873,10 @@ export struct ScheduleSettingsPanel {
         }.width('100%').margin({ top: 14, bottom: 14 })
         Row() {
           Column() {
-            Text('显示周六周日').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+            Text(T('显示周六周日')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
               .fontColor($r('app.color.text_primary'))
               .width('100%')
-            Text('关闭后，若当周周六/周日确实有课仍会显示，避免漏课').fontSize(11)
+            Text(T('关闭后，若当周周六/周日确实有课仍会显示，避免漏课')).fontSize(11)
               .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
               .width('100%')
               .margin({ top: 2 })
@@ -883,7 +888,7 @@ export struct ScheduleSettingsPanel {
             .onChange((on: boolean) => { this.weekend = on; this.apply(); })
         }.width('100%').margin({ top: 14, bottom: 14 })
         Row() {
-          Text('显示下周课程').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('显示下周课程')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.nextWeek })
             .selectedColor(Theme.colorOf(this.themeColor))
@@ -891,12 +896,12 @@ export struct ScheduleSettingsPanel {
         }.width('100%').margin({ top: 14, bottom: 14 })
 
         // ===== 课程格子 =====
-        Text('课程格子').fontSize(17).fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold)).fontColor(Theme.colorOf(this.themeColor))
+        Text(T('课程格子')).fontSize(17).fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold)).fontColor(Theme.colorOf(this.themeColor))
           .width('100%').textAlign(TextAlign.Start).margin({ top: 18, bottom: 8 })
 
         ColorPickCell({ hex: $txtColor, palette: COLOR_PALETTE, label: '文字颜色', onChange: () => { this.apply(); } })
         Row() {
-          Text('文字颜色叠加格子颜色').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('文字颜色叠加格子颜色')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.textMix })
             .selectedColor(Theme.colorOf(this.themeColor))
@@ -904,10 +909,10 @@ export struct ScheduleSettingsPanel {
         }.width('100%').margin({ top: 14, bottom: 14 })
         Row() {
           Column() {
-            Text('课程格子沉浸光感').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+            Text(T('课程格子沉浸光感')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
               .fontColor($r('app.color.text_primary'))
               .width('100%')
-            Text('课程格子改用沉浸光感材质渲染（API 26+），课程底色以半透明叠层保留；独立于外观设置的沉浸光感开关，可单独开启')
+            Text(T('课程格子改用沉浸光感材质渲染（API 26+），课程底色以半透明叠层保留；独立于外观设置的沉浸光感开关，可单独开启'))
               .fontSize(11)
               .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
               .width('100%')
@@ -931,14 +936,14 @@ export struct ScheduleSettingsPanel {
         Divider().color($r('app.color.divider'))
         ColorPickCell({ hex: $bdrColor, palette: COLOR_PALETTE, label: '格子边框颜色', onChange: () => { this.apply(); } })
         Row() {
-          Text('边框使用格子颜色').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('边框使用格子颜色')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.bdrCourse })
             .selectedColor(Theme.colorOf(this.themeColor))
             .onChange((on: boolean) => { this.bdrCourse = on; this.apply(); })
         }.width('100%').margin({ top: 14, bottom: 14 })
         Row() {
-          Text('虚线边框').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('虚线边框')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.bdrDash })
             .selectedColor(Theme.colorOf(this.themeColor))
@@ -947,7 +952,7 @@ export struct ScheduleSettingsPanel {
 
         Column() {
           Row() {
-            Text('边框粗细').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
+            Text(T('边框粗细')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
             Blank()
             Text(`${this.borderW}vp`).fontSize(12).fontColor(Theme.colorOf(this.themeColor))
           }.width('100%')
@@ -961,7 +966,7 @@ export struct ScheduleSettingsPanel {
         Divider().color($r('app.color.divider'))
         Column() {
           Row() {
-            Text('格子高度').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
+            Text(T('格子高度')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
             Blank()
             Text(`${this.cellH}vp`).fontSize(12).fontColor(Theme.colorOf(this.themeColor))
           }.width('100%')
@@ -973,7 +978,7 @@ export struct ScheduleSettingsPanel {
         }.width('100%').margin({ top: 12, bottom: 12 })
         Column() {
           Row() {
-            Text('圆角半径').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
+            Text(T('圆角半径')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
             Blank()
             Text(`${this.cellR}vp`).fontSize(12).fontColor(Theme.colorOf(this.themeColor))
           }.width('100%')
@@ -985,7 +990,7 @@ export struct ScheduleSettingsPanel {
         }.width('100%').margin({ top: 12, bottom: 12 })
         Column() {
           Row() {
-            Text('不透明度').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
+            Text(T('不透明度')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
             Blank()
             Text(`${this.cellOp}%`).fontSize(12).fontColor(Theme.colorOf(this.themeColor))
           }.width('100%')
@@ -997,7 +1002,7 @@ export struct ScheduleSettingsPanel {
         }.width('100%').margin({ top: 12, bottom: 12 })
         Column() {
           Row() {
-            Text('下周课程不透明度').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
+            Text(T('下周课程不透明度')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
             Blank()
             Text(`${this.nextOp}%`).fontSize(12).fontColor(Theme.colorOf(this.themeColor))
           }.width('100%')
@@ -1011,7 +1016,7 @@ export struct ScheduleSettingsPanel {
         Divider().color($r('app.color.divider'))
         Column() {
           Row() {
-            Text('文字大小').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
+            Text(T('文字大小')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium)).fontColor($r('app.color.text_primary'))
             Blank()
             Text(`${this.textSz}`).fontSize(12).fontColor(Theme.colorOf(this.themeColor))
           }.width('100%')
@@ -1023,32 +1028,32 @@ export struct ScheduleSettingsPanel {
         }.width('100%').margin({ top: 12, bottom: 12 })
 
         Row() {
-          Text('文字水平对齐').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('文字水平对齐')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Row({ space: 12 }) {
             Row({ space: 4 }) {
               Radio({ value: 'c', group: 'align' }).checked(this.hAlign === 0)
                 .radioStyle({ checkedBackgroundColor: Theme.colorOf(this.themeColor) })
                 .onChange(() => { this.hAlign = 0; this.apply(); })
-              Text('居中').fontSize(13).fontColor($r('app.color.text_primary'))
+              Text(T('居中')).fontSize(13).fontColor($r('app.color.text_primary'))
             }
             Row({ space: 4 }) {
               Radio({ value: 'l', group: 'align' }).checked(this.hAlign === 1)
                 .radioStyle({ checkedBackgroundColor: Theme.colorOf(this.themeColor) })
                 .onChange(() => { this.hAlign = 1; this.apply(); })
-              Text('靠左').fontSize(13).fontColor($r('app.color.text_primary'))
+              Text(T('靠左')).fontSize(13).fontColor($r('app.color.text_primary'))
             }
             Row({ space: 4 }) {
               Radio({ value: 'r', group: 'align' }).checked(this.hAlign === 2)
                 .radioStyle({ checkedBackgroundColor: Theme.colorOf(this.themeColor) })
                 .onChange(() => { this.hAlign = 2; this.apply(); })
-              Text('靠右').fontSize(13).fontColor($r('app.color.text_primary'))
+              Text(T('靠右')).fontSize(13).fontColor($r('app.color.text_primary'))
             }
           }
         }.width('100%').margin({ top: 14, bottom: 14 })
 
         Row() {
-          Text('文字垂直居中').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('文字垂直居中')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.vCenter })
             .selectedColor(Theme.colorOf(this.themeColor))
@@ -1057,28 +1062,28 @@ export struct ScheduleSettingsPanel {
 
         Divider().color($r('app.color.divider'))
         Row() {
-          Text('格子内显示上课时间').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('格子内显示上课时间')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.showTime })
             .selectedColor(Theme.colorOf(this.themeColor))
             .onChange((on: boolean) => { this.showTime = on; this.apply(); })
         }.width('100%').margin({ top: 14, bottom: 14 })
         Row() {
-          Text('格子内显示上课地点').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('格子内显示上课地点')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.showLoc })
             .selectedColor(Theme.colorOf(this.themeColor))
             .onChange((on: boolean) => { this.showLoc = on; this.apply(); })
         }.width('100%').margin({ top: 14, bottom: 14 })
         Row() {
-          Text('地点前显示@').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('地点前显示@')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.showAt })
             .selectedColor(Theme.colorOf(this.themeColor))
             .onChange((on: boolean) => { this.showAt = on; this.apply(); })
         }.width('100%').margin({ top: 14, bottom: 14 })
         Row() {
-          Text('格子内显示授课老师').fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
+          Text(T('格子内显示授课老师')).fontSize(14).fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary')).layoutWeight(1)
           Toggle({ type: ToggleType.Switch, isOn: this.showTch })
             .selectedColor(Theme.colorOf(this.themeColor))
@@ -1115,7 +1120,7 @@ export struct ScheduleSettingsPanel {
             this.getUIContext().getPromptAction().showToast({ message: '已恢复默认设置' });
           }
         }) {
-          Text('恢复默认设置')
+          Text(T('恢复默认设置'))
             .width('100%').height(44).fontSize(15).fontColor('#F0524D').textAlign(TextAlign.Center)
         }
         // 「关闭」：绿色实底白字（用户指定），材质仍走 Toggle 承载层
@@ -1126,7 +1131,7 @@ export struct ScheduleSettingsPanel {
           btnTint: '',
           btnOnClick: () => { this.onClose(); }
         }) {
-          Text('关闭')
+          Text(T('关闭'))
             .width('100%').height(44).fontSize(15).fontColor(Color.White).textAlign(TextAlign.Center)
         }
         Column().height(24)

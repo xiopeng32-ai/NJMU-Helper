@@ -1,38 +1,18 @@
-# ---- HarmonyOS / DevEco Studio ----
-/build
-/entry/build
-/entry/.preview
-/.hvigor
-/.idea
-/.cxx
-/oh_modules
-/entry/oh_modules
-/oh-package-lock.json5.bak
+# 构建产物与依赖（不入库）
+/build/
+**/build/
+/oh_modules/
+**/oh_modules/
+/.hvigor/
+**/.hvigor/
+*.hap
+*.har
+*.hsp
+*.log
+.DS_Store
+.idea/
+*.iml
 local.properties
 
-# ---- 签名与密钥（绝对不要提交）----
-*.p12
-*.cer
-*.p7b
-*.csr
-*.keystore
-*.jks
-signing/
-build-profile.json5.local
-
-# ---- 构建产物 ----
-*.hap
-*.hsp
-*.app
-*.har
-*.zip
-
-# ---- 系统 / 编辑器 ----
-.DS_Store
-Thumbs.db
-.vscode/
-*.log
-
-# ---- 项目内部 ----
-.workbuddy/
-*.genie
+# 签名与凭据：build-profile.json5 含本机证书路径与口令，务必不要提交
+# （仓库版本保留 signingConfigs: []，首次构建请在 DevEco Studio 中自动生成签名）

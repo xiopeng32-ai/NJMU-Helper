@@ -51,6 +51,26 @@
     {
       "name": "today_schedule_card_desc",
       "value": "显示今天要上的课程"
+    },
+    {
+      "name": "score_card_name",
+      "value": "学业成绩"
+    },
+    {
+      "name": "score_card_desc",
+      "value": "显示 GPA、排名与已修学分"
+    },
+    {
+      "name": "reason_agent_reminder",
+      "value": "用于在上课前推送课程提醒，即使应用未打开也能准时提醒"
+    },
+    {
+      "name": "BackgroundWorkAbility_label",
+      "value": "课表与成绩后台同步"
+    },
+    {
+      "name": "BackgroundWorkAbility_desc",
+      "value": "定期在后台检查新成绩与教务公告，并在有更新时通知"
     }
   ]
 }

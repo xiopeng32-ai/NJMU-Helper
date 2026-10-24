@@ -37,6 +37,8 @@ const PARTICLE_SPECS: ParticleSpec[] = (() => {
 /** 单颗粒子：从中心沿角度飞散并淡出（延迟错开形成层次感） */
 @Component
 struct DissolveParticle {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop angle: number = 0;
   @Prop distance: number = 52;
   /** 粒子直径（不能叫 size——与 CustomComponent 基类的 size 属性冲突） */
@@ -69,6 +71,8 @@ struct DissolveParticle {
 
 @Component
 export struct DissolveBurst {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 触发序号：>0 渲染粒子层；每次自增都会重建粒子并重新播放爆散 */
   @Prop trigger: number = 0;
 

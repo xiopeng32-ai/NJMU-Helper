@@ -24,6 +24,7 @@ import { MaterialSheetPanel } from './common/MaterialCard';
 import { MaterialCardLayer } from './common/MaterialCarrier';
 import { materialAvailable, sheetBlurStyle } from '../common/SystemMaterial';
 import { AppearanceStore } from '../common/AppearanceStore';
+import { T } from '../common/I18n';
 
 /** 官网直达入口条目 */
 interface QuickLink {
@@ -88,6 +89,8 @@ const MOCK_NEWS: NewsItem[][] = [
 
 @Component
 struct NewsRow {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop item: NewsItem | null = null;
   @StorageProp('wallpaperTone') wallpaperTone: number = -1;
   @StorageProp('isDarkMode') isDarkMode: boolean = false;
@@ -166,6 +169,8 @@ struct NewsRow {
 
 @Component
 export struct NewsPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   @StorageProp('isDarkMode') isDarkMode: boolean = false;
   @StorageProp('bottomInsetPx') bottomInsetPx: number = 0;
@@ -231,9 +236,9 @@ export struct NewsPage {
   /** 每个板块是否已加载过（懒加载去重） */
   private loadedTabs: boolean[] = [false, false, false, false];
   /** 真实新闻板块（用于 Tabs 内容，避免为"收藏"创建空 TabContent） */
-  private newsTabs: string[] = ['要闻', '综合', '科研', '媒体'];
+  private newsTabs: string[] = [T('要闻'), T('综合'), T('科研'), T('媒体')];
   /** 板块栏标签（最后一项为"收藏"，与其它板块一致：点击或左右滑动均可进入） */
-  private tabs: string[] = ['要闻', '综合', '科研', '媒体', '收藏'];
+  private tabs: string[] = [T('要闻'), T('综合'), T('科研'), T('媒体'), T('收藏')];
   /** 收藏板块列表（本地读取，滑入该板块时刷新） */
   @State favs: NewsItem[] = [];
   /** 收藏变化信号（AppStorage）：详情页收藏/取消后即时刷新收藏板块 */
@@ -257,6 +262,16 @@ export struct NewsPage {
 
   /** 页面消失：注销横竖屏监听 */
   aboutToDisappear(): void {
+    // 注销 MediaQuery 监听（只置 null 不会取消注册，回调会持续持有已销毁的组件）
+    if (this.landscapeListener !== null) {
+      this.landscapeListener.off('change');
+      this.landscapeListener = null;
+    }
+    if (this.wideListener !== null) {
+      this.wideListener.off('change');
+      this.wideListener = null;
+    }
+
     this.landscapeListener = null;
     this.wideListener = null;
   }
@@ -407,7 +422,7 @@ export struct NewsPage {
   private openDetail(item: NewsItem): void {
     // 功能浏览模式：虚拟新闻不进入详情（不联网）
     if (JwApi.USE_MOCK && !this.debugNetwork) {
-      this.getUIContext().getPromptAction().showToast({ message: '示例数据，暂不支持查看详情' });
+      this.getUIContext().getPromptAction().showToast({ message: T('示例数据，暂不支持查看详情') });
       return;
     }
     if (NewsApi.isLocalUrl(item.url)) {
@@ -415,7 +430,7 @@ export struct NewsPage {
       AppState.stack.pushPath({ name: Const.ROUTE_NEWS_DETAIL });
     } else {
       AppState.webUrl = item.url;
-      AppState.webTitle = '外部链接';
+      AppState.webTitle = T('外部链接');
       AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
     }
   }
@@ -450,16 +465,16 @@ export struct NewsPage {
   /** 取消收藏（带确认），成功后刷新收藏板块 */
   private removeFav(item: NewsItem): void {
     this.getUIContext().getPromptAction().showDialog({
-      title: '取消收藏',
-      message: '确定将该新闻从收藏中移除吗？',
+      title: T('取消收藏'),
+      message: T('确定将该新闻从收藏中移除吗？'),
       buttons: [
-        { text: '取消', color: '#888888' },
-        { text: '取消收藏', color: '#DB5252', primary: true }
+        { text: T('取消'), color: '#888888' },
+        { text: T('取消收藏'), color: '#DB5252', primary: true }
       ]
     }).then((res: promptAction.ShowDialogSuccessResponse) => {
       if (res.index === 1) {
         DataStore.removeNewsFav(item.url);
-        this.getUIContext().getPromptAction().showToast({ message: '已取消收藏' });
+        this.getUIContext().getPromptAction().showToast({ message: T('已取消收藏') });
         this.reloadFavs();
       }
     });
@@ -472,10 +487,10 @@ export struct NewsPage {
       Column() {
         // 悬浮顶栏让位（与其它板块一致，避免内容被渐变顶栏遮挡）
         Column().width('100%').height(this.getUIContext().px2vp(this.topInsetPx) + 60 + 40 + 44)
-        Text('暂无收藏')
+        Text(T('暂无收藏'))
           .fontSize(14)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
-        Text('在新闻详情页点击「收藏」即可加入')
+        Text(T('在新闻详情页点击「收藏」即可加入'))
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ top: 8 })
@@ -514,7 +529,7 @@ export struct NewsPage {
   /** 收藏项左滑「取消收藏」按钮 */
   @Builder
   favDeleteBtn(item: NewsItem) {
-    Text('取消收藏')
+    Text(T('取消收藏'))
       .fontSize(13)
       .fontColor(Color.White)
       .backgroundColor('#DB5252')
@@ -612,15 +627,15 @@ export struct NewsPage {
 
   /** 官网直达入口列表（南医新闻页顶部快捷栏） */
   private quickLinks: QuickLink[] = [
-    { key: 'notice', label: '官网公告', url: Const.JWC_LIST_URL },
-    { key: 'animal', label: '动物中心', url: Const.ANIMAL_CENTER_URL },
-    { key: 'instrument', label: '创新器械', url: Const.INSTRUMENT_URL }
+    { key: 'notice', label: T('官网公告'), url: Const.JWC_LIST_URL },
+    { key: 'animal', label: T('动物中心'), url: Const.ANIMAL_CENTER_URL },
+    { key: 'instrument', label: T('创新器械'), url: Const.INSTRUMENT_URL }
   ];
 
   /** 打开官网直达入口：动物中心/创新器械/官网公告走 WebView */
   private openQuickLink(link: QuickLink): void {
     if (JwApi.USE_MOCK && !this.debugNetwork) {
-      this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+      this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
       return;
     }
     AppState.webUrl = link.url;
@@ -631,7 +646,7 @@ export struct NewsPage {
   /** 打开学院公告订阅页 */
   private openCollegeNotice(): void {
     if (JwApi.USE_MOCK && !this.debugNetwork) {
-      this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+      this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
       return;
     }
     AppState.stack.pushPath({ name: Const.ROUTE_COLLEGE_NOTICE });
@@ -659,13 +674,13 @@ export struct NewsPage {
   quickLinkBar() {
     Scroll() {
       Row() {
-        this.quickPill('官网公告', () => { this.openQuickLink(this.quickLinks[0]); })
+        this.quickPill(T('官网公告'), () => { this.openQuickLink(this.quickLinks[0]); })
         Column().width(8)
-        this.quickPill('动物中心', () => { this.openQuickLink(this.quickLinks[1]); })
+        this.quickPill(T('动物中心'), () => { this.openQuickLink(this.quickLinks[1]); })
         Column().width(8)
-        this.quickPill('创新器械', () => { this.openQuickLink(this.quickLinks[2]); })
+        this.quickPill(T('创新器械'), () => { this.openQuickLink(this.quickLinks[2]); })
         Column().width(8)
-        this.quickPill('学院公告', () => { this.openCollegeNotice(); })
+        this.quickPill(T('学院公告'), () => { this.openCollegeNotice(); })
       }
       .alignItems(VerticalAlign.Top)
       .padding({ left: 16, right: 16 })
@@ -682,15 +697,15 @@ export struct NewsPage {
     // 弹窗内容套 MaterialSheetPanel：材质由 Toggle 承载层渲染；配套硬要求（见 build 的 bindSheet 选项）
     // 是显式 backgroundColor: Color.Transparent（默认白底会把材质整块盖住）。
     // SheetSize.FIT_CONTENT（高度随内容）→ panelFillHeight: false；内边距原样保留。
-    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false, panelTitle: '新闻设置', panelShowClose: true, panelOnClose: (): void => { this.showNewsSetting = false; } }) {
+    MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false, panelTitle: T('新闻设置'), panelShowClose: true, panelOnClose: (): void => { this.showNewsSetting = false; } }) {
       Column() {
         Row() {
           Column() {
-            Text('获取新闻封面缩略图')
+            Text(T('获取新闻封面缩略图'))
               .fontSize(14)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
               .fontColor($r('app.color.text_primary'))
-            Text('关闭后列表不再加载封面图片，可节省流量、加快加载')
+            Text(T('关闭后列表不再加载封面图片，可节省流量、加快加载'))
               .fontSize(11)
               .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
               .margin({ top: 2 })
@@ -711,11 +726,11 @@ export struct NewsPage {
         // 内容背景大卡片开关
         Row() {
           Column() {
-            Text('内容背景大卡片')
+            Text(T('内容背景大卡片'))
               .fontSize(14)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
               .fontColor($r('app.color.text_primary'))
-            Text('新闻列表底部显示一张延伸到屏幕底的大卡片（沉浸光感材质）')
+            Text(T('新闻列表底部显示一张延伸到屏幕底的大卡片（沉浸光感材质）'))
               .fontSize(11)
               .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
               .margin({ top: 2 })
@@ -746,12 +761,12 @@ export struct NewsPage {
     if (this.listLoading[index]) {
       Column() {
         LoadingProgress().width(32).height(32).color(Theme.colorOf(this.themeColor))
-        Text('加载中').fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 10 })
+        Text(T('加载中')).fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 10 })
       }
       .width('100%').height('100%').justifyContent(FlexAlign.Center)
     } else if (this.lists[index].length === 0) {
       Column() {
-        Text(this.listLoading[index] ? '加载中' : '暂无新闻')
+        Text(this.listLoading[index] ? T('加载中') : T('暂无新闻'))
           .fontSize(14)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
       }
@@ -775,7 +790,7 @@ export struct NewsPage {
           // 功能浏览模式：虚拟数据标识
           if (JwApi.USE_MOCK && !this.debugNetwork) {
             ListItem() {
-              Text('示例数据 · 功能浏览模式')
+              Text(T('示例数据 · 功能浏览模式'))
                 .fontSize(11)
                 .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 .width('100%')
@@ -834,13 +849,13 @@ export struct NewsPage {
             Column() {
               if (this.loadingMore[index]) {
                 LoadingProgress().width(22).height(22).color(Theme.colorOf(this.themeColor)).margin({ top: 14 })
-                Text('加载中…').fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 6 })
+                Text(T('加载中…')).fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 6 })
               } else if (!this.hasMore[index]) {
-                Text('已加载全部新闻').fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 14 })
+                Text(T('已加载全部新闻')).fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 14 })
               } else {
-                Text('上拉加载更多').fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 14 })
+                Text(T('上拉加载更多')).fontSize(12).fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) }).margin({ top: 14 })
               }
-              Text('数据来源: 南京医科大学新闻网')
+              Text(T('数据来源: 南京医科大学新闻网'))
                 .fontSize(11).fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 16 })
               Column().height(120)
@@ -948,7 +963,7 @@ export struct NewsPage {
           })
           .backgroundBlurStyle(Immersive.blur(BlurStyle.Thin, this.barStyle === 'legacy'))
       Row() {
-        BarTitle({ title: '南医新闻' })
+        BarTitle({ title: T('南医新闻') })
         // 搜索框：输入框，回车跳转搜索结果页。
         // 含 TextInput 不能套 MaterialCard（onTouch 写组件态会打断输入焦点）→ Stack 兄弟结构：
         // MaterialCardLayer 纯视觉承载层画沉浸光感（受全局开关控制、layerShadow:false 防成排投影叠暗带），
@@ -960,7 +975,7 @@ export struct NewsPage {
             MaterialCardLayer({ layerRadius: 16, layerShadow: false, layerForce: true })
           }
           Row() {
-            TextInput({ text: this.keyword, placeholder: '搜索新闻' })
+            TextInput({ text: this.keyword, placeholder: T('搜索新闻') })
               .height(32)
               .enterKeyType(EnterKeyType.Done)
               .fontSize(13)
@@ -1007,7 +1022,7 @@ export struct NewsPage {
             this.showNewsSetting = true;
           }
         }) {
-          Text('设置').fontSize(12).fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
+          Text(T('设置')).fontSize(12).fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
             .height(32)
             .textAlign(TextAlign.Center)
             .padding({ left: 14, right: 14 })
@@ -1024,15 +1039,15 @@ export struct NewsPage {
           btnOnClick: () => {
             // 功能浏览模式默认禁止；调试模式开启后允许
             if (JwApi.USE_MOCK && !this.debugNetwork) {
-              this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+              this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
               return;
             }
             AppState.webUrl = 'https://www.njmu.edu.cn/';
-            AppState.webTitle = '南医新闻 · 网页端';
+            AppState.webTitle = T('南医新闻 · 网页端');
             AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
           }
         }) {
-          Text('网页端').fontSize(12).fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
+          Text(T('网页端')).fontSize(12).fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
             .height(32)
             .textAlign(TextAlign.Center)
             .padding({ left: 14, right: 14 })
@@ -1129,7 +1144,7 @@ export struct NewsPage {
       width: SheetUtil.sheetWidth(),
       preferType: SheetType.BOTTOM,
       height: SheetSize.LARGE, dragBar: true,
-      backgroundColor: $r('app.color.bg_page'), title: { title: '南医新闻 · 网页端' }
+      backgroundColor: $r('app.color.bg_page'), title: { title: T('南医新闻 · 网页端') }
     })
     // 灰字广播依赖登记：grayTick 变化触发整页重算 grayTertiary 文本色（恒真不改变视觉）
     .opacity(this.grayTick >= 0 ? 1 : 1)

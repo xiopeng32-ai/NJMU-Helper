@@ -13,6 +13,7 @@ import { COURSE_BG_HEX } from '../common/ScheduleConfig';
 import { CourseItem } from '../model/Models';
 import { EMPTY_COURSE } from '../model/Empty';
 import { MaterialButton } from './common/MaterialButton';
+import { T } from '../common/I18n';
 
 /** 课程独立颜色：3 套 × 20 色（套1 鲜艳 / 套2 柔和浅色 / 套3 深邃） */
 const COURSE_PALETTES: string[][] = [
@@ -38,6 +39,8 @@ const COURSE_PALETTES: string[][] = [
 
 @Component
 export struct CourseDetailPanel {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
   /** 全局字重响应式订阅：表达式读 this.fwMode 才登记依赖，fwValue 声明即订阅 */
@@ -181,16 +184,16 @@ export struct CourseDetailPanel {
           .width('100%')
           .margin({ bottom: 16 })
 
-          this.infoRow('任课教师', this.selected.teacher)
+          this.infoRow(T('任课教师'), this.selected.teacher)
           this.infoRow('上课地点', this.selected.location)
-          this.infoRow('上课时间', this.timeText)
+          this.infoRow(T('上课时间'), this.timeText)
           this.infoRow('上课周次', this.selected.weeksText)
           this.infoRow('课程属性', `${this.selected.courseType} · ${this.selected.credit} 学分`)
 
           // 课程独立颜色：3 套 × 20 色
           Divider().color($r('app.color.divider'))
           Row() {
-            Text('课程颜色')
+            Text(T('课程颜色'))
               .fontSize(15)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
               .fontColor($r('app.color.text_primary'))
@@ -203,7 +206,7 @@ export struct CourseDetailPanel {
               .margin({ left: 8 })
             Blank()
             // 一键为所有课程分配颜色
-            Text('一键分配')
+            Text(T('一键分配'))
               .fontSize(12)
               .fontColor(Theme.colorOf(this.themeColor))
               .padding({ left: 8, right: 8, top: 3, bottom: 3 })
@@ -214,7 +217,7 @@ export struct CourseDetailPanel {
                 this.assignAllColors();
               })
             if ((this.disp[this.selected.name] ?? '').length > 0) {
-              Text('恢复默认')
+              Text(T('恢复默认'))
                 .fontSize(12)
                 .fontColor('#F0524D')
                 .padding({ left: 8, right: 8, top: 3, bottom: 3 })
@@ -228,7 +231,7 @@ export struct CourseDetailPanel {
           .width('100%')
           .margin({ top: 12, bottom: 4 })
 
-          Text('为当前课程单独设置颜色（空=按课程名自动取色）')
+          Text(T('为当前课程单独设置颜色（空=按课程名自动取色）'))
             .fontSize(11)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
@@ -293,7 +296,7 @@ export struct CourseDetailPanel {
               this.onClose();
             }
           }) {
-            Text('关闭')
+            Text(T('关闭'))
               .fontSize(15)
               .fontColor(Theme.colorOf(this.themeColor))
               .width('100%')

@@ -36,23 +36,24 @@ import { MaterialButton } from './common/MaterialButton';
 import { MaterialCardLayer } from './common/MaterialCarrier';
 import { GlassMaterial } from '../common/GlassMaterial';
 import { materialAvailable, sheetBlurStyle } from '../common/SystemMaterial';
+import { T } from '../common/I18n';
 
 /** 静态条件数据（模板演示用，后续接真实接口时替换为服务端下发的选项） */
 const STATIC_CAMPUS: EmptyRoomCondition[] = [
-  { code: '', name: '全部' },
+  { code: '', name: T('全部') },
   { code: '1', name: '老满城校区' },
   { code: '2', name: '亚心校区' },
   { code: '3', name: '塔城校区' }
 ];
 const STATIC_BUILDING: EmptyRoomCondition[] = [
-  { code: '', name: '全部' },
+  { code: '', name: T('全部') },
   { code: '01', name: '主教学楼' },
   { code: '02', name: '综合实验楼' },
   { code: '03', name: '博学楼' },
   { code: '04', name: '图书馆' }
 ];
 const STATIC_ROOM_TYPE: EmptyRoomCondition[] = [
-  { code: '', name: '全部' },
+  { code: '', name: T('全部') },
   { code: '1', name: '普通教室' },
   { code: '2', name: '多媒体教室' },
   { code: '3', name: '实验室' },
@@ -70,6 +71,8 @@ const STATIC_SUB_TYPES: Record<string, EmptyRoomCondition[]> = {
 
 @Component
 export struct KxjsPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -87,7 +90,7 @@ export struct KxjsPage {
   // 学年学期（本地生成）
   @State terms: TermInfo[] = [];
   @State selectedTermIndex: number = 0;
-  @State termLabel: string = '加载中…';
+  @State termLabel: string = T('加载中…');
   // 条件列表（静态模板数据）
   @State campusList: EmptyRoomCondition[] = STATIC_CAMPUS;
   @State buildingList: EmptyRoomCondition[] = STATIC_BUILDING;
@@ -106,7 +109,7 @@ export struct KxjsPage {
   @State weekdaysSet: number[] = [1];
   @State sectionsSet: number[] = [1];
   @State weekLabel: string = '第 1 周';
-  @State weekdayLabel: string = '周一';
+  @State weekdayLabel: string = T('周一');
   @State sectionLabel: string = '第 1 节';
   // 座位数范围 + 场地名称
   @State seatMinText: string = '';
@@ -161,6 +164,16 @@ export struct KxjsPage {
 
   /** 页面消失：注销横竖屏监听 + 退出活动页上下文（回落全局灰字色） */
   aboutToDisappear(): void {
+    // 注销 MediaQuery 监听（只置 null 不会取消注册，回调会持续持有已销毁的组件）
+    if (this.landscapeListener !== null) {
+      this.landscapeListener.off('change');
+      this.landscapeListener = null;
+    }
+    if (this.wideListener !== null) {
+      this.wideListener.off('change');
+      this.wideListener = null;
+    }
+
     this.landscapeListener = null;
     this.wideListener = null;
     GlassMaterial.restoreTabPage();
@@ -202,9 +215,9 @@ export struct KxjsPage {
     this.campusIndex = 0;
     this.buildingIndex = 0;
     this.roomTypeIndex = 0;
-    this.campusLabel = this.campusList.length > 0 ? this.campusList[0].name : '全部';
-    this.buildingLabel = this.buildingList.length > 0 ? this.buildingList[0].name : '全部';
-    this.roomTypeLabel = this.roomTypeList.length > 0 ? this.roomTypeList[0].name : '全部';
+    this.campusLabel = this.campusList.length > 0 ? this.campusList[0].name : T('全部');
+    this.buildingLabel = this.buildingList.length > 0 ? this.buildingList[0].name : T('全部');
+    this.roomTypeLabel = this.roomTypeList.length > 0 ? this.roomTypeList[0].name : T('全部');
     if (this.roomTypeList.length > 0) {
       this.loadSubTypes(this.roomTypeList[0].code);
     }
@@ -246,7 +259,7 @@ export struct KxjsPage {
   private async loadSubTypes(parentCode: string): Promise<void> {
     this.subTypeList = STATIC_SUB_TYPES[parentCode] ?? [];
     this.subTypeIndex = 0;
-    this.subTypeLabel = this.subTypeList.length > 0 ? this.subTypeList[0].name : '全部';
+    this.subTypeLabel = this.subTypeList.length > 0 ? this.subTypeList[0].name : T('全部');
     try {
       const remote = await JwApi.getSubRoomTypes(parentCode);
       if (remote.length > 0) {
@@ -449,8 +462,8 @@ export struct KxjsPage {
   private resetAll(): void {
     this.buildingIndex = 0;
     this.roomTypeIndex = 0;
-    this.buildingLabel = this.buildingList.length > 0 ? this.buildingList[0].name : '全部';
-    this.roomTypeLabel = this.roomTypeList.length > 0 ? this.roomTypeList[0].name : '全部';
+    this.buildingLabel = this.buildingList.length > 0 ? this.buildingList[0].name : T('全部');
+    this.roomTypeLabel = this.roomTypeList.length > 0 ? this.roomTypeList[0].name : T('全部');
     // 二级类别随一级重置
     this.subTypeList = [];
     this.subTypeIndex = 0;
@@ -463,7 +476,7 @@ export struct KxjsPage {
     this.weekdaysSet = [1];
     this.sectionsSet = [1];
     this.weekLabel = '第 1 周';
-    this.weekdayLabel = '周一';
+    this.weekdayLabel = T('周一');
     this.sectionLabel = '第 1 节';
     // 座位数范围 + 场地名称
     this.seatMinText = '';
@@ -478,7 +491,7 @@ export struct KxjsPage {
   /** 打开网页端空闲教室查询（在"外部链接"页面中访问，共享登录 Cookie） */
   private openWebQuery(): void {
     if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-      this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+      this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
       return;
     }
     AppState.webUrl =
@@ -538,7 +551,7 @@ export struct KxjsPage {
     if (this.terms.length === 0) {
       return;
     }
-    this.openSingleSheet('选择学年-学期', 'term', this.terms.map((t: TermInfo) => t.label), this.selectedTermIndex);
+    this.openSingleSheet(T('选择学年-学期'), 'term', this.terms.map((t: TermInfo) => t.label), this.selectedTermIndex);
   }
 
   /** 校区 */
@@ -798,16 +811,16 @@ export struct KxjsPage {
       }
       Column() {
       // 单选：学年学期 / 校区 / 楼号 / 场地类别 / 场地二级类别
-      PickRow({ label: '学年学期', value: this.termLabel, placeholder: '请选择', onTap: () => this.openTermPicker() })
-      PickRow({ label: '校区', value: this.campusLabel, placeholder: '请选择', onTap: () => this.openCampusPicker() })
-      PickRow({ label: '楼号', value: this.buildingLabel, placeholder: '全部', onTap: () => this.openBuildingPicker() })
-      PickRow({ label: '场地类别', value: this.roomTypeLabel, placeholder: '请选择', onTap: () => this.openRoomTypePicker() })
+      PickRow({ label: '学年学期', value: this.termLabel, placeholder: T('请选择'), onTap: () => this.openTermPicker() })
+      PickRow({ label: '校区', value: this.campusLabel, placeholder: T('请选择'), onTap: () => this.openCampusPicker() })
+      PickRow({ label: '楼号', value: this.buildingLabel, placeholder: T('全部'), onTap: () => this.openBuildingPicker() })
+      PickRow({ label: '场地类别', value: this.roomTypeLabel, placeholder: T('请选择'), onTap: () => this.openRoomTypePicker() })
       PickRow({ label: '场地二级类别', value: this.subTypeLabel, placeholder: '请先选场地类别', onTap: () => this.openSubTypePicker() })
 
       // 多选：周次 / 星期 / 节次（至少选 1 项）
-      PickRow({ label: '周次', value: this.weekLabel, placeholder: '请选择', onTap: () => this.openWeekPicker() })
-      PickRow({ label: '星期', value: this.weekdayLabel, placeholder: '请选择', onTap: () => this.openWeekdayPicker() })
-      PickRow({ label: '节次', value: this.sectionLabel, placeholder: '请选择', onTap: () => this.openSectionPicker() })
+      PickRow({ label: T('周次'), value: this.weekLabel, placeholder: T('请选择'), onTap: () => this.openWeekPicker() })
+      PickRow({ label: '星期', value: this.weekdayLabel, placeholder: T('请选择'), onTap: () => this.openWeekdayPicker() })
+      PickRow({ label: '节次', value: this.sectionLabel, placeholder: T('请选择'), onTap: () => this.openSectionPicker() })
 
       // 座位数范围（从 ~ 至）：PickRow 同款长条胶囊（行距 margin 必须挂 Stack 根——
       // Stack 子组件重叠布局，挂在内部 Row 上不参与排列也不撑高 Stack，行与行会挤在一起）；
@@ -817,7 +830,7 @@ export struct KxjsPage {
           MaterialCardLayer({ layerRadius: 10, layerShadow: false })
         }
         Row() {
-          Text('座位数')
+          Text(T('座位数'))
             .fontSize(13)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width(86)
@@ -840,7 +853,7 @@ export struct KxjsPage {
             .onChange((v: string) => {
               this.seatMinText = v;
             })
-          Text('至')
+          Text(T('至'))
             .fontSize(13)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .margin({ left: 6, right: 6 })
@@ -862,7 +875,7 @@ export struct KxjsPage {
             .onChange((v: string) => {
               this.seatMaxText = v;
             })
-          Text('人')
+          Text(T('人'))
             .fontSize(13)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .margin({ left: 6 })
@@ -885,7 +898,7 @@ export struct KxjsPage {
           MaterialCardLayer({ layerRadius: 10, layerShadow: false })
         }
         Row() {
-          Text('场地名称')
+          Text(T('场地名称'))
             .fontSize(13)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width(86)
@@ -987,7 +1000,7 @@ export struct KxjsPage {
             // 顶栏让位
             Column().width('100%').height(this.getUIContext().px2vp(this.topInsetPx) + 60)
             Row() {
-              Text('查询结果')
+              Text(T('查询结果'))
                 .fontSize(14)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor($r('app.color.text_primary'))
@@ -1106,7 +1119,7 @@ export struct KxjsPage {
               this.openWebQuery();
             }
           }) {
-            Text('网页端')
+            Text(T('网页端'))
               .fontSize(13)
               .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
@@ -1124,7 +1137,7 @@ export struct KxjsPage {
               this.resetAll();
             }
           }) {
-            Text('清空')
+            Text(T('清空'))
               .fontSize(13)
               .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
               .padding({ left: 10, right: 10, top: 5, bottom: 5 })
@@ -1166,7 +1179,7 @@ export struct KxjsPage {
 
                 // 查询结果
                 Row() {
-                  Text('查询结果')
+                  Text(T('查询结果'))
                     .fontSize(14)
                     .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                     .fontColor($r('app.color.text_primary'))
@@ -1367,7 +1380,7 @@ export struct KxjsPage {
           .fontSize(12)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         Blank()
-        Text(this.multiPickerTempSet.length === this.multiPickerAllValues.length ? '全清' : '全选')
+        Text(this.multiPickerTempSet.length === this.multiPickerAllValues.length ? '全清' : T('全选'))
           .fontSize(13)
           .fontColor(Theme.colorOf(this.themeColor))
           .padding({ left: 12, right: 12, top: 6, bottom: 6 })
@@ -1376,7 +1389,7 @@ export struct KxjsPage {
           .onClick(() => {
             this.togglePickAll();
           })
-        Button('确定')
+        Button(T('确定'))
           .fontSize(14)
           .fontColor($r('app.color.brand_on'))
           .backgroundColor(Theme.colorOf(this.themeColor))
@@ -1448,7 +1461,7 @@ export struct KxjsPage {
         this.detailRow('使用班级', this.selectedRoom.sybj, '#A16207')
         this.detailRow('空闲时间', this.selectedRoom.time, '#005BAC')
 
-        Button('关闭')
+        Button(T('关闭'))
           .fontSize(15)
           .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .backgroundColor($r('app.color.bg_chip'))

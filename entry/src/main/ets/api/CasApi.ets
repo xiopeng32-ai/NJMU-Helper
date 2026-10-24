@@ -18,6 +18,7 @@ import rcp from '@hms.collaboration.rcp';
 import { util } from '@kit.ArkTS';
 import { aesEncryptPassword } from '../common/AesUtil';
 import { LogStore } from '../common/LogStore';
+import { DataStore } from '../common/DataStore';
 import { Const } from '../common/Constants';
 
 /** CAS（统一身份认证）登录入口 —— 南医大 authserver.njmu.edu.cn（金智 IDS） */
@@ -150,7 +151,7 @@ class CookieJar {
   cookieValue(host: string, path: string, name: string): string {
     const full: string = this.cookieHeader('https://' + host + path);
     const parts: string[] = full.split(';');
-    for (let i = 0; i < parts.length; i++) {
+    for (let i: number = 0; i < parts.length; i++) {
       const seg: string = parts[i].trim();
       const eq: number = seg.indexOf('=');
       if (eq > 0 && seg.substring(0, eq).trim() === name) {
@@ -158,6 +159,34 @@ class CookieJar {
       }
     }
     return '';
+  }
+
+  /** 导出某 host 的全部 Cookie 串（"n1=v1; n2=v2"），用于持久化可信设备凭据 */
+  dumpHost(host: string): string {
+    const m: Map<string, CookieEntry> | undefined = this.jar.get(host);
+    if (m === undefined) {
+      return '';
+    }
+    const out: string[] = [];
+    m.forEach((c: CookieEntry) => {
+      out.push(`${c.name}=${c.value}`);
+    });
+    return out.join('; ');
+  }
+
+  /** 从 Cookie 串导入（回放此前保存的可信设备凭据，如 MULTIFACTOR_BROWSER_FINGERPRINT） */
+  importHeader(host: string, header: string, path: string = '/'): void {
+    if (header.length === 0) {
+      return;
+    }
+    const parts: string[] = header.split(';');
+    for (let i: number = 0; i < parts.length; i++) {
+      const seg: string = parts[i].trim();
+      const eq: number = seg.indexOf('=');
+      if (eq > 0) {
+        this.putCookie(host, seg.substring(0, eq).trim(), seg.substring(eq + 1).trim(), path);
+      }
+    }
   }
 }
 
@@ -372,8 +401,10 @@ export class CasApi {
         if (anySid.length === 0) {
           throw new Error('教务系统会话建立失败（未拿到 jwglxt JSESSIONID）');
         }
+        CasApi.persistAuthCookies(jar);
         return CasApi.buildCookie(anySid, modAuthCas, route, castgc);
       }
+      CasApi.persistAuthCookies(jar);
       return CasApi.buildCookie(jwglxtSid, modAuthCas, route, castgc);
     } finally {
       // 验证码等待期保持会话挂起（pendingSession 仍指向本 session），其余情况一律关闭
@@ -400,6 +431,38 @@ export class CasApi {
   }
 
   /**
+   * 保存 authserver 域全部 Cookie（尤其是 MULTIFACTOR_BROWSER_FINGERPRINT 可信设备指纹）。
+   * 首次登录必然触发 MFA，登录成功后服务端下发该指纹（400 天），
+   * 之后换取任何子系统 ST 时都必须回放，否则会被判为不可信设备、退回登录页而不发 ticket。
+   */
+  private static persistAuthCookies(jar: CookieJar): void {
+    try {
+      const all: string = jar.dumpHost(Const.AUTH_HOST);
+      if (all.length === 0) {
+        return;
+      }
+      DataStore.put(DataStore.KEY_CAS_AUTH_COOKIES, all);
+      const hasFp: boolean = all.indexOf('MULTIFACTOR_BROWSER_FINGERPRINT') >= 0;
+      LogStore.log('登录', '统一认证', '保存设备凭据', `Cookie=${all.split(';').length}项 设备指纹=${hasFp ? '有' : '无'}`);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  /** 回放已保存的 authserver 域 Cookie（含设备指纹）；CASTGC 由调用方用最新值覆盖 */
+  private static restoreAuthCookies(jar: CookieJar): void {
+    try {
+      const raw: string = DataStore.get(DataStore.KEY_CAS_AUTH_COOKIES);
+      if (raw.length === 0) {
+        return;
+      }
+      jar.importHeader(Const.AUTH_HOST, raw, '/authserver');
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  /**
    * 携带 CASTGC + service 访问 authserver，换取 ST（ticket）。
    * CAS 协议：已登录状态下请求 login?service=xxx 会 302 回跳 service 并附带 ticket=ST-xxxx。
    * 从回跳的 Location 中解析出 ticket 返回。
@@ -407,6 +470,8 @@ export class CasApi {
   private static async exchangeTicket(session: rcp.Session, jar: CookieJar, castgc: string): Promise<string> {
     const serviceUrl: string = encodeURIComponent(Const.JW_SSO_BRIDGE_URL);
     const url: string = `${CAS_LOGIN_URL}?service=${serviceUrl}`;
+    // 回放可信设备凭据（含 MULTIFACTOR_BROWSER_FINGERPRINT），避免换票被判为新设备触发 MFA
+    CasApi.restoreAuthCookies(jar);
     // 确保请求携带 CASTGC Cookie（jar 已在登录链中收集，这里兜底再注入）
     jar.putCookie(Const.AUTH_HOST, 'CASTGC', castgc, '/authserver');
     const resp: Hop = await CasApi.fetch(session, jar, url, 'GET');
@@ -505,6 +570,9 @@ export class CasApi {
       }
     });
     const jar: CookieJar = new CookieJar();
+    // ★ 回放可信设备凭据（含 MULTIFACTOR_BROWSER_FINGERPRINT + 已保存的其他 authserver Cookie），
+    //   否则服务端判定为新设备 → 触发 MFA → 退回登录页而不下发 ticket
+    CasApi.restoreAuthCookies(jar);
     jar.putCookie(Const.AUTH_HOST, 'CASTGC', castgc, '/authserver');
     try {
       const url: string = `${CAS_LOGIN_URL}?service=${encodeURIComponent(serviceUrl)}`;

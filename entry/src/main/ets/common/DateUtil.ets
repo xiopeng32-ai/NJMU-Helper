@@ -4,6 +4,7 @@
  */
 import { Const } from './Constants';
 import { TermInfo } from '../model/Models';
+import { I18n, T } from './I18n';
 
 const DAY_MS: number = 24 * 60 * 60 * 1000;
 
@@ -18,9 +19,9 @@ export class DateUtil {
     return `${date.getFullYear()}-${DateUtil.pad(date.getMonth() + 1)}-${DateUtil.pad(date.getDate())}`;
   }
 
-  /** Date -> MM月dd日 */
+  /** Date -> 中文「10月24日」/ 英文「Oct 24」（列表、卡片、导出图片统一走这里） */
   static formatCn(date: Date): string {
-    return `${date.getMonth() + 1}月${date.getDate()}日`;
+    return I18n.monthDay(date);
   }
 
   /** yyyy-MM-dd -> Date（按本地 0 点） */
@@ -80,6 +81,20 @@ export class DateUtil {
 
 
   /** 当前学年第一学期（按当前日期判断学年，非盲目取最新） */
+  /**
+   * 上一学年第一学期（1~2 月寒假期间仍在第一学期，buildCurrentTerm 会算成第二学期）。
+   * 与 buildLatestTerm 同构，仅 beginYear 固定为 year-1。
+   */
+  static buildPrevFirstTerm(now: Date): TermInfo {
+    const beginYear: number = now.getFullYear() - 1;
+    return {
+      id: `${beginYear}-${beginYear + 1}-1`,
+      label: `${beginYear}-${beginYear + 1}学年 第一学期`,
+      startDate: DateUtil.defaultTermStart(`${beginYear}-${beginYear + 1}-1`),
+      totalWeeks: 19
+    } as TermInfo;
+  }
+
   static buildLatestTerm(): TermInfo {
     const now: Date = new Date();
     const year: number = now.getFullYear();
@@ -141,10 +156,25 @@ export class DateUtil {
   }
 
   /** 拼接节次时间：1-2 节 -> 10:00-11:40 */
+  /** @deprecated 硬编码 Const.SECTIONS，忽略用户自定义作息；请用 SectionUtil.rangeTextCurrent */
   static sectionRange(startSection: number, endSection: number): string {
     const s: number = Math.max(1, Math.min(Const.SECTION_COUNT, startSection));
     const e: number = Math.max(1, Math.min(Const.SECTION_COUNT, endSection));
     return `${Const.SECTIONS[s - 1].start}-${Const.SECTIONS[e - 1].end}`;
+  }
+
+  /** 某节次的开始分钟数（越界夹取，避免课表存在第16-17节等非常规节次时索引 undefined 崩溃） */
+  /** @deprecated 硬编码作息；请用 SectionUtil.startMinCurrent */
+  static sectionStartMin(section: number): number {
+    const i: number = Math.max(1, Math.min(Const.SECTION_COUNT, Math.floor(section)));
+    return DateUtil.minutesOf(Const.SECTIONS[i - 1].start);
+  }
+
+  /** 某节次的结束分钟数（越界夹取） */
+  /** @deprecated 硬编码作息；请用 SectionUtil.endMinCurrent */
+  static sectionEndMin(section: number): number {
+    const i: number = Math.max(1, Math.min(Const.SECTION_COUNT, Math.floor(section)));
+    return DateUtil.minutesOf(Const.SECTIONS[i - 1].end);
   }
 
   /** 当前时间的分钟数 */
@@ -163,17 +193,17 @@ export class DateUtil {
   static relativeDay(target: Date): string {
     const d: number = DateUtil.diffDays(new Date(), target);
     if (d === 0) {
-      return '今天';
+      return T('今天');
     }
     if (d === 1) {
-      return '明天';
+      return T('明天');
     }
     if (d === 2) {
-      return '后天';
+      return T('后天');
     }
     if (d < 0) {
-      return `${-d}天前`;
+      return T('{0}天前', -d);
     }
-    return `${d}天后`;
+    return T('{0}天后', d);
   }
 }

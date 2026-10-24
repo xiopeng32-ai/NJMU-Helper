@@ -37,6 +37,8 @@ import { Theme } from '../../common/ThemeUtil';
  */
 @Component
 export struct IconCircleButton {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @Prop buttonSize: number = 40;
   @Prop iconSize: number = 20;
   @Prop buttonEnabled: boolean = true;

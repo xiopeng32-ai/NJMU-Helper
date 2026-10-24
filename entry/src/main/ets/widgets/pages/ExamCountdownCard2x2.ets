@@ -8,6 +8,8 @@
  *
  * 交互：点击卡片跳转到「考试安排」页面，让用户挑选要倒计时的考试。
  */
+
+import { T } from '../../common/I18n';
 let localStorageExam = new LocalStorage();
 
 @Entry(localStorageExam)
@@ -34,7 +36,7 @@ struct ExamCountdownCard2x2 {
     Column() {
       // 顶部行：标题 + 更新时间
       Row() {
-        Text('考试倒计时')
+        Text(T('考试倒计时'))
           .fontSize(13)
           .fontWeight(FontWeight.Bold)
           .fontColor('#1A1D1C')
@@ -122,7 +124,7 @@ struct ExamCountdownCard2x2 {
           .textAlign(TextAlign.Center)
           .margin({ top: 2 })
 
-        Text('点击选择要倒计时的考试')
+        Text(T('点击选择要倒计时的考试'))
           .fontSize(8)
           .fontColor('#2C5FA8')
           .margin({ top: 4 })
@@ -130,10 +132,10 @@ struct ExamCountdownCard2x2 {
       } else {
         // 真正空态：无任何考试安排（既无真实也无示例）
         Column() {
-          Text('暂无考试安排')
+          Text(T('暂无考试安排'))
             .fontSize(12)
             .fontColor('#999999')
-          Text('点击选择要倒计时的考试')
+          Text(T('点击选择要倒计时的考试'))
             .fontSize(9)
             .fontColor('#2C5FA8')
             .margin({ top: 4 })

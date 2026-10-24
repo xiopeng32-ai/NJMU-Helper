@@ -1,5 +1,3 @@
-import { display } from '@kit.ArkUI';
-
 /**
  * 半模态面板宽度工具。
  * 与课程表页面 ScheduleView 的 sheetWidth 逻辑保持一致：
@@ -7,6 +5,9 @@ import { display } from '@kit.ArkUI';
  *  - 手机：保持 100% 全宽。
  * 全屏设备上的 bindSheet 配合 preferType: SheetType.BOTTOM 会从底部上浮并自动居中。
  */
+
+import { display } from '@kit.ArkUI';
+
 export class SheetUtil {
   static sheetWidth(): Dimension {
     try {

@@ -6,10 +6,17 @@ import { fileIo } from '@kit.CoreFileKit';
 import { AppState } from '../common/AppState';
 import { AppearanceStore } from '../common/AppearanceStore';
 import { DataStore } from '../common/DataStore';
+import { I18n } from '../common/I18n';
+import { LogStore } from '../common/LogStore';
+import { NotifyScheduler } from '../common/NotifyScheduler';
+import { PushNotifier } from '../common/PushNotifier';
 import { GlassMaterial } from '../common/GlassMaterial';
 import { WallpaperTone } from '../common/WallpaperTone';
 import { Theme } from '../common/ThemeUtil';
 import { NewsApi } from '../api/NewsApi';
+import { connection } from '@kit.NetworkKit';
+import { HttpClient } from '../api/HttpClient';
+import { JwApi } from '../api/JwApi';
 
 const DOMAIN = 0x0000;
 
@@ -36,10 +43,67 @@ export default class EntryAbility extends UIAbility {
     // 初始化本地持久化（历史账号 + 数据缓存），并保存全局 Context
     DataStore.init(this.context);
     AppState.context = this.context;
+    // 界面语言：读取上次选择（默认跟随系统）→ 解析生效语言 → 同步系统资源语言。
+    // 必须在 DataStore.init 之后、任何界面构建之前完成，否则首帧会先按默认值渲染再跳变。
+    I18n.init();
+    // 多端流转（应用接续）：从另一台设备接续过来时，恢复上次停留的 Tab 与二级页面
+    try {
+      if (launchParam.launchReason === AbilityConstant.LaunchReason.CONTINUATION) {
+        const params: Record<string, Object> = (want.parameters ?? {}) as Record<string, Object>;
+        const tabRaw: number = Number.parseInt(String(params['continueTab'] ?? '-1'), 10);
+        const routeRaw: string = String(params['continueRoute'] ?? '');
+        // 落到 DataStore：MainView 挂载后读取并消费（AppStorage 在 onCreate 阶段写入可能丢失）
+        DataStore.put(AppState.KEY_CONTINUE_TAB, `${Number.isNaN(tabRaw) ? 0 : tabRaw}`);
+        DataStore.put(AppState.KEY_CONTINUE_ROUTE, routeRaw);
+        DataStore.put(AppState.KEY_CONTINUE_PENDING, '1');
+        LogStore.log('流转', '接续接收', 'CONTINUATION',
+          `tab=${tabRaw} route=${routeRaw.length > 0 ? routeRaw : '-'}`);
+        hilog.info(DOMAIN, 'EntryAbility', '接续恢复 tab=%{public}d route=%{public}s', tabRaw, routeRaw);
+      }
+    } catch (e) {
+      // 接续恢复失败不影响正常启动
+    }
+    // 无感在线：网络恢复时立刻清掉"无网"缓存并自动重拉数据，
+    // 用户从飞行模式/地铁断网恢复后无需手动下拉刷新
+    try {
+      const netConn: connection.NetConnection = connection.createNetConnection();
+      netConn.on('netAvailable', () => {
+        HttpClient.resetNetworkCache();
+        if (!JwApi.USE_MOCK) {
+          JwApi.lastRefreshReset();
+          JwApi.refreshAll().catch(() => {
+            // ignore
+          });
+        }
+      });
+      netConn.register((err: Object) => {
+        if (err !== undefined && err !== null) {
+          hilog.warn(DOMAIN, 'EntryAbility', 'netAvailable 监听注册失败');
+        }
+      });
+    } catch (e) {
+      // 监听注册失败不影响主流程
+    }
+    // 读取真实版本号（供关于页版本显示与检查更新比对，杜绝硬编码漏改）
+    AppState.resolveAppVersion();
+    // 通知与提醒：建槽 + 首次排程（失败不阻断启动）
+    PushNotifier.ensureSlot().then(() => {
+      NotifyScheduler.rescheduleAll('app-start').catch(() => {
+      });
+    }).catch(() => {
+    });
+    // 接续能力自检：日志里若始终没有「接续保存」，说明系统未回调 onContinue（设备/账号/开关条件不满足）
+    try {
+      const ver: string = AppState.appVersion;
+      LogStore.log('流转', '能力自检', '完成',
+        `continuable=已声明 v${ver}（若接续无反应，请检查两端同华为账号 + 应用接续开关 + 同签名包）`);
+    } catch (e) {
+      // ignore
+    }
     // 处理桌面卡片跳转意图（params.open = 'home' | 'exam-pick'）
     const open: string = (want.parameters?.['open'] as string) ?? '';
     if (open.length > 0) {
-      AppState.openPageRequest = open;
+      AppState.requestOpenPage(open);
     }
     // 头像显示开关（默认关闭，仅影响圆形头像）
     const showAvatar: boolean = DataStore.get(DataStore.KEY_SHOW_AVATAR) === '1';
@@ -103,8 +167,13 @@ export default class EntryAbility extends UIAbility {
     }
   }
 
-  /** 应用回到前台：重新应用当前颜色模式 */
+  /** 应用回到前台：重新应用当前颜色模式，并关闭后台隐私模式（前台由 DLP 防窥接管） */
   onForeground(): void {
+    this.setPrivacyMode(false);
+    // 通知与提醒：回到前台立即重排（补齐后台期间错过的提醒/实况窗）
+    NotifyScheduler.markForeground(true);
+    NotifyScheduler.rescheduleAll('foreground').catch(() => {
+    });
     try {
       this.context.getApplicationContext()
         .setColorMode(DataStore.isDarkOn() ? ConfigurationConstant.ColorMode.COLOR_MODE_DARK
@@ -115,10 +184,39 @@ export default class EntryAbility extends UIAbility {
   }
 
   /** Ability 已存在时再次被拉起（桌面卡片点击） */
+  /**
+   * 多端流转（应用接续）：把当前使用状态交给目标设备（手机 / 平板 / 2in1）。
+   * 返回 AGREE 表示接受接续；目标设备 onCreate 收到 LaunchReason.CONTINUATION 后按 wantParam 恢复。
+   * 只传轻量状态（Tab 序号 + 二级页面路由名），业务数据仍走各自本地缓存/接口，避免跨设备传大对象。
+   */
+  onContinue(wantParam: Record<string, Object>): AbilityConstant.OnContinueResult {
+    // 无论发生什么都返回 AGREE：抛错会让"再次接续"直接失败
+    try {
+      AppState.saveContinueState();
+      const tab: string = DataStore.get(AppState.KEY_CONTINUE_TAB);
+      const route: string = DataStore.get(AppState.KEY_CONTINUE_ROUTE);
+      wantParam['continueTab'] = tab.length > 0 ? tab : '0';
+      wantParam['continueRoute'] = route;
+      wantParam['continueAt'] = `${Date.now()}`;
+      // 用 LogStore：hilog 只在系统日志里，App 内日志页看不到（此前"日志没有相关显示"的原因）
+      LogStore.log('流转', '接续保存', 'AGREE', `tab=${tab} route=${route.length > 0 ? route : '-'}`);
+      hilog.info(DOMAIN, 'EntryAbility', '接续保存 tab=%{public}s route=%{public}s', tab, route);
+    } catch (e) {
+      LogStore.log('流转', '接续保存', '异常降级AGREE', LogStore.errorOf(e as Object));
+      try {
+        wantParam['continueTab'] = '0';
+        wantParam['continueRoute'] = '';
+      } catch (e2) {
+        // ignore
+      }
+    }
+    return AbilityConstant.OnContinueResult.AGREE;
+  }
+
   onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     const open: string = (want.parameters?.['open'] as string) ?? '';
     if (open.length > 0) {
-      AppState.openPageRequest = open;
+      AppState.requestOpenPage(open);
     }
   }
 
@@ -215,5 +313,24 @@ export default class EntryAbility extends UIAbility {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
     // 切后台时立即落盘，避免防抖队列中的数据因进程挂起而丢失
     DataStore.flushNow();
+    // 通知与提醒：进入后台收敛一次（实况窗该建就建），并停止前台心跳
+    NotifyScheduler.markForeground(false);
+    // 防窥：进入后台开启窗口隐私模式，多任务卡片/最近任务预览不再泄露成绩等敏感内容
+    this.setPrivacyMode(true);
+  }
+
+  /** 设置窗口隐私模式（失败静默：部分设备/窗口类型不支持） */
+  private setPrivacyMode(on: boolean): void {
+    try {
+      window.getLastWindow(this.context).then((w: window.Window) => {
+        w.setWindowPrivacyMode(on).catch((_e: Object) => {
+          // 不支持时忽略
+        });
+      }).catch((_e: Object) => {
+        // 忽略
+      });
+    } catch (e) {
+      // 忽略
+    }
   }
 }

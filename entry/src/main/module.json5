@@ -7,7 +7,8 @@
     "deviceTypes": [
       "phone",
       "tablet",
-      "2in1"
+      "2in1",
+      "tv"
     ],
     "deliveryWithInstall": true,
     "installationFree": false,
@@ -58,7 +59,15 @@
           ],
           "when": "inuse"
         }
-      }
+      },
+      {
+        "name": "ohos.permission.PUBLISH_AGENT_REMINDER",
+        "reason": "$string:reason_agent_reminder",
+        "usedScene": {
+          "abilities": ["EntryAbility"],
+          "when": "always"
+        }
+      },
     ],
     "abilities": [
       {
@@ -70,6 +79,10 @@
         "startWindowIcon": "$media:transparent_icon",
         "startWindowBackground": "$color:start_window_background",
         "exported": true,
+        "minWindowWidth": 420,
+        "minWindowHeight": 620,
+        // 多端流转（应用接续）：允许把当前使用状态接到手机/平板/2in1 另一台设备继续
+        "continuable": true,
         "skills": [
           {
             "entities": [
@@ -96,6 +109,14 @@
             "resource": "$profile:form_config"
           }
         ]
+      },
+      {
+        "name": "BackgroundWorkAbility",
+        "srcEntry": "./ets/workscheduler/BackgroundWorkAbility.ets",
+        "label": "$string:BackgroundWorkAbility_label",
+        "description": "$string:BackgroundWorkAbility_desc",
+        "type": "workScheduler",
+        "exported": false
       },
       {
         "name": "EntryBackupAbility",

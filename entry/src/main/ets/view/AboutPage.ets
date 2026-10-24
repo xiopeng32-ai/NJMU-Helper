@@ -15,6 +15,7 @@ import { SheetUtil } from '../common/SheetUtil';
 import { http } from '@kit.NetworkKit';
 import { AppState } from '../common/AppState';
 import { Theme } from '../common/ThemeUtil';
+import { ResponsiveUtil } from '../common/ResponsiveUtil';
 import { GlassMaterial } from '../common/GlassMaterial';
 import { Const } from '../common/Constants';
 import { LogStore } from '../common/LogStore';
@@ -33,10 +34,19 @@ import { materialActive, sheetBlurStyle } from '../common/SystemMaterial';
 import { MaterialCardLayer } from './common/MaterialCarrier';
 import { CHANGELOG_ALL, CHANGELOG_MAX, ChangelogItem } from '../common/Changelog';
 import { AppearanceStore } from '../common/AppearanceStore';
+import { T } from '../common/I18n';
 
+
+/** 版本清单解析结果 */
+class UpdateInfo {
+  version: string = '';
+  notes: string = '';
+}
 
 @Component
 export struct AboutPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -60,10 +70,10 @@ export struct AboutPage {
   @State debugPwd: string = '';
   /** 调试模式是否开启（日志/联网任一）：驱动「退出调试」红胶囊显隐（AppState 静态字段非响应式，需本地镜像） */
   @State debugActive: boolean = false;
-  /** 当前应用版本（与界面「版本」文本保持同步，发版时两处一起改） */
-  private readonly currentVersion: string = '1.9.4';
-  /** 备案编号：App 备案通过后填入，例如「苏ICP备2026XXXXXX号-3A」；留空则不显示 */
-  private readonly icpNo: string = '';
+  /** 当前应用版本（启动时从 bundleManager 读取，见 AppState.appVersion；不再硬编码） */
+  private currentVersion(): string {
+    return AppState.appVersion;
+  }
   /** 检查更新请求进行中 */
   @State checkingUpdate: boolean = false;
   /** 连点计时器（超时重置计数） */
@@ -105,12 +115,12 @@ export struct AboutPage {
     const isLog: boolean = AppState.logEnabled;
     const isNet: boolean = AppState.debugNetwork;
     this.getUIContext().getPromptAction().showDialog({
-      title: isLog ? '日志调试已开启' : '调试模式已开启',
+      title: isLog ? T('日志调试已开启') : T('调试模式已开启'),
       message: isLog && isNet ? '当前正在收集使用日志，且功能浏览模式允许联网。是否退出调试模式？' :
         (isLog ? '当前正在收集功能使用日志。是否退出日志调试？' : '当前功能浏览模式允许联网。是否退出调试模式？'),
       buttons: [
-        { text: '取消', color: '#888888' },
-        { text: '退出调试模式', color: '#DB5252', primary: true }
+        { text: T('取消'), color: '#888888' },
+        { text: T('退出调试模式'), color: '#DB5252', primary: true }
       ]
     }).then((res) => {
       if (res.index === 1) {
@@ -127,13 +137,13 @@ export struct AboutPage {
    *  功能浏览模式（USE_MOCK）开启调试联网 + 日志收集；真实登录模式开启日志调试 */
   private submitDebugPwd(): void {
     if (this.debugPwd !== 'admin') {
-      this.getUIContext().getPromptAction().showToast({ message: '密码错误' });
+      this.getUIContext().getPromptAction().showToast({ message: T('密码错误') });
       return;
     }
     this.showDebugSheet = false;
     if (AppState.logEnabled || AppState.debugNetwork) {
       // 已开启：提示已开启，避免重复开启
-      this.getUIContext().getPromptAction().showToast({ message: AppState.logEnabled ? '日志调试已开启' : '调试模式已开启' });
+      this.getUIContext().getPromptAction().showToast({ message: AppState.logEnabled ? T('日志调试已开启') : T('调试模式已开启') });
       return;
     }
     if (JwApi.USE_MOCK) {
@@ -141,7 +151,7 @@ export struct AboutPage {
       AppState.debugNetwork = true;
       AppState.logEnabled = true;
       LogStore.log('日志调试', '开启', '成功', '功能浏览模式调试开启（联网 + 日志收集）');
-      this.getUIContext().getPromptAction().showToast({ message: '调试模式已开启：功能浏览允许联网并收集日志' });
+      this.getUIContext().getPromptAction().showToast({ message: T('调试模式已开启：功能浏览允许联网并收集日志') });
     } else {
       // 真实登录：开启日志调试
       AppState.logEnabled = true;
@@ -169,107 +179,177 @@ export struct AboutPage {
       cardMargin: { top: 0 }
     }) {
     Column() {
-      Text('项目链接')
+      Text(T('项目链接'))
         .fontSize(13)
         .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
         .fontColor($r('app.color.text_primary'))
         .width('100%')
         .margin({ bottom: 10 })
-      // 本项目双平台入口（GitHub / Gitee）；Gitee 入口同时见于《用户协议》《隐私政策》联系方式
-      this.linkRow('南医助手（GitHub）', 'https://github.com/FengHDSL/南医助手')
-      this.linkRow('南医助手（Gitee）', 'https://gitee.com/pandasoos/南医助手')
-      this.linkRow('miha_hm（参考）', 'https://github.com/MrCashmere/miha_hm')
-      this.linkRow('zhengfang-apk（参考）', 'https://github.com/znjhahaha/zhengfang-apk')
-      this.linkRow('HiXD（参考）', 'https://github.com/PollenWang6/HiXD')
-      this.linkRow('Traintime PDA（参考）', 'https://github.com/BenderBlog/traintime_pda')
+      // 本项目入口：仓库 / 问题反馈 / 官网（地址以本应用实际仓库为准，勿再指向其它项目的同名仓库）
+      this.linkRow(T('GitHub 开源仓库'), 'https://github.com/xiopeng32-ai/NJMU-Helper')
+      this.linkRow(T('问题反馈') + ' · Issues', 'https://github.com/xiopeng32-ai/NJMU-Helper/issues')
+      this.linkRow(T('官方网站'), 'https://www.sydxky.cn/')
+      // 上游与参考项目（如实署名，链接需可达）
+      this.linkRow(T('上游项目') + ' · XJAU-Helper', 'https://github.com/FengHDSL/XJAU-Helper')
+      this.linkRow('miha_hm', 'https://github.com/MrCashmere/miha_hm')
+      this.linkRow('zhengfang-apk', 'https://github.com/znjhahaha/zhengfang-apk')
+      this.linkRow('HiXD', 'https://github.com/PollenWang6/HiXD')
+      this.linkRow('Traintime PDA', 'https://github.com/BenderBlog/traintime_pda')
 
-      Text('开源等级: MIT License')
+      Text(T('开源等级: MIT License'))
         .fontSize(12)
         .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .width('100%')
         .textAlign(TextAlign.Center)
         .margin({ top: 18 })
-
-      // 备案编号（工信部要求 App 显著位置展示并链接备案系统）：icpNo 为空时整行不渲染
-      if (this.icpNo.length > 0) {
-        this.linkRow('备案号：' + this.icpNo, 'https://beian.miit.gov.cn/')
-      }
     }
     .width('100%')
     .alignItems(HorizontalAlign.Start)
     }
   }
 
-  /** 检查更新：拉取 HAP 资源站页面，解析版本徽标（fa-code-branch 后的 vX.Y.Z）并比对当前版本 */
+  /** 新版本清单地址（优先）：结构稳定，可带更新说明与下载路径 */
+  private static readonly VERSION_JSON_URL: string = 'https://www.sydxky.cn/version.json';
+  /** 详情页地址（兜底）：清单不可用时按旧方式解析版本徽标 */
+  private static readonly DETAIL_PAGE_URL: string = 'https://www.sydxky.cn/detail.php?id=796';
+  /** 检查结果缓存时长（30 分钟内重复点击直接给结论，不重复请求） */
+  private static readonly CHECK_TTL: number = 30 * 60 * 1000;
+
+  /**
+   * 检查更新（优化版）：
+   *  1) 30 分钟内已检查过 → 直接复用结果（避免频繁请求、也防止用户连点）
+   *  2) 优先读 version.json（带更新说明），失败回退详情页 HTML 解析
+   *  3) 超时 6 秒 + 自动重试 1 次
+   */
   private checkUpdate(): void {
     if (this.checkingUpdate) {
       return;
     }
+    const lastAt: number = Number.parseInt(DataStore.get('update_last_check_at'), 10);
+    const lastVer: string = DataStore.get('update_last_check_ver');
+    if (lastAt > 0 && Date.now() - lastAt < AboutPage.CHECK_TTL && lastVer.length > 0) {
+      this.presentUpdateResult(lastVer, '');
+      return;
+    }
     this.checkingUpdate = true;
-    // 超时保护：8 秒未返回按超时提示（网络不可达/域名解析失败等）
-    let finished = false;
-    const timer = setTimeout(() => {
-      if (!finished) {
-        finished = true;
-        this.checkingUpdate = false;
-        this.getUIContext().getPromptAction().showToast({ message: '检查更新超时，请稍后再试' });
-      }
-    }, 8000);
-    const httpRequest = http.createHttp();
-    httpRequest.request('https://www.sydxky.cn/detail.php?id=796', {
-      method: http.RequestMethod.GET,
-      connectTimeout: 8000,
-      readTimeout: 8000,
-      header: { 'User-Agent': 'Mozilla/5.0 (HarmonyOS) 南医助手' }
-    }).then((resp: http.HttpResponse) => {
-      if (finished) {
+    this.fetchVersionJson().then((info: UpdateInfo | null) => {
+      if (info !== null) {
+        this.finishCheck(info.version, info.notes);
         return;
       }
-      finished = true;
-      clearTimeout(timer);
-      httpRequest.destroy();
-      this.checkingUpdate = false;
-      const html: string = typeof resp.result === 'string' ? resp.result : '';
-      const remote: string = this.parseRemoteVersion(html);
-      if (remote.length === 0) {
-        this.getUIContext().getPromptAction().showToast({ message: '检查更新失败，请稍后再试' });
-        return;
-      }
-      const cmp: number = this.compareVersion(this.currentVersion, remote);
-      if (cmp < 0) {
-        this.getUIContext().getPromptAction().showDialog({
-          title: '发现新版本',
-          message: `发现新版本：v${remote}，请前往AppTest或前往HAP资源站更新！`,
-          buttons: [
-            { text: '前往更新', color: '#005BAC' },
-            { text: '关闭', color: '#666666' }
-          ]
-        }).then((res) => {
-          if (res.index === 0) {
-            this.openUpdateSite();
-          }
-        });
-      } else if (cmp > 0) {
-        this.getUIContext().getPromptAction().showDialog({
-          title: '版本超前',
-          message: `当前最新版本为 v${remote}！`,
-          buttons: [
-            { text: '知道了', color: '#005BAC' }
-          ]
-        });
-      } else {
-        this.getUIContext().getPromptAction().showToast({ message: `已是最新版本（v${this.currentVersion}）` });
-      }
+      // 清单不可用 → 回退 HTML 解析
+      this.fetchVersionFromHtml(1).then((v: string) => {
+        this.finishCheck(v, '');
+      });
     }).catch(() => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      clearTimeout(timer);
-      httpRequest.destroy();
-      this.checkingUpdate = false;
-      this.getUIContext().getPromptAction().showToast({ message: '检查更新超时，请稍后再试' });
+      this.fetchVersionFromHtml(1).then((v: string) => {
+        this.finishCheck(v, '');
+      });
     });
+  }
+
+  /** 拉取 version.json；失败返回 null（不抛错，交由上层兜底） */
+  private async fetchVersionJson(): Promise<UpdateInfo | null> {
+    try {
+      const req: http.HttpRequest = http.createHttp();
+      const resp: http.HttpResponse = await req.request(AboutPage.VERSION_JSON_URL, {
+        method: http.RequestMethod.GET,
+        connectTimeout: 6000,
+        readTimeout: 6000,
+        header: { 'User-Agent': 'Mozilla/5.0 (HarmonyOS) 南医助手', 'Cache-Control': 'no-cache' }
+      });
+      req.destroy();
+      if (resp.responseCode !== 200) {
+        return null;
+      }
+      const body: string = typeof resp.result === 'string' ? resp.result : '';
+      if (body.length === 0 || body.indexOf('{') < 0) {
+        return null;
+      }
+      const root: Record<string, Object> = JSON.parse(body) as Record<string, Object>;
+      const v: string = String(root['version'] ?? '');
+      if (v.length === 0) {
+        return null;
+      }
+      const info: UpdateInfo = new UpdateInfo();
+      info.version = v;
+      const rawNotes: Object = root['notes'] ?? '';
+      if (Array.isArray(rawNotes)) {
+        const arr: Object[] = rawNotes as Object[];
+        const lines: string[] = [];
+        for (let i: number = 0; i < arr.length && i < 4; i++) {
+          lines.push(`· ${String(arr[i])}`);
+        }
+        info.notes = lines.join('\n');
+      }
+      return info;
+    } catch (e) {
+      LogStore.log('更新', '清单', '读取失败', LogStore.errorOf(e as Object));
+      return null;
+    }
+  }
+
+  /** 从详情页 HTML 解析版本号（带一次重试） */
+  private async fetchVersionFromHtml(retryLeft: number): Promise<string> {
+    try {
+      const req: http.HttpRequest = http.createHttp();
+      const resp: http.HttpResponse = await req.request(AboutPage.DETAIL_PAGE_URL, {
+        method: http.RequestMethod.GET,
+        connectTimeout: 6000,
+        readTimeout: 6000,
+        header: { 'User-Agent': 'Mozilla/5.0 (HarmonyOS) 南医助手' }
+      });
+      req.destroy();
+      const html: string = typeof resp.result === 'string' ? resp.result : '';
+      const v: string = this.parseRemoteVersion(html);
+      if (v.length === 0 && retryLeft > 0) {
+        return await this.fetchVersionFromHtml(retryLeft - 1);
+      }
+      return v;
+    } catch (e) {
+      if (retryLeft > 0) {
+        return await this.fetchVersionFromHtml(retryLeft - 1);
+      }
+      return '';
+    }
+  }
+
+  /** 收尾：缓存结果 + 按比对结果给出界面反馈 */
+  private finishCheck(remote: string, notes: string): void {
+    this.checkingUpdate = false;
+    if (remote.length === 0) {
+      this.getUIContext().getPromptAction().showToast({ message: T('检查更新失败，请检查网络后重试') });
+      return;
+    }
+    DataStore.put('update_last_check_at', `${Date.now()}`);
+    DataStore.put('update_last_check_ver', remote);
+    this.presentUpdateResult(remote, notes);
+  }
+
+  /** 展示检查结果（有更新弹窗 + 更新说明，否则轻提示） */
+  private presentUpdateResult(remote: string, notes: string): void {
+    const cmp: number = this.compareVersion(this.currentVersion(), remote);
+    if (cmp < 0) {
+      const noteText: string = notes.length > 0 ? `\n\n更新内容：\n${notes}` : '';
+      this.getUIContext().getPromptAction().showDialog({
+        title: `发现新版本 v${remote}`,
+        message: `当前版本 v${this.currentVersion()}${noteText}`,
+        buttons: [
+          { text: T('前往更新'), color: '#005BAC' },
+          { text: T('稍后'), color: '#666666' }
+        ]
+      }).then((res) => {
+        if (res.index === 0) {
+          this.openUpdateSite();
+        }
+      });
+    } else if (cmp > 0) {
+      this.getUIContext().getPromptAction().showToast({
+        message: `当前已是最新发布版本（线上 v${remote}）`, duration: 2200
+      });
+    } else {
+      this.getUIContext().getPromptAction().showToast({ message: `已是最新版本（v${this.currentVersion()}）` });
+    }
   }
 
   /** 从资源站 HTML 解析最新版本号（优先版本徽标锚点，兜底全页第一个 span vX.Y.Z；取不到返回空串） */
@@ -315,7 +395,7 @@ export struct AboutPage {
       };
       ctx.startAbility(want);
     } catch (e) {
-      this.getUIContext().getPromptAction().showToast({ message: '打开浏览器失败' });
+      this.getUIContext().getPromptAction().showToast({ message: T('打开浏览器失败') });
     }
   }
 
@@ -341,7 +421,7 @@ export struct AboutPage {
             .height(14)
             .color(Color.White)
         }
-        Text(this.checkingUpdate ? '检查中…' : '检查更新')
+        Text(this.checkingUpdate ? T('检查中…') : T('检查更新'))
           .fontSize(13)
           .fontColor(Color.White)
       }
@@ -365,11 +445,25 @@ export struct AboutPage {
         this.confirmExitDebug();
       }
     }) {
-      Text('退出调试')
+      Text(T('退出调试'))
         .fontSize(13)
         .fontColor($r('sys.color.font_primary'))
         .padding({ left: 18, right: 18, top: 8, bottom: 8 })
     }
+  }
+
+  /** 链接行右侧展示用：去掉协议与末尾斜杠，过长的靠省略号截断 */
+  private static shortUrl(url: string): string {
+    let s: string = url;
+    if (s.startsWith('https://')) {
+      s = s.substring(8);
+    } else if (s.startsWith('http://')) {
+      s = s.substring(7);
+    }
+    while (s.endsWith('/')) {
+      s = s.substring(0, s.length - 1);
+    }
+    return s;
   }
 
   @Builder
@@ -379,7 +473,7 @@ export struct AboutPage {
         .fontSize(13)
         .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .layoutWeight(1)
-      Text(url.replace('https://github.com/', '').replace('https://gitee.com/', ''))
+      Text(AboutPage.shortUrl(url))
         .fontSize(12)
         .fontColor(Theme.colorOf(this.themeColor))
         .maxLines(1)
@@ -404,13 +498,13 @@ export struct AboutPage {
       return;
     }
     this.getUIContext().getPromptAction().showDialog({
-      title: '取消同意',
-      message: '取消同意后将无法使用本应用，下次打开需重新同意。是否同时清除本地数据？',
+      title: T('取消同意'),
+      message: T('取消同意后将无法使用本应用，下次打开需重新同意。是否同时清除本地数据？'),
       buttons: [
         // 用户指定配色：「清除数据并退出」红、「保留数据并退出」天蓝、「取消」绿
-        { text: '清除数据并退出', color: '#DB5252' },
-        { text: '保留数据并退出', color: '#1E90FF' },
-        { text: '取消', color: '#4CAF50' }
+        { text: T('清除数据并退出'), color: '#DB5252' },
+        { text: T('保留数据并退出'), color: '#1E90FF' },
+        { text: T('取消'), color: '#4CAF50' }
       ]
     }).then((res) => {
       if (res.index === 2) {
@@ -452,11 +546,11 @@ export struct AboutPage {
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                 .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 12 })
-              Text(`版本 ${this.currentVersion}`)
+              Text(`版本 ${this.currentVersion()} · ${ResponsiveUtil.deviceTypeLabel()}`)
                 .fontSize(12)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 4 })
-              Text('仅供学习交流使用，严禁用于商业用途！')
+              Text(T('仅供学习交流使用，严禁用于商业用途！'))
                 .fontSize(11)
                 .fontColor(WallpaperTone.onWallpaperSecondary(this.wallpaperTone, this.isDarkMode))
                 .margin({ top: 8 })
@@ -490,14 +584,14 @@ export struct AboutPage {
               cardMargin: { bottom: 12 }
             }) {
             Column() {
-              Text('南医助手（NJMU Helper）是一款专为南京医科大学学生打造的校园工具：原生鸿蒙开发，完全开源，完全免费，轻量小巧。课表、成绩、考试、学业、教室查询一站集成，南医新闻、校公众号随时掌握校园动态。数据来源于学校官方网页，不经过也不保存于非学校官方服务器。南医助手，让你的校园生活更便利！')
+              Text(T('南医助手（NJMU Helper）是一款专为南京医科大学学生打造的校园工具：原生鸿蒙开发，完全开源，完全免费，轻量小巧。课表、成绩、考试、学业、教室查询一站集成，南医新闻、校公众号随时掌握校园动态。数据来源于学校官方网页，不经过也不保存于非学校官方服务器。南医助手，让你的校园生活更便利！'))
                 .fontSize(12)
                 .lineHeight(20)
                 .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                 .textAlign(TextAlign.Center)
                 .width('100%')
               // 独立开发者免责声明（红色醒目；措辞与 PrivacyText.ets 独立开发声明保持一致）
-              Text('本应用由学生独立开发，非学校官方应用，与校方无任何隶属或合作关系！')
+              Text(T('本应用由学生独立开发，非学校官方应用，与校方无任何隶属或合作关系！'))
                 .fontSize(12)
                 .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                 .fontColor('#DB5252')
@@ -515,7 +609,7 @@ export struct AboutPage {
 
             // 入口：查看全部历史更新日志
             Row() {
-              Text('查看全部更新日志 ›')
+              Text(T('查看全部更新日志 ›'))
                 .fontSize(12)
                 .fontColor(Theme.colorOf(this.themeColor))
             }
@@ -542,13 +636,13 @@ export struct AboutPage {
             }) {
             Column() {
               Row({ space: 22 }) {
-                Text('《用户协议》')
+                Text(T('《用户协议》'))
                   .fontSize(12)
                   .fontColor(Theme.colorOf(this.themeColor))
                   .onClick(() => {
                     AppState.stack.pushPath({ name: Const.ROUTE_TERMS });
                   })
-                Text('《隐私政策》')
+                Text(T('《隐私政策》'))
                   .fontSize(12)
                   .fontColor(Theme.colorOf(this.themeColor))
                   .onClick(() => {
@@ -571,7 +665,7 @@ export struct AboutPage {
                     this.cancelAgreement();
                   }
                 }) {
-                  Text('取消同意并退出')
+                  Text(T('取消同意并退出'))
                     .fontSize(12)
                     .fontColor('#DB5252')
                     .padding({ left: 16, right: 16, top: 6, bottom: 6 })
@@ -596,7 +690,7 @@ export struct AboutPage {
 
         // 悬浮顶栏：主题色渐变到透明，内容可滚入其下层
         PageHeader({
-          title: '关于应用',
+          title: T('关于应用'),
           subtitle: '南医助手',
           onBack: () => {
             AppState.stack.pop();
@@ -636,14 +730,14 @@ export struct AboutPage {
     // 本弹窗高度随内容（SheetSize.FIT_CONTENT），传 panelFillHeight: false（不写 height('100%')，避免被撑成整屏）。
     MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false, panelShowClose: true, panelOnClose: (): void => { this.showDebugSheet = false; } }) {
     Column() {
-      Text('调试模式')
+      Text(T('调试模式'))
         .fontSize(17)
         .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
         .fontColor($r('app.color.text_primary'))
         .width('100%')
         .margin({ top: 16, bottom: 8 })
 
-      Text(JwApi.USE_MOCK ? '输入密码以开启功能浏览模式的联网能力' : '输入密码以开启日志调试（收集使用日志）')
+      Text(JwApi.USE_MOCK ? T('输入密码以开启功能浏览模式的联网能力') : T('输入密码以开启日志调试（收集使用日志）'))
         .fontSize(12)
         .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .width('100%')
@@ -656,7 +750,7 @@ export struct AboutPage {
         if (materialActive()) {
           MaterialCardLayer({ layerRadius: $r('sys.float.corner_radius_level12'), layerShadow: false })
         }
-        TextInput({ text: this.debugPwd, placeholder: '请输入密码' })
+        TextInput({ text: this.debugPwd, placeholder: T('请输入密码') })
           .height(48)
           .enterKeyType(EnterKeyType.Done)
           .borderRadius($r('sys.float.corner_radius_level12'))
@@ -693,7 +787,7 @@ export struct AboutPage {
           this.submitDebugPwd();
         }
       }) {
-        Text('确认')
+        Text(T('确认'))
           .fontSize(14)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
           .fontColor($r('sys.color.font_primary'))

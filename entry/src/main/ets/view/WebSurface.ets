@@ -22,6 +22,8 @@ import { LogStore } from '../common/LogStore';
 
 @Component
 export struct WebSurface {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 页面加载完成后回传网页标题（供外部链接页更新标题栏；默认空回调） */
   onTitleChange: (title: string) => void = () => {
   };

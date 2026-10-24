@@ -15,6 +15,7 @@ import { HttpClient, HttpResult } from './HttpClient';
 import { DataStore } from '../common/DataStore';
 import { LogStore } from '../common/LogStore';
 import { ClassFilter, GrabPolicy, GrabTarget, SelectableClass, SelectedCourseItem, SelectContext, SelectScope } from '../model/Models';
+import { T } from '../common/I18n';
 
 /** 选课/退课结果 */
 export interface SelectResult {
@@ -369,7 +370,7 @@ export class SelectApi {
   /** 课程类别代码 → 中文名 */
   private static roundLabel(kklxdm: string): string {
     if (kklxdm === '01') {
-      return '必修课';
+      return T('必修课');
     }
     if (kklxdm === '02') {
       return '限选课';

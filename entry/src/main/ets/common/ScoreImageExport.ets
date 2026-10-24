@@ -101,6 +101,41 @@ export class ImageExport {
           // ignore
         }
       }
+      // 关键：长图快照（1080×6000+）单张可达 30MB，不释放会连续导出几次即 OOM
+      try {
+        await pm.release();
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  /** 清理导出目录，只保留最近 max 个文件（按修改时间） */
+  private static pruneExports(dir: string, max: number): void {
+    try {
+      const names: string[] = fileIo.listFileSync(dir);
+      if (names.length <= max) {
+        return;
+      }
+      const items: string[] = names.map((n: string) => `${dir}/${n}`);
+      items.sort((a: string, b: string) => {
+        try {
+          return fileIo.statSync(a).mtime - fileIo.statSync(b).mtime;
+        } catch (e) {
+          return 0;
+        }
+      });
+      const drop: number = items.length - max;
+      for (let i: number = 0; i < drop; i++) {
+        try {
+          fileIo.unlinkSync(items[i]);
+        } catch (e) {
+          // ignore
+        }
+      }
+      LogStore.log('导出图片', '清理旧图', '完成', `删除${drop}张 保留${max}张`);
+    } catch (e) {
+      // 目录不存在/读取失败时忽略
     }
   }
 

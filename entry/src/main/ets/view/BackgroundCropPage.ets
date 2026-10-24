@@ -30,6 +30,7 @@ import { WallpaperTone } from '../common/WallpaperTone';
 import { PageHeader } from './common/UiKit';
 import { WallpaperFill } from './common/WallpaperFill';
 import { GlassMaterial } from '../common/GlassMaterial';
+import { T } from '../common/I18n';
 
 /** 裁剪框最小宽度（vp），防止把手把框拖没了 */
 const MIN_CROP_WIDTH: number = 80;
@@ -38,6 +39,8 @@ const MAX_DECODE_LONG_SIDE: number = 2560;
 
 @Component
 export struct BackgroundCropPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -502,7 +505,7 @@ export struct BackgroundCropPage {
 
           // ── 底部操作（本项目功能保留：换图 / 复位 / 清空背景）──
           Row({ space: 10 }) {
-            Text('重新选择')
+            Text(T('重新选择'))
               .fontSize(13)
               .fontColor($r('app.color.text_primary'))
               .height(38)
@@ -513,7 +516,7 @@ export struct BackgroundCropPage {
               .onClick(() => {
                 this.pickImage();
               })
-            Text('复位')
+            Text(T('复位'))
               .fontSize(13)
               .fontColor($r('app.color.text_primary'))
               .height(38)
@@ -524,7 +527,7 @@ export struct BackgroundCropPage {
               .onClick(() => {
                 this.resetCrop();
               })
-            Text('清空背景')
+            Text(T('清空背景'))
               .fontSize(13)
               .fontColor('#FFFFFF')
               .height(38)
@@ -540,7 +543,7 @@ export struct BackgroundCropPage {
           .justifyContent(FlexAlign.Center)
           .margin({ top: 16 })
 
-          Text('提示：拖动白色框调整裁剪区域，拖动右下角圆形把手调整大小；框内区域即最终背景。')
+          Text(T('提示：拖动白色框调整裁剪区域，拖动右下角圆形把手调整大小；框内区域即最终背景。'))
             .fontSize(11)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .textAlign(TextAlign.Center)
@@ -555,7 +558,7 @@ export struct BackgroundCropPage {
         PageHeader({
           title: '裁剪背景',
           subtitle: this.hasImage ? `${this.srcW}×${this.srcH}` : '选择图片后裁剪',
-          actionText: this.busy ? '处理中' : '完成',
+          actionText: this.busy ? '处理中' : T('完成'),
           actionTone: 'theme',
           onBack: () => {
             try {

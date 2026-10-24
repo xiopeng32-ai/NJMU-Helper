@@ -12,9 +12,12 @@ import { BackButton } from './common/BackButton';
 import { WallpaperFill } from './common/WallpaperFill';
 import { AppearanceStore } from '../common/AppearanceStore';
 import { GlassMaterial } from '../common/GlassMaterial';
+import { T } from '../common/I18n';
 
 @Component
 export struct NewsFavPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -64,16 +67,16 @@ export struct NewsFavPage {
   /** 取消收藏（按 url）并刷新列表 */
   private removeFav(item: NewsItem): void {
     this.getUIContext().getPromptAction().showDialog({
-      title: '取消收藏',
-      message: '确定将该新闻从收藏中移除吗？',
+      title: T('取消收藏'),
+      message: T('确定将该新闻从收藏中移除吗？'),
       buttons: [
-        { text: '取消', color: '#888888' },
-        { text: '取消收藏', color: '#DB5252', primary: true }
+        { text: T('取消'), color: '#888888' },
+        { text: T('取消收藏'), color: '#DB5252', primary: true }
       ]
     }).then((res) => {
       if (res.index === 1) {
         DataStore.removeNewsFav(item.url);
-        this.getUIContext().getPromptAction().showToast({ message: '已取消收藏' });
+        this.getUIContext().getPromptAction().showToast({ message: T('已取消收藏') });
         this.reload();
       }
     });
@@ -86,7 +89,7 @@ export struct NewsFavPage {
       AppState.stack.pushPath({ name: Const.ROUTE_NEWS_DETAIL });
     } else {
       AppState.webUrl = item.url;
-      AppState.webTitle = '外部链接';
+      AppState.webTitle = T('外部链接');
       AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
     }
   }
@@ -109,12 +112,12 @@ export struct NewsFavPage {
             .backgroundBlurStyle(Immersive.blur(BlurStyle.Thin, this.barStyle === 'legacy'))
         Row() {
           BackButton({ onBack: () => { AppState.stack.pop(); } })
-          Text('我的收藏')
+          Text(T('我的收藏'))
             .fontSize(18).fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
             .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
             .margin({ left: 6 })
             .layoutWeight(1)
-          Text('刷新')
+          Text(T('刷新'))
             .fontSize(12)
             .fontColor(WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
             .height(34)
@@ -136,10 +139,10 @@ export struct NewsFavPage {
 
         if (this.items.length === 0) {
           Column() {
-            Text('暂无收藏')
+            Text(T('暂无收藏'))
               .fontSize(14)
               .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
-            Text('在新闻详情页点击"收藏"即可收藏')
+            Text(T('在新闻详情页点击"收藏"即可收藏'))
               .fontSize(12)
               .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
               .margin({ top: 8 })
@@ -161,7 +164,7 @@ export struct NewsFavPage {
                     .layoutWeight(1).alignItems(HorizontalAlign.Start)
 
                     // 取消收藏按钮
-                    Text('取消')
+                    Text(T('取消'))
                       .fontSize(12)
                       .fontColor('#DB5252')
                       .padding({ left: 10, right: 10, top: 5, bottom: 5 })

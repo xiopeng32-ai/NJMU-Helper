@@ -12,6 +12,8 @@ import { WallpaperTone } from '../../common/WallpaperTone';
 
 @Component
 export struct WallpaperFill {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('wallpaperId') wallpaperId: string = 'none';
   @StorageProp('isDarkMode') isDarkMode: boolean = false;
   @StorageProp('themeColor') themeColor: string = 'green';
@@ -26,7 +28,7 @@ export struct WallpaperFill {
 
   build() {
     Stack() {
-      if (this.wallpaperId.startsWith('c:')) {
+      if (this.wallpaperId.startsWith('c:') && typeof Wallpaper.src(this.wallpaperId) === 'string') {
         Image(Wallpaper.src(this.wallpaperId))
           .width('100%')
           .height('100%')

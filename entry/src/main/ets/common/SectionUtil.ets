@@ -6,6 +6,8 @@
  */
 import { SectionTime, Const } from './Constants';
 import { ScheduleConfig } from './ScheduleConfig';
+import { DataStore } from './DataStore';
+import { T } from './I18n';
 
 export class SectionUtil {
   /** 解析单节时间 "HH:MM-HH:MM" → [start, end]；非法返回 null */
@@ -88,12 +90,65 @@ export class SectionUtil {
   /** 节次所属时段（上午/下午/晚上）：上午 1-4、下午 5-8、晚上 其余 */
   static period(index: number): string {
     if (index <= 4) {
-      return '上午';
+      return T('上午');
     }
     if (index <= 8) {
-      return '下午';
+      return T('下午');
     }
-    return '晚上';
+    return T('晚上');
+  }
+
+  // ── 当前生效作息（按持久化串缓存，用户改了作息自动失效） ──
+  // 首页/今日课表每次渲染都要算时间，不能每条课都 JSON.parse 一次配置；
+  // 也不能像以前那样走 DateUtil.sectionRange（硬编码 Const.SECTIONS，忽略自定义作息）。
+  private static rawKey: string = '';
+  private static memo: SectionTime[] = [];
+
+  /** 当前持久化作息对应的节次表（缓存，配置变化后首次调用自动重建） */
+  static current(): SectionTime[] {
+    const raw: string = DataStore.get(DataStore.KEY_SCHEDULE_CFG);
+    if (raw !== SectionUtil.rawKey || SectionUtil.memo.length === 0) {
+      SectionUtil.rawKey = raw;
+      SectionUtil.memo = SectionUtil.list(ScheduleConfig.load());
+    }
+    return SectionUtil.memo;
+  }
+
+  /** 某节次开始分钟数（当前生效作息，越界夹取） */
+  static startMinCurrent(section: number): number {
+    return SectionUtil.minuteOf(SectionUtil.current(), section, false);
+  }
+
+  /** 某节次结束分钟数（当前生效作息，越界夹取） */
+  static endMinCurrent(section: number): number {
+    return SectionUtil.minuteOf(SectionUtil.current(), section, true);
+  }
+
+  /** 节次区间时间文本（当前生效作息），如 08:00-09:40 */
+  static rangeTextCurrent(startSection: number, endSection: number): string {
+    const list: SectionTime[] = SectionUtil.current();
+    if (list.length === 0) {
+      return '';
+    }
+    const a: number = Math.max(1, Math.min(list.length, Math.floor(startSection)));
+    const b: number = Math.max(a, Math.min(list.length, Math.floor(endSection)));
+    return `${list[a - 1].start}-${list[b - 1].end}`;
+  }
+
+  /** 单节起止分钟数（内部：越界夹取，非法返回 0） */
+  private static minuteOf(list: SectionTime[], section: number, end: boolean): number {
+    if (list.length === 0) {
+      return 0;
+    }
+    const i: number = Math.max(1, Math.min(list.length, Math.floor(section))) - 1;
+    const text: string = end ? list[i].end : list[i].start;
+    const p: string[] = text.split(':');
+    const h: number = Number.parseInt(p[0], 10);
+    const m: number = p.length > 1 ? Number.parseInt(p[1], 10) : 0;
+    if (isNaN(h) || isNaN(m)) {
+      return 0;
+    }
+    return h * 60 + m;
   }
 
   /** 把 "HH:MM" 加上分钟数（跨日则回到 00:00 起算） */

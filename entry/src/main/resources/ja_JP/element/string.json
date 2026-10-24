@@ -1,0 +1,44 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "NJMU教務サービスのクライアント"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "NJMUヘルパーのメイン画面"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "NJMUヘルパー"
+    },
+    {
+      "name": "reason_internet",
+      "value": "大学の教務システムに接続し、時間割や成績を取得するために使用します"
+    },
+    {
+      "name": "reason_calendar",
+      "value": "試験日程をシステムカレンダーに登録して通知するために使用します"
+    },
+    {
+      "name": "reason_agent_reminder",
+      "value": "授業前にリマインダーを送信します（アプリを開いていなくても通知されます）"
+    },
+    {
+      "name": "class_preview_card_name",
+      "value": "授業予告"
+    },
+    {
+      "name": "exam_countdown_card_name",
+      "value": "試験カウントダウン"
+    },
+    {
+      "name": "today_schedule_card_name",
+      "value": "今日の授業"
+    },
+    {
+      "name": "score_card_name",
+      "value": "学業成績"
+    }
+  ]
+}

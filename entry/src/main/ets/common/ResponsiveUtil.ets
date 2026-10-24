@@ -1,5 +1,3 @@
-import { deviceInfo } from '@kit.BasicServicesKit';
-
 /**
  * 窗口自适应工具：统一「手机端布局 / 大屏（平板 · PC）布局」的判定口径。
  *
@@ -11,6 +9,9 @@ import { deviceInfo } from '@kit.BasicServicesKit';
  * 说明：ArkUI 的 mediaquery 以**窗口**为参照并随窗口尺寸变化回调，
  * 因此无需额外注册 windowSizeChange 即可感知 PC 窗口缩放。
  */
+
+import { deviceInfo } from '@kit.BasicServicesKit';
+
 export class ResponsiveUtil {
   /** 大屏布局的窗口宽度阈值（vp）：窗口宽 ≥ 该值视为大屏 */
   static readonly WIDE_WIDTH_VP: number = 600;
@@ -23,6 +24,61 @@ export class ResponsiveUtil {
   static isDesktop(): boolean {
     const t: string = deviceInfo.deviceType;
     return t === '2in1' || t === 'pc';
+  }
+
+  /** 是否智慧屏（遥控器操作、远距离观看，需要更大的栏高/图标/字号与焦点支持） */
+  static isTv(): boolean {
+    return deviceInfo.deviceType === 'tv';
+  }
+
+  /** 是否大屏设备（PC / 智慧屏）：内容区可限制最大宽度，避免超宽行 */
+  static isLargeScreen(): boolean {
+    const t: string = deviceInfo.deviceType;
+    return t === 'tv' || t === '2in1' || t === 'pc';
+  }
+
+  /** 大屏内容区最大宽度（vp）；0 = 不限制（手机/平板保持铺满） */
+  static contentMaxWidth(): number {
+    if (ResponsiveUtil.isTv()) {
+      return 1200;
+    }
+    if (ResponsiveUtil.isDesktop()) {
+      return 1100;
+    }
+    return 0;
+  }
+
+  /** 底栏图标尺寸（智慧屏放大，远距离可辨） */
+  static tabIconSize(): number {
+    return ResponsiveUtil.isTv() ? 26 : 20;
+  }
+
+  /** 底栏文字尺寸 */
+  static tabFontSize(): number {
+    return ResponsiveUtil.isTv() ? 14 : 10;
+  }
+
+  /** 底栏单项高度 */
+  static tabItemHeight(): number {
+    return ResponsiveUtil.isTv() ? 64 : 46;
+  }
+
+  /** 当前设备类型（诊断用，写日志/关于页） */
+  static deviceTypeLabel(): string {
+    const t: string = deviceInfo.deviceType;
+    if (t === 'tv') {
+      return '智慧屏';
+    }
+    if (t === '2in1' || t === 'pc') {
+      return '电脑';
+    }
+    if (t === 'tablet') {
+      return '平板';
+    }
+    if (t === 'phone') {
+      return '手机';
+    }
+    return t;
   }
 
   /**

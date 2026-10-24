@@ -8,9 +8,12 @@
  */
 import { AppearanceStore } from '../../common/AppearanceStore';
 import { GlassMaterial } from '../../common/GlassMaterial';
+import { T } from '../../common/I18n';
 
 @Component
 export struct AntiPeepOverlay {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 是否检测到窥屏 */
   @Prop isPeeped: boolean = false;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
@@ -30,18 +33,18 @@ export struct AntiPeepOverlay {
           .fillColor($r('app.color.brand'))
           .margin({ bottom: 16 })
 
-        Text('防窥保护已启动')
+        Text(T('防窥保护已启动'))
           .fontSize(18)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
           .margin({ bottom: 8 })
 
-        Text('检测到非机主观看，敏感信息已隐藏')
+        Text(T('检测到非机主观看，敏感信息已隐藏'))
           .fontSize(13)
           .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ bottom: 4 })
 
-        Text('请面向手机解锁后查看')
+        Text(T('请面向手机解锁后查看'))
           .fontSize(13)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
       }

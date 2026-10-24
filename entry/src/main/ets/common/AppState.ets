@@ -2,6 +2,7 @@
  * 全局运行时状态（登录态、当前学期、路由栈、页面间传值）
  */
 import { common } from '@kit.AbilityKit';
+import { bundleManager } from '@kit.AbilityKit';
 import { CourseItem, NoticeItem, TermInfo, UserProfile } from '../model/Models';
 import { DateUtil } from './DateUtil';
 import { DataStore } from './DataStore';
@@ -15,6 +16,28 @@ export class SharedHistoryItem {
 export class AppState {
   /** 全局 Ability Context（EntryAbility 注入，供文件缓存等使用） */
   static context: common.Context | null = null;
+  /** 应用真实版本号（启动时由 EntryAbility 从 bundleManager 读取并缓存，杜绝页面硬编码漏改） */
+  static appVersion: string = '1.0.0';
+
+  /**
+   * 从 bundleManager 读取当前应用真实 versionName（如 1.9.9），读取失败回退 APP_VERSION_FALLBACK。
+   * 供关于页「版本」文本与检查更新比对使用，发版只改 AppScope/app.json5 一处即可。
+   */
+  static resolveAppVersion(): void {
+    try {
+      if (AppState.context === null) {
+        return;
+      }
+      const info = bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
+      const vn: string = info.versionName ?? '';
+      if (vn.length > 0) {
+        AppState.appVersion = vn;
+      }
+    } catch (e) {
+      // 读取失败保留 fallback 版本号
+    }
+  }
+
   /** 在系统浏览器中打开外部链接（隐私协议等 Web 内点击外链时使用） */
   static openExternalLink(url: string): void {
     if (AppState.context === null) {
@@ -30,6 +53,12 @@ export class AppState {
   static stack: NavPathStack = new NavPathStack();
   /** 当前学期（默认最新学年第一学期，首页/课程表/考试/成绩一致） */
   static term: TermInfo = DateUtil.buildLatestTerm();
+  /**
+   * term 是否已被显式设置（JwApi.setTerm / 用户切学期）。
+   * 默认值来自 buildLatestTerm()（恒非 null），若直接用它判断"已就绪"，
+   * 1~8 月会算出周次越界 → 提醒计划为空 → 撤销全部提醒。
+   */
+  static termExplicit: boolean = false;
   /** 功能浏览模式（USE_MOCK）下当前周次：>0 时首页/课程表用此值替代 DateUtil.weekOfTerm（让 mock 始终有数据） */
   static mockCurrentWeek: number = 0;
   /** 学期切换监听器（首页顶栏切换后广播，课程表/成绩页注册后自动同步，避免依赖 @Watch 触发） */
@@ -43,6 +72,29 @@ export class AppState {
    * 处理一次后清空，避免重复触发。
    */
   static openPageRequest: string = '';
+
+  /** 页面跳转请求的实时订阅（热启动时 MainView 已挂载，不会再走 aboutToAppear） */
+  private static openPageCbs: Array<(p: string) => void> = [];
+
+  /** 写入跳转请求并实时通知已挂载的页面 */
+  static requestOpenPage(p: string): void {
+    AppState.openPageRequest = p;
+    for (const cb of AppState.openPageCbs) {
+      try {
+        cb(p);
+      } catch (e) {
+        // 订阅方已销毁时忽略
+      }
+    }
+  }
+
+  static setOpenPageListener(cb: (p: string) => void): void {
+    AppState.openPageCbs = [cb];
+  }
+
+  static clearOpenPageListener(): void {
+    AppState.openPageCbs = [];
+  }
 
   /**
    * 主页"重登"按钮触发回调（Index 注入）。
@@ -158,6 +210,34 @@ export class AppState {
   /** 冷启动会话就绪标记：首页数据加载前必须为 true（false = 正在从服务大厅重新桥接新教务系统）。
    *  由 Index 冷启动流程置 false/true，HomeView.loadData 等待其就绪后再取数。 */
   static sessionReady: boolean = true;
+  /** 教务会话已过期（接口被重定向到统一身份认证登录页）：界面据此显示「登录已过期 · 重登」入口 */
+  static sessionExpired: boolean = false;
+  /** 多端流转（应用接续）用：当前底部 Tab 序号（MainView 实时同步） */
+  static currentTabIndex: number = 0;
+  /** 多端流转（应用接续）用：当前二级页面路由名（空 = 停在 Tab 页） */
+  static lastRouteName: string = '';
+
+  /** DataStore 键：接续快照（Tab / 页面 / 是否有待恢复状态） */
+  static readonly KEY_CONTINUE_TAB: string = 'continue_tab';
+  static readonly KEY_CONTINUE_ROUTE: string = 'continue_route';
+  static readonly KEY_CONTINUE_PENDING: string = 'continue_pending';
+
+  /**
+   * 把当前界面状态落盘，供接续时读取。
+   * 不依赖 Ability 生命周期与 AppStorage 时序：onContinue 只需读 DataStore 即可，
+   * 这是修复「接续后空白 / 再次接续失败」的关键（原实现读内存态，接续冷启动时为空）。
+   */
+  static saveContinueState(): void {
+    try {
+      const names: string[] = AppState.stack.getAllPathName();
+      const route: string = names.length > 0 ? names[names.length - 1] : AppState.lastRouteName;
+      DataStore.put(AppState.KEY_CONTINUE_TAB, `${AppState.currentTabIndex}`);
+      DataStore.put(AppState.KEY_CONTINUE_ROUTE, route);
+    } catch (e) {
+      // 栈未就绪时至少把 Tab 落盘
+      DataStore.put(AppState.KEY_CONTINUE_TAB, `${AppState.currentTabIndex}`);
+    }
+  }
   /** 7天免登录：网页版/服务大厅登录成功后是否持久化教务系统会话 Cookie 以便自动重登（默认开启） */
   static remember7d: boolean = true;
   /** 隐藏调试模式：功能浏览（USE_MOCK）下允许联网（关于页连点图标 5 次 + 密码 admin 开启）。
@@ -169,12 +249,22 @@ export class AppState {
     AppStorage.setOrCreate('debugNetwork', value);
   }
   /** 日志调试模式（真实登录下开启）：开启后收集各功能模块使用日志，用于排查 bug。
-   *  用 AppStorage 存储，页面可通过 @StorageProp('logEnabled') 响应式监听。 */
+   *  用 AppStorage 存储，页面可通过 @StorageProp('logEnabled') 响应式监听。
+   *  持久化到 DataStore（用户手动开关后冷启动保留）；默认开启，持续收集方便定位问题。 */
   static get logEnabled(): boolean {
-    return AppStorage.get<boolean>('logEnabled') ?? false;
+    const v: boolean | undefined = AppStorage.get<boolean>('logEnabled');
+    if (v !== undefined) {
+      return v;
+    }
+    // 冷启动：从持久化读取，未设置过则默认开启（持续收集）
+    const stored: string = DataStore.get('log_enabled');
+    const on: boolean = stored.length === 0 ? true : stored === '1';
+    AppStorage.setOrCreate('logEnabled', on);
+    return on;
   }
   static set logEnabled(value: boolean) {
     AppStorage.setOrCreate('logEnabled', value);
+    DataStore.put('log_enabled', value ? '1' : '0');
   }
   /** 首页"下次课"点击后，切到课程表要自动打开的课程（ScheduleView 打开详情后清空） */
   static pendingCourse: CourseItem | null = null;

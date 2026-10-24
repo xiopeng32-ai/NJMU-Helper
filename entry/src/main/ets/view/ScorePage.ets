@@ -8,6 +8,8 @@ import { ScoreView } from './ScoreView';
 
 @Component
 export struct ScorePage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   build() {
     NavDestination() {
       ScoreView({ showBack: true })

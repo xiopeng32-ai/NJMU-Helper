@@ -53,6 +53,8 @@ const BTN_GLOW_ALPHA: number = 0.30;
 
 @Component
 export struct MaterialButton {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 按钮圆角（胶囊按钮传大值，如 999；与承载层圆角一致，避免出现内嵌小圆角边框） */
   @Prop btnRadius: Length = 17;
   /**

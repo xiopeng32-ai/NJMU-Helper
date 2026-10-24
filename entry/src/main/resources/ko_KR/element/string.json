@@ -1,0 +1,44 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "NJMU 학사 서비스 클라이언트"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "NJMU 헬퍼 메인 화면"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "NJMU 헬퍼"
+    },
+    {
+      "name": "reason_internet",
+      "value": "대학 학사 시스템에 연결해 시간표와 성적을 가져오는 데 사용합니다"
+    },
+    {
+      "name": "reason_calendar",
+      "value": "시험 일정을 시스템 캘린더에 등록해 알림을 받는 데 사용합니다"
+    },
+    {
+      "name": "reason_agent_reminder",
+      "value": "수업 전에 알림을 보냅니다(앱을 열지 않아도 알림이 도착합니다)"
+    },
+    {
+      "name": "class_preview_card_name",
+      "value": "수업 예고"
+    },
+    {
+      "name": "exam_countdown_card_name",
+      "value": "시험 카운트다운"
+    },
+    {
+      "name": "today_schedule_card_name",
+      "value": "오늘의 수업"
+    },
+    {
+      "name": "score_card_name",
+      "value": "학업 성적"
+    }
+  ]
+}

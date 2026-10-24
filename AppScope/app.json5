@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.njmu.helper",
     "vendor": "example",
-    "versionCode": 1009009,
-    "versionName": "1.9.9",
+    "versionCode": 2000201,
+    "versionName": "2.2.1",
     "buildVersion": "1",
     "icon": "$media:layered_image",
     "label": "$string:app_name"

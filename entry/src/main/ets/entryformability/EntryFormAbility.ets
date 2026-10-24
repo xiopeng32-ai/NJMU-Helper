@@ -15,19 +15,15 @@ import { Want } from '@kit.AbilityKit';
 import { formBindingData, FormExtensionAbility, formInfo, formProvider } from '@kit.FormKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { DataStore } from '../common/DataStore';
+import { SectionUtil } from '../common/SectionUtil';
 import { Const } from '../common/Constants';
 import { DateUtil } from '../common/DateUtil';
-import { CourseItem, ExamItem } from '../model/Models';
+import { AcademicReport, CourseItem, ExamItem } from '../model/Models';
+import { I18n, T } from '../common/I18n';
 
 const TAG: string = 'EntryFormAbility';
 const DOMAIN: number = 0xFF00;
 let viewIndex: number = 0; // 0=today, 1=tomorrow, 2=nextDay（持久化在 Form 进程内）
-
-/** 节次时间表（索引 0 占位，与 Const.SECTIONS 一致） */
-const SECTION_TIMES: string[] = [
-  '', '10:00-10:50', '11:00-11:50', '12:10-13:00', '13:10-14:00',
-  '15:30-16:20', '16:30-17:20', '17:40-18:30', '18:40-19:30', '20:30-21:15', '21:25-22:10'
-];
 
 /** 卡片绑定数据结构：全部用平面字段（string[]/number[]/number） */
 class FormData {
@@ -68,6 +64,12 @@ class FormData {
   examLocation: string;
   hasExam: boolean;
   isDemoExam: boolean;
+  // 学业成绩
+  scoreGpa: string;
+  scoreRank: string;
+  scoreCredit: string;
+  scoreTerm: string;
+  hasScore: boolean;
   // 其他
   weekLabel: string;
   dateLabel: string;
@@ -94,10 +96,15 @@ class FormData {
     this.weeklyJson = '[]';
     this.todayJson = '[]';
     this.tomorrowJson = '[]';
-    this.dayLabel = '今天';
-    this.dayLabelTomorrow = '明天';
+    this.dayLabel = T('今天');
+    this.dayLabelTomorrow = T('明天');
     this.dayLabelNextDay = '';
     this.todayLabel = '';
+    this.scoreGpa = '--';
+    this.scoreRank = '--';
+    this.scoreCredit = '--';
+    this.scoreTerm = '';
+    this.hasScore = false;
     this.examName = '';
     this.examDays = '';
     this.examTime = '';
@@ -136,13 +143,11 @@ class DayCourses {
 }
 
 /**
- * 节次时间范围：与 DateUtil.sectionRange 一致（10:00-11:40 这样的字符串）。
- * 卡片不依赖 DateUtil 是因为 Form 进程无 UI Context 直接调用复杂。
+ * 节次时间范围：走 SectionUtil 的"当前生效作息"（用户可自定义），
+ * 不再读硬编码 Const.SECTIONS —— 否则改过作息后卡片时间会错。
  */
 function sectionTime(startSection: number, endSection: number): string {
-  const s: string = SECTION_TIMES[startSection] ?? '';
-  const eEnd: string = (SECTION_TIMES[endSection] ?? '').split('-')[1] ?? '';
-  return eEnd.length > 0 ? `${s.split('-')[0] ?? ''}-${eEnd}` : s;
+  return SectionUtil.rangeTextCurrent(startSection, endSection);
 }
 
 /**
@@ -444,6 +449,23 @@ function buildFormData(view: number): FormData {
   }
 
   f.isEmpty = f.todayCount === 0 && f.tomorrowCount === 0 && f.nextDayCount === 0;
+
+  // 学业成绩卡片数据：读本地学业缓存（登录后刷新即写入），无需联网
+  try {
+    const raw: string = DataStore.loadJSON(DataStore.KEY_ACADEMIC);
+    if (raw.length > 0) {
+      const rep: AcademicReport = JSON.parse(raw) as AcademicReport;
+      if (rep.gpa > 0) {
+        f.hasScore = true;
+        f.scoreGpa = `${Math.round(rep.gpa * 100) / 100}`;
+        f.scoreRank = rep.rank > 0 && rep.classSize > 0 ? `${rep.rank}/${rep.classSize}` : '--';
+        f.scoreCredit = rep.totalEarned > 0 ? `${rep.totalEarned}` : '--';
+        f.scoreTerm = rep.totalRequired > 0 ? `已修 ${rep.totalEarned} / 计划 ${rep.totalRequired} 学分` : '';
+      }
+    }
+  } catch (e) {
+    hilog.warn(DOMAIN, TAG, 'read academic cache failed');
+  }
   return f;
 }
 
@@ -453,6 +475,8 @@ export default class EntryFormAbility extends FormExtensionAbility {
   private ensureInit(): void {
     if (!this.initDone) {
       DataStore.init(this.context);
+      // 卡片运行在独立进程：必须自己初始化一次语言，否则卡片文案永远停在默认语言
+      I18n.init();
       this.initDone = true;
     }
   }

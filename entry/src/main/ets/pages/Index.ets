@@ -13,12 +13,19 @@ import { TermInfo, UserProfile } from '../model/Models';
 import { promptAction } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { DailyWallpaper } from '../common/DailyWallpaper';
+import { NotifyLifecycle } from '../common/NotifyLifecycle';
+import { NotifyScheduler } from '../common/NotifyScheduler';
 import { AppearanceStore } from '../common/AppearanceStore';
+import { T } from '../common/I18n';
 
 @Entry
 @Component
 struct Index {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @State logged: boolean = false;
+  /** 登录兜底定时器句柄（登录成功后必须清掉，否则回调会在已进主页后继续跑） */
+  private loginTimers: number[] = [];
   @State autoRelogin: boolean = false;
   /** 前往登录页模式（不退出登录，仅跳转登录界面，可从登录页返回首页） */
   @State showLoginOnly: boolean = false;
@@ -37,6 +44,13 @@ struct Index {
   }
 
   /** 页面出现：初始化 AppStorage 兜底值并加载主界面 */
+  aboutToDisappear(): void {
+    for (const t of this.loginTimers) {
+      clearTimeout(t);
+    }
+    this.loginTimers = [];
+  }
+
   aboutToAppear(): void {
     // 每日壁纸：已保存图像地址时，每天首次启动自动下载并应用新壁纸（静默，失败不影响启动）
     try {
@@ -47,6 +61,23 @@ struct Index {
     // 首次启动隐私引导：未同意隐私协议 → 全屏覆盖引导页（隐私协议→开发者声明），
     // 同意/暂不同意后才进入下方登录/主界面逻辑（LoginView 不再自动弹隐私弹窗）。
     this.privacyGate = !DataStore.isPrivacyAgreed();
+
+    // ★ 冷启动真实模式判定（关键修复）：
+    //   USE_MOCK 是内存态、每次冷启动重置为 true，若直接用它判断「是否已登录」，
+    //   会导致 cachedProfile 恒为 null → hasCache 恒 false → 「已登录秒开主页」分支永远不进，
+    //   每次启动都被迫重新走登录流程（首页数据也因此反复从空缓存开始）。
+    //   改为按「本地是否存在任何真实登录痕迹」判定：有缓存资料 / CASTGC / 会话 Cookie / 记住的账号密码。
+    const probeProfile: UserProfile | null = DataStore.loadCachedProfile();
+    const probeHasProfile: boolean = probeProfile !== null && probeProfile.name.length > 0
+      && probeProfile.studentId !== 'demo';
+    const probeHasCredentials: boolean =
+      DataStore.get(DataStore.KEY_CAS_TGC).length > 0 ||
+        DataStore.get(DataStore.KEY_SESSION_COOKIE).length > 0 ||
+        (DataStore.get(DataStore.KEY_AUTO_ACCOUNT).length > 0 && DataStore.get(DataStore.KEY_AUTO_PWD).length > 0);
+    if (probeHasProfile || probeHasCredentials) {
+      JwApi.USE_MOCK = false;
+    }
+
     // 功能浏览模式（USE_MOCK=true）：仅启用离线模式（禁止真实网络请求，避免误访教务系统）。
     // ⚠ 周次按**真实日期**推算（用户要求：日历/课表的日期定位必须是真实周次，不能固定演示值）；
     //   口径与真实模式一致（学期外 <1 时兜底第 1 周）。
@@ -72,6 +103,10 @@ struct Index {
     // 兜底必须用"当前日期推算的学期"（如 2026-10 → 2026-2027-1），
     // 不能取列表第一个（历史学期或未来学期都会错），否则所有接口用错误 xnm 查询返回空数据。
     JwApi.setTerm(picked !== null ? picked : DateUtil.buildCurrentTerm());
+    // 学期就绪后补一次提醒排程：EntryAbility.onCreate 的 app-start 早于这里，
+    // 不补的话 1~8 月（默认学期周次越界）会把提醒排空且本轮不再恢复
+    NotifyScheduler.rescheduleAll('term-ready').catch(() => {
+    });
 
     // ── 冷启动会话恢复策略（核心：服务大厅登录态在 → 必须先"从服务大厅重新打开新教务系统"再取数据）──
     //  有 CASTGC（服务大厅登录成功且保持登录态）：教务系统会话不可持久化 →
@@ -91,6 +126,8 @@ struct Index {
       AppState.account = cachedProfile!.studentId;
       this.logged = true;
       JwApi.USE_MOCK = false;
+      // 清演示周次残留：演示周次会让首页按错误周次匹配真实课表，导致"下一节课"永远为空
+      AppState.mockCurrentWeek = 0;
       HttpClient.setOfflineMode(false);
       // 注册主页"重登"按钮回调（HomeView 在 aboutToAppear 触发）
       AppState.onForceRelogin = () => {
@@ -155,12 +192,12 @@ struct Index {
     // 无缓存资料：走账号+密码自动重登（弹登录页遮罩）或手动登录。
     if (autoAcct.length > 0 && autoPwd.length > 0 && loginMode !== 'legacy') {
       this.autoRelogin = true;
-      setTimeout(() => {
+      this.loginTimers.push(setTimeout(() => {
         if (!this.logged) {
           this.getUIContext().getPromptAction().showToast({ message: '登录失败，请稍后再试', duration: 2000 });
           this.logged = true; // 进入主页，使用本地缓存数据
         }
-      }, 10000);
+      }, 10000));
       AppState.onForceRelogin = () => {
         this.forceRelogin();
       };
@@ -187,7 +224,7 @@ struct Index {
       title: '真正重新登录',
       message: reloginMsg,
       buttons: [
-        { text: '取消', color: '#888888' },
+        { text: T('取消'), color: '#888888' },
         { text: '重新登录', color: '#FF9800' }
       ]
     }).then((r: promptAction.ShowDialogSuccessResponse) => {
@@ -201,24 +238,24 @@ struct Index {
       // 超时兜底（分两阶段，避免"服务大厅实际已登录、却提示登录失败"的状态冲突）：
       // ① 20s 未完成但登录已进入收尾阶段（会话已建立，正在校验资料）→ 延长 30s 等待；
       // ② 仍未完成 → 提示失败并回到主页用缓存。
-      setTimeout(() => {
+      this.loginTimers.push(setTimeout(() => {
         if (!this.forceReloginLoading) {
           return;
         }
         if (JwApi.stage() === 'profile') {
-          setTimeout(() => {
+          this.loginTimers.push(setTimeout(() => {
             if (this.forceReloginLoading) {
               this.forceReloginLoading = false;
               this.getUIContext().getPromptAction().showToast({ message: '登录收尾超时，请稍后再试', duration: 2000 });
               this.showLoginOnly = false;
             }
-          }, 30000);
+          }, 20000));
           return;
         }
         this.forceReloginLoading = false;
         this.getUIContext().getPromptAction().showToast({ message: '登录失败，请稍后再试', duration: 2000 });
         this.showLoginOnly = false;
-      }, 20000);
+      }, 12000));
     }).catch(() => {
       // 弹窗失败时不做任何事
     });
@@ -231,13 +268,19 @@ struct Index {
           // 前往登录页（不退出）：登录页左上角显示返回按钮，可返回首页
           LoginView({
             showBack: true,
-            autoRelogin: false,
+            // ★ 必须把 autoRelogin 真正传给 LoginView：此前硬编码 false，
+            //   导致点「立即重登」后登录页不会自动登录，只留下全屏遮罩转圈（绿屏卡死）
+            autoRelogin: this.autoRelogin,
             onBack: () => {
               this.showLoginOnly = false;
+              this.autoRelogin = false;
+              this.forceReloginLoading = false;
             },
             onSuccess: () => {
               // 在登录页完成登录后返回主页
               this.showLoginOnly = false;
+              this.autoRelogin = false;
+              this.forceReloginLoading = false;
               this.scheduleMockWatermark();
               if (!JwApi.USE_MOCK) {
                 HttpClient.setOfflineMode(false);
@@ -250,6 +293,9 @@ struct Index {
         } else {
           MainView({
             onLogout: () => {
+              // 退出登录：撤销提醒、停实况窗、删快照（防止换账号后残留旧提醒/假新增）
+              NotifyLifecycle.purge('logout').catch(() => {
+              });
               this.logged = false;
             },
             onGotoLogin: () => {
@@ -270,7 +316,19 @@ struct Index {
             if (!JwApi.USE_MOCK) {
               HttpClient.setOfflineMode(false);
               JwApi.refreshAll().then(() => {
-                // 数据已刷新
+                // 数据已刷新：若部分接口回退缓存，提示用户（获取状态提示）
+                const st = AppStorage.get<Record<string, Object>>('dataRefreshStatus');
+                if (st !== undefined && st !== null) {
+                  const allFresh: boolean = st['allFresh'] === true;
+                  const fromCacheCount: number = Number(st['fromCacheCount'] ?? 0);
+                  if (!allFresh && fromCacheCount > 0) {
+                    const totalCount: number = Number(st['totalCount'] ?? 0);
+                    this.getUIContext().getPromptAction().showToast({
+                      message: `部分数据获取失败，已展示上次获取的数据（${fromCacheCount}/${totalCount} 项）`,
+                      duration: 2500
+                    });
+                  }
+                }
               }).catch(() => {
                 // 忽略
               });
@@ -282,25 +340,36 @@ struct Index {
         })
       }
       // 功能浏览模式水印已移除（用户要求去除模拟数据预览水印）。
-      // "重登" 全局遮罩：叠加在主页之上，居中提示正在重新登录
+      // "重登" 全局遮罩：叠加在主页之上，提示正在重新登录，并允许随时取消（避免卡死无法返回）
       if (this.forceReloginLoading) {
         Column() {
           LoadingProgress()
             .width(42)
             .height(42)
-            .color($r('app.color.brand_on'))
-          Text('正在重新登录…')
+            .color('#FFFFFF')
+          Text(T('正在重新登录…'))
             .fontSize(14)
-            .fontColor($r('app.color.brand_on'))
+            .fontColor('#FFFFFF')
             .margin({ top: 14 })
+          Text(T('取消'))
+            .fontSize(13)
+            .fontColor('#FFFFFF')
+            .padding({ left: 20, right: 20, top: 8, bottom: 8 })
+            .backgroundColor('rgba(255,255,255,0.22)')
+            .borderRadius(16)
+            .margin({ top: 18 })
+            .onClick(() => {
+              // 用户主动取消：立即撤掉遮罩与登录页，回到首页继续看离线数据
+              this.forceReloginLoading = false;
+              this.autoRelogin = false;
+              this.showLoginOnly = false;
+              this.getUIContext().getPromptAction().showToast({ message: '已取消重登，当前显示离线数据', duration: 1800 });
+            })
         }
         .width('100%')
         .height('100%')
         .justifyContent(FlexAlign.Center)
-        .backgroundColor('#CC079841')
-        .onClick(() => {
-          // 拦截点击
-        })
+        .backgroundColor('rgba(0,0,0,0.55)')
       }
       // 首启隐私引导页（覆盖在最顶层；未同意时才会显示，同意后关闭）
       if (this.privacyGate) {

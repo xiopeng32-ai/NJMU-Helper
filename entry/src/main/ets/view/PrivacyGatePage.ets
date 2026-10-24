@@ -24,9 +24,12 @@ import { common } from '@kit.AbilityKit';
 import { MaterialCard } from './common/MaterialCard';
 import { MaterialButton } from './common/MaterialButton';
 import { AppearanceStore } from '../common/AppearanceStore';
+import { T } from '../common/I18n';
 
 @Component
 export struct PrivacyGatePage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
@@ -85,10 +88,10 @@ export struct PrivacyGatePage {
 
   private stepTitle(): string {
     if (this.step === 1) {
-      return '开发者声明';
+      return T('开发者声明');
     }
     if (this.step === 2) {
-      return '账号风控提醒';
+      return T('账号风控提醒');
     }
     return '隐私保护指引';
   }
@@ -132,9 +135,9 @@ export struct PrivacyGatePage {
       title: '不同意',
       message: '不同意用户协议与隐私政策将无法使用本应用。是否清除本地数据？',
       buttons: [
-        { text: '清除数据并退出', color: '#DB5252' },
-        { text: '保留数据并退出', color: '#666666' },
-        { text: '取消', color: '#666666' }
+        { text: T('清除数据并退出'), color: '#DB5252' },
+        { text: T('保留数据并退出'), color: '#666666' },
+        { text: T('取消'), color: '#666666' }
       ]
     }).then((res) => {
       if (res.index === 2) {
@@ -259,7 +262,7 @@ export struct PrivacyGatePage {
       if (this.step === 0) {
         // ── 第 1 步：隐私协议全文 ──
         Column() {
-          Text('在你使用「南医助手」前，请阅读并同意以下隐私保护指引：')
+          Text(T('在你使用「南医助手」前，请阅读并同意以下隐私保护指引：'))
             .fontSize(13)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width('100%')
@@ -276,10 +279,10 @@ export struct PrivacyGatePage {
                 .select(this.agreeTerms)
                 .selectedColor(Theme.colorOf(this.themeColor))
                 .onChange((v: boolean) => { this.agreeTerms = v; })
-              Text('我已阅读并同意')
+              Text(T('我已阅读并同意'))
                 .fontSize(12)
                 .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
-              Text('《用户协议》')
+              Text(T('《用户协议》'))
                 .fontSize(12)
                 .fontColor(Theme.colorOf(this.themeColor))
                 .onClick(() => { this.showDoc = 'terms'; })
@@ -292,10 +295,10 @@ export struct PrivacyGatePage {
                 .select(this.agreePrivacy)
                 .selectedColor(Theme.colorOf(this.themeColor))
                 .onChange((v: boolean) => { this.agreePrivacy = v; })
-              Text('我已阅读并同意')
+              Text(T('我已阅读并同意'))
                 .fontSize(12)
                 .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
-              Text('《隐私政策》')
+              Text(T('《隐私政策》'))
                 .fontSize(12)
                 .fontColor(Theme.colorOf(this.themeColor))
                 .onClick(() => { this.showDoc = 'privacy'; })
@@ -325,7 +328,7 @@ export struct PrivacyGatePage {
                     this.declineAgreement();
                   }
                 }) {
-                  Text('不同意')
+                  Text(T('不同意'))
                     .fontSize(14)
                     .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
                     .height(42)
@@ -348,7 +351,7 @@ export struct PrivacyGatePage {
                     this.onAgreePrivacy();
                   }
                 }) {
-                  Text('同意并继续')
+                  Text(T('同意并继续'))
                     .fontSize(14)
                     .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
                     // 文字色按背景亮度自动取深/浅（品牌绿上深色文字对比度更高）；
@@ -401,7 +404,7 @@ export struct PrivacyGatePage {
           .edgeEffect(EdgeEffect.Spring)
 
           Column() {
-            this.actionBar('上一步', '我已知晓',
+            this.actionBar(T('上一步'), T('我已知晓'),
               () => { this.goStep(0); }, () => { this.onKnowDeclaration(); })
           }
           .margin({ bottom: 16 + this.getUIContext().px2vp(this.bottomInsetPx) })
@@ -427,7 +430,7 @@ export struct PrivacyGatePage {
               cardShadow: GlassMaterial.cardShadowStyle()
             }) {
             Column() {
-              Text('请勿频繁登录与退出教务系统，以免导致账号风控无法使用！' +
+              Text(T('请勿频繁登录与退出教务系统，以免导致账号风控无法使用！') +
                 '建议将应用锁定在后台，以免被清除。\n\n' +
                 '若账号风控导致应用无法使用，请清除应用数据，等待24小时及以上，风控将自动解除。\n\n' +
                 '若此时应用还是无法登录，则可能是学校服务器更新，应用不一定还能登录，' +
@@ -448,7 +451,7 @@ export struct PrivacyGatePage {
           .padding({ left: 8, right: 8 })
 
           Column() {
-            this.actionBar('上一步', '我知道了',
+            this.actionBar(T('上一步'), '我知道了',
               () => { this.goStep(1); }, () => { this.onFinish(); })
           }
           .margin({ bottom: 16 + this.getUIContext().px2vp(this.bottomInsetPx) })
@@ -470,7 +473,7 @@ export struct PrivacyGatePage {
       if (this.showDoc.length > 0) {
         Column() {
           Row() {
-            Text(this.showDoc === 'terms' ? '用户协议' : '隐私政策')
+            Text(this.showDoc === 'terms' ? T('用户协议') : T('隐私政策'))
               .fontSize(16)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
               .fontColor($r('app.color.text_primary'))

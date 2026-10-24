@@ -76,6 +76,8 @@ const NO_SHADOW: ShadowOptions = { radius: 0, color: 'rgba(0,0,0,0)', offsetX: 0
  */
 @Component
 export struct MaterialCard {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   // ── 外观（本项目 GlassMaterial 体系；由调用方在构造时传入）──
   /** 卡片圆角（须与承载层圆角一致，否则出现内嵌小圆角边框） */
   @Prop cardRadius: Length = 20;
@@ -572,6 +574,8 @@ export struct MaterialCard {
  */
 @Component
 export struct MaterialSheetPanel {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 面板上方两角的圆角 */
   @Prop panelRadius: Length = 20;
   /** 内容内边距（传 0 则由内容自己控制留白） */

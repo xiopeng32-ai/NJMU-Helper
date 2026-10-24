@@ -39,9 +39,12 @@ import { sheetBlurStyle } from '../common/SystemMaterial';
 import { ImageExport, ExportResult } from '../common/ScoreImageExport';
 import { WallpaperTone } from '../common/WallpaperTone';
 import { common } from '@kit.AbilityKit';
+import { T } from '../common/I18n';
 
 @Component
 export struct ScoreView {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 二级页面模式：显示返回按钮（tab 内嵌时不显示） */
   @Prop showBack: boolean = false;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
@@ -151,11 +154,11 @@ export struct ScoreView {
   /** 打开绩点计算方法网页（教务处官网 kcjxf，在"外部链接"页面中访问） */
   private openCalcWeb(): void {
     if (JwApi.USE_MOCK && !AppState.debugNetwork) {
-      this.getUIContext().getPromptAction().showToast({ message: '当前模式禁止使用' });
+      this.getUIContext().getPromptAction().showToast({ message: T('当前模式禁止使用') });
       return;
     }
     AppState.webUrl = Const.JWC_KJXF_URL;
-    AppState.webTitle = '课程及学分 · 绩点计算方法';
+    AppState.webTitle = T('课程及学分 · 绩点计算方法');
     AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
   }
 
@@ -180,7 +183,7 @@ export struct ScoreView {
           .fontSize(28)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.brand'))
-        Text('平均分')
+        Text(T('平均分'))
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ top: 4 })
@@ -198,7 +201,7 @@ export struct ScoreView {
           .fontSize(28)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.brand'))
-        Text('平均学分绩点 GPA')
+        Text(T('平均学分绩点 GPA'))
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ top: 4 })
@@ -216,7 +219,7 @@ export struct ScoreView {
           .fontSize(28)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.accent_orange'))
-        Text('已修课程')
+        Text(T('已修课程'))
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ top: 4 })
@@ -248,11 +251,11 @@ export struct ScoreView {
       }
     }) {
     Row() {
-      Text('GPA 按学校「课程及学分」办法计算，仅供参考')
+      Text(T('GPA 按学校「课程及学分」办法计算，仅供参考'))
         .fontSize(12)
         .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .layoutWeight(1)
-      Text('查看 ›')
+      Text(T('查看 ›'))
         .fontSize(12)
         .fontColor($r('app.color.brand'))
     }
@@ -273,6 +276,16 @@ export struct ScoreView {
   }
 
   aboutToDisappear(): void {
+    // 注销 MediaQuery 监听（只置 null 不会取消注册，回调会持续持有已销毁的组件）
+    if (this.landscapeListener !== null) {
+      this.landscapeListener.off('change');
+      this.landscapeListener = null;
+    }
+    if (this.wideListener !== null) {
+      this.wideListener.off('change');
+      this.wideListener = null;
+    }
+
     this.landscapeListener = null;
     this.wideListener = null;
     this.peepMgr.stop();
@@ -445,7 +458,7 @@ export struct ScoreView {
   private openExportSheet(): void {
     const items: ScoreItem[] = this.sortedItems();
     if (items.length === 0) {
-      this.getUIContext().getPromptAction().showToast({ message: '暂无成绩数据，无法导出' });
+      this.getUIContext().getPromptAction().showToast({ message: T('暂无成绩数据，无法导出') });
       return;
     }
     // 默认全选
@@ -488,11 +501,11 @@ export struct ScoreView {
     this.showExportSheet = false;
     const items: ScoreItem[] = this.exportItems();
     if (items.length === 0) {
-      this.getUIContext().getPromptAction().showToast({ message: '请至少选择一门课程' });
+      this.getUIContext().getPromptAction().showToast({ message: T('请至少选择一门课程') });
       return;
     }
     this.exportingImage = true;
-    this.getUIContext().getPromptAction().showToast({ message: '正在生成成绩图片…' });
+    this.getUIContext().getPromptAction().showToast({ message: T('正在生成成绩图片…') });
     try {
       const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
       // 用离屏 Builder 完整渲染：课程多时卡片高度可超屏幕，组件快照会截断
@@ -567,7 +580,7 @@ export struct ScoreView {
         Column() {
           // 统一标题组件（大标题固定高 28，副标题独立行）
           BarTitle({
-            title: '成绩查询',
+            title: T('成绩查询'),
             subtitle: this.currentTermLabel(),
             showChevron: true,
             onSubtitleTap: () => { this.showTermSheet = true; }
@@ -580,7 +593,7 @@ export struct ScoreView {
 
         Blank()
         // 导出成绩图片按钮
-        Text('导出')
+        Text(T('导出'))
           .fontSize(13)
           .fontColor(this.subtitleColor.length > 0 ? this.subtitleColor : WallpaperTone.onWallpaper(this.wallpaperTone, this.isDarkMode))
           .padding({ left: 10, right: 10, top: 5, bottom: 5 })
@@ -667,7 +680,7 @@ export struct ScoreView {
     // 原内容的 20/8/24vp 内边距原样留在内层 Column 上（panelPadding: 0，间距不变）。
     // 关闭按钮由面板自绘（沉浸光感），替代系统 showClose。
     MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false,
-      panelTitle: '成绩详情', panelShowClose: true, panelOnClose: (): void => { this.showSheet = false; } }) {
+      panelTitle: T('成绩详情'), panelShowClose: true, panelOnClose: (): void => { this.showSheet = false; } }) {
     Column() {
       if (this.selectedItem !== null) {
         Row() {
@@ -684,7 +697,7 @@ export struct ScoreView {
         .width('100%')
         .margin({ bottom: 14 })
 
-        this.detailRow('课程名称', this.selectedItem.courseName, this.courseAttrColor(this.selectedItem.courseType))
+        this.detailRow(T('课程名称'), this.selectedItem.courseName, this.courseAttrColor(this.selectedItem.courseType))
         // 课程属性：显示为符号标签（必修=绿色、选修=蓝色，与成绩卡片一致）+ 学分
         Row() {
           Column()
@@ -693,7 +706,7 @@ export struct ScoreView {
             .borderRadius(3)
             .backgroundColor(this.courseAttrColor(this.selectedItem.courseType))
             .margin({ right: 10 })
-          Text('课程属性')
+          Text(T('课程属性'))
             .fontSize(13)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .width(72)
@@ -713,12 +726,12 @@ export struct ScoreView {
         .width('100%')
         .alignItems(VerticalAlign.Center)
         .padding({ top: 7, bottom: 7 })
-        this.detailRow('任课教师', this.selectedItem.teacher.length > 0 ? this.selectedItem.teacher : '暂未公布',
+        this.detailRow(T('任课教师'), this.selectedItem.teacher.length > 0 ? this.selectedItem.teacher : T('暂未公布'),
           this.courseAttrColor(this.selectedItem.courseType))
         this.detailRow('成绩', `${this.selectedItem.scoreText}（绩点 ${this.selectedItem.gradePoint.toFixed(1)}）`,
           this.courseAttrColor(this.selectedItem.courseType))
-        this.detailRow('考试性质', this.selectedItem.examType, this.courseAttrColor(this.selectedItem.courseType))
-        this.detailRow('所属学期', this.currentTermLabel(), this.courseAttrColor(this.selectedItem.courseType))
+        this.detailRow(T('考试性质'), this.selectedItem.examType, this.courseAttrColor(this.selectedItem.courseType))
+        this.detailRow(T('所属学期'), this.currentTermLabel(), this.courseAttrColor(this.selectedItem.courseType))
 
         // 关闭按钮：材质走 MaterialButton 的 Toggle 承载层（普通 Button 直接挂材质真机不渲染）；
         // 底部矩形关闭按钮改红色（与考试页底部关闭按钮同款）：
@@ -734,7 +747,7 @@ export struct ScoreView {
             this.showSheet = false;
           }
         }) {
-          Text('关闭')
+          Text(T('关闭'))
             .fontSize(15)
             // 红底上的文字黑白自适应（系统 font_primary 随深浅色切换）
             .fontColor($r('sys.color.font_primary'))
@@ -793,10 +806,10 @@ export struct ScoreView {
     // 高度随内容（FIT_CONTENT）→ panelFillHeight: false；内层 Column 的 20/8/24vp 内边距原样保留。
     // 关闭按钮由面板自绘（沉浸光感），替代系统 showClose。
     MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false,
-      panelTitle: '选择学年-学期', panelShowClose: true, panelOnClose: (): void => { this.showTermSheet = false; } }) {
+      panelTitle: T('选择学年-学期'), panelShowClose: true, panelOnClose: (): void => { this.showTermSheet = false; } }) {
     Column() {
       if (this.terms.length === 0) {
-        Text('暂无可查询的学期')
+        Text(T('暂无可查询的学期'))
           .fontSize(13)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .width('100%')
@@ -845,11 +858,11 @@ export struct ScoreView {
   @Builder
   exportSheet() {
     MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false,
-      panelTitle: '选择要导出的课程', panelShowClose: true, panelOnClose: (): void => { this.showExportSheet = false; } }) {
+      panelTitle: T('选择要导出的课程'), panelShowClose: true, panelOnClose: (): void => { this.showExportSheet = false; } }) {
     Column() {
       // 顶部：全选开关 + 已选计数
       Row() {
-        Text(this.exportSelectAll ? '全选' : '取消全选')
+        Text(this.exportSelectAll ? T('全选') : T('取消全选'))
           .fontSize(12)
           .fontColor($r('app.color.brand'))
           .padding({ left: 10, right: 10, top: 4, bottom: 4 })
@@ -922,7 +935,7 @@ export struct ScoreView {
         btnMargin: { top: 12, left: 20, right: 20, bottom: 24 },
         btnOnClick: () => { this.exportScoreImage(); }
       }) {
-        Text(this.exportingImage ? '生成中…' : '导出图片')
+        Text(this.exportingImage ? T('生成中…') : T('导出图片'))
           .fontSize(15)
           .fontColor('#FFFFFF')
           .width('100%')
@@ -1021,7 +1034,7 @@ export struct ScoreView {
                     .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
                     .fontColor($r('app.color.text_primary'))
                   Blank()
-                  Text(this.sortByScore ? '按绩点排序 ⇅' : '默认排序 ⇅')
+                  Text(this.sortByScore ? T('按绩点排序 ⇅') : T('默认排序 ⇅'))
                     .fontSize(12)
                     .fontColor($r('app.color.brand'))
                     .onClick(() => {
@@ -1198,7 +1211,7 @@ export struct ScoreView {
       .width('100%')
       .alignItems(HorizontalAlign.Start)
 
-      Text('南医助手 · 成绩单')
+      Text(T('南医助手 · 成绩单'))
         .fontSize(10)
         .fontColor('#7F9BC4')
         .margin({ top: 14 })

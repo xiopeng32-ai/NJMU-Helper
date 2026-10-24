@@ -2,6 +2,7 @@
  * 全局常量：作息时间、色板、快捷入口等
  */
 import { QuickEntry } from '../model/Models';
+import { I18n, T } from './I18n';
 
 /** 一节课的时间段 */
 export interface SectionTime {
@@ -33,15 +34,26 @@ export class Const {
     { index: 15, start: '20:40', end: '21:20' }
   ];
 
-  /** 节次所属的时段（上午 / 下午 / 晚上） */
-  static readonly SECTION_PERIODS: string[] = [
-    '上午', '上午', '上午', '上午', '上午', '上午',
-    '下午', '下午', '下午', '下午', '下午', '下午',
-    '晚上', '晚上', '晚上'
-  ];
+  /**
+   * 节次所属的时段（上午 / 下午 / 晚上）。
+   * ⚠ 必须是 getter：static readonly 在类加载时求值一次，切换语言后不会更新。
+   */
+  static get SECTION_PERIODS(): string[] {
+    const am: string = T('上午');
+    const pm: string = T('下午');
+    const ev: string = T('晚上');
+    return [am, am, am, am, am, am, pm, pm, pm, pm, pm, pm, ev, ev, ev];
+  }
 
-  static readonly WEEK_LABELS: string[] = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-  static readonly WEEK_SHORT: string[] = ['一', '二', '三', '四', '五', '六', '日'];
+  /** 周一到周日的短名（周一 / Mon）：getter，随界面语言变化 */
+  static get WEEK_LABELS(): string[] {
+    return I18n.weekShort();
+  }
+
+  /** 周次圆点单字（中文「一」，英文「Mo」，日文「月」…，由各语言地域表提供） */
+  static get WEEK_SHORT(): string[] {
+    return I18n.weekInitials();
+  }
 
   /** 课程块背景色板 */
   static readonly COURSE_BG: Resource[] = [
@@ -55,13 +67,31 @@ export class Const {
     $r('app.color.course_fg_5'), $r('app.color.course_fg_6'), $r('app.color.course_fg_7'), $r('app.color.course_fg_8')
   ];
 
-  /** 首页快捷入口（通知/校历已下放到右上角"消息"入口与日历组件） */
-  static readonly QUICK_ENTRIES: QuickEntry[] = [
-    { key: 'exam', title: '考试查询', icon: '考试查询', color: $r('app.color.accent_orange') },
-    { key: 'score', title: '成绩查询', icon: '成绩查询', color: $r('app.color.accent_purple') },
-    { key: 'room', title: '教室查询', icon: '教室查询', color: $r('app.color.accent_blue') },
-    { key: 'jw', title: '教务系统', icon: '教务系统', color: $r('app.color.brand') }
-  ];
+  /**
+   * 首页快捷入口（通知/校历已下放到右上角"消息"入口与日历组件）。
+   * title 随语言翻译；icon 是图标查找键（中文常量），**不能**翻译。
+   */
+  /** 快捷入口缓存：同一语言下复用同一份数组，避免每次 build 都新建 6 个对象 + 6 次 $r 解析 */
+  private static quickCache: QuickEntry[] = [];
+  private static quickRev: number = -1;
+
+  static get QUICK_ENTRIES(): QuickEntry[] {
+    const rev: number = I18n.revision();
+    if (Const.quickRev === rev && Const.quickCache.length > 0) {
+      return Const.quickCache;
+    }
+    Const.quickCache = [
+      // icon 是图标查找键（中文常量），**绝不能**翻译，否则英文下取不到图标
+      { key: 'today', title: T('今日课表'), icon: '今日课表', color: $r('app.color.accent_blue') },
+      { key: 'exam', title: T('考试查询'), icon: '考试查询', color: $r('app.color.accent_orange') },
+      { key: 'score', title: T('成绩查询'), icon: '成绩查询', color: $r('app.color.accent_purple') },
+      { key: 'room', title: T('教室查询'), icon: '教室查询', color: $r('app.color.accent_blue') },
+      { key: 'jw', title: T('教务系统'), icon: '教务系统', color: $r('app.color.brand') },
+      { key: 'cloud', title: T('云课堂'), icon: '云课堂', color: $r('app.color.accent_purple') }
+    ];
+    Const.quickRev = rev;
+    return Const.quickCache;
+  }
 
   /** 页面路由名 */
   static readonly ROUTE_EXAM: string = 'ExamPage';
@@ -76,6 +106,10 @@ export class Const {
   static readonly ROUTE_ABOUT: string = 'AboutPage';
   /** 更新日志（完整历史）页：关于应用页「查看全部更新日志」入口 */
   static readonly ROUTE_CHANGELOG: string = 'ChangelogPage';
+  /** 通知与提醒设置页 */
+  static readonly ROUTE_NOTIFY_SETTINGS: string = 'NotifySettingsPage';
+  /** 语言与地区（界面语言切换）页：入口在「我的」设置区 */
+  static readonly ROUTE_LANGUAGE: string = 'LanguagePage';
   /** 课表原文件（原始导入识别文件）查看页：课表页底部「课表原文件」入口 */
   static readonly ROUTE_COURSE_RAW: string = 'CourseRawPage';
   /** 快捷选课（BETA）：移植自参考项目的正方选课/抢课模块，入口在「我的」学业情况下方 */
@@ -97,6 +131,8 @@ export class Const {
   static readonly ROUTE_COLLEGE_NOTICE: string = 'CollegeNoticePage';
   /** 云课堂页（智教云：我的课程 / 课堂实录 / 通知） */
   static readonly ROUTE_CLOUD_CLASS: string = 'CloudClassPage';
+  /** 今日课表页（首页快捷入口「今日课表」直达：只展示当天课程与倒计时） */
+  static readonly ROUTE_TODAY_SCHEDULE: string = 'TodaySchedulePage';
 
   /** 教务系统网址（应用内 WebView 打开）。南医大教务系统域名 jwpt.njmu.edu.cn（2026-10 抓包实测，非旧 IP 202.195.176.76）。 */
   static readonly WEB_PORTAL_URL: string = 'https://jwpt.njmu.edu.cn/jwglxt/xtgl/index_initMenu.html';

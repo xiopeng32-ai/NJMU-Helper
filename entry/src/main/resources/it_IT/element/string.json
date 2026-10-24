@@ -1,0 +1,44 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Client dei servizi didattici NJMU"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Schermata principale di NJMU Helper"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "NJMU Helper"
+    },
+    {
+      "name": "reason_internet",
+      "value": "Serve per collegarsi al sistema didattico dell'università (orario e voti)"
+    },
+    {
+      "name": "reason_calendar",
+      "value": "Serve per aggiungere gli esami al calendario di sistema e ricevere promemoria"
+    },
+    {
+      "name": "reason_agent_reminder",
+      "value": "Invia un promemoria prima della lezione, anche ad app chiusa"
+    },
+    {
+      "name": "class_preview_card_name",
+      "value": "Prossima lezione"
+    },
+    {
+      "name": "exam_countdown_card_name",
+      "value": "Conto alla rovescia"
+    },
+    {
+      "name": "today_schedule_card_name",
+      "value": "Lezioni di oggi"
+    },
+    {
+      "name": "score_card_name",
+      "value": "Carriera"
+    }
+  ]
+}

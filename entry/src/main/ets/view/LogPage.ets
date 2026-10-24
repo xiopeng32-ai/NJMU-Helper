@@ -23,9 +23,12 @@ import { MaterialCardLayer } from './common/MaterialCarrier';
 import { DissolveBurst } from './common/DissolveBurst';
 import { isApi26OrAbove, materialActive } from '../common/SystemMaterial';
 import { AppearanceStore } from '../common/AppearanceStore';
+import { T } from '../common/I18n';
 
 @Component
 export struct LogPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 灰字广播订阅：颜色表达式需传 this.grayTick 才登记响应式依赖（否则改色不实时刷新） */
   @StorageProp('grayTick') grayTick: number = 0;
   /** 内嵌模式（登录页直接展示，不依赖 Navigation 栈）：为 true 时用普通容器包裹、返回走回调 */
@@ -75,7 +78,7 @@ export struct LogPage {
 
   /** 当前筛选的模块名 */
   private currentFilter(): string {
-    return this.moduleList()[this.filterIdx] ?? '全部';
+    return this.moduleList()[this.filterIdx] ?? T('全部');
   }
 
   /** 筛选后的可见日志（含原始 index，用于展开/勾选定位）；按时间排序（sortDesc） */
@@ -113,14 +116,14 @@ export struct LogPage {
 
   /** 模块列表（去重 + 固定顺序） */
   private moduleList(): string[] {
-    const order: string[] = ['网络', '登录', '课表', '成绩', '考试', '新闻', '学业', '日志调试'];
+    const order: string[] = [T('网络'), T('登录'), T('课表'), T('成绩'), T('考试'), '新闻', T('学业'), T('日志调试')];
     const seen: string[] = [];
     for (const log of this.logs) {
       if (seen.indexOf(log.module) < 0 && log.module.length > 0) {
         seen.push(log.module);
       }
     }
-    const out: string[] = ['全部'];
+    const out: string[] = [T('全部')];
     for (const m of order) {
       if (seen.indexOf(m) >= 0) {
         out.push(m);
@@ -153,8 +156,8 @@ export struct LogPage {
       title: '清空日志',
       message: '确定清空全部日志记录吗？',
       buttons: [
-        { text: '取消', color: '#888888' },
-        { text: '清空', color: '#DB5252', primary: true }
+        { text: T('取消'), color: '#888888' },
+        { text: T('清空'), color: '#DB5252', primary: true }
       ]
     }).then((res) => {
       if (res.index === 1) {
@@ -366,20 +369,20 @@ export struct LogPage {
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(ctx);
       docPicker.save(options).then((uris: string[]) => {
         if (uris.length === 0) {
-          this.getUIContext().getPromptAction().showToast({ message: '已取消导出' });
+          this.getUIContext().getPromptAction().showToast({ message: T('已取消导出') });
           return;
         }
         try {
           fileIo.copyFileSync(zipPath, uris[0]);
           this.getUIContext().getPromptAction().showToast({ message: '日志与附件已导出（zip）' });
         } catch (e) {
-          this.getUIContext().getPromptAction().showToast({ message: '导出失败' });
+          this.getUIContext().getPromptAction().showToast({ message: T('导出失败') });
         }
       }).catch(() => {
-        this.getUIContext().getPromptAction().showToast({ message: '导出失败' });
+        this.getUIContext().getPromptAction().showToast({ message: T('导出失败') });
       });
     } catch (e) {
-      this.getUIContext().getPromptAction().showToast({ message: '导出失败' });
+      this.getUIContext().getPromptAction().showToast({ message: T('导出失败') });
     }
   }
 
@@ -393,7 +396,7 @@ export struct LogPage {
       const docPicker: picker.DocumentViewPicker = new picker.DocumentViewPicker(ctx);
       docPicker.save(options).then((uris: string[]) => {
         if (uris.length === 0) {
-          this.getUIContext().getPromptAction().showToast({ message: '已取消导出' });
+          this.getUIContext().getPromptAction().showToast({ message: T('已取消导出') });
           return;
         }
         try {
@@ -402,13 +405,13 @@ export struct LogPage {
           fileIo.closeSync(file);
           this.getUIContext().getPromptAction().showToast({ message: '日志已导出' });
         } catch (e) {
-          this.getUIContext().getPromptAction().showToast({ message: '导出失败' });
+          this.getUIContext().getPromptAction().showToast({ message: T('导出失败') });
         }
       }).catch(() => {
-        this.getUIContext().getPromptAction().showToast({ message: '导出失败' });
+        this.getUIContext().getPromptAction().showToast({ message: T('导出失败') });
       });
     } catch (e) {
-      this.getUIContext().getPromptAction().showToast({ message: '导出失败' });
+      this.getUIContext().getPromptAction().showToast({ message: T('导出失败') });
     }
   }
 
@@ -438,11 +441,11 @@ export struct LogPage {
     Column() {
       if (this.logs.length === 0) {
         Column() {
-          Text('暂无日志')
+          Text(T('暂无日志'))
             .fontSize(15)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.text_primary'))
-          Text('开启日志调试后，这里会展示各功能模块的使用日志与联网反馈')
+          Text(T('开启日志调试后，这里会展示各功能模块的使用日志与联网反馈'))
             .fontSize(12)
             .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .margin({ top: 8 })
@@ -613,7 +616,7 @@ export struct LogPage {
         this.row('参数', log.params)
       }
       if (log.error.length > 0) {
-        this.row('异常', log.error)
+        this.row(T('异常'), log.error)
       }
       if (log.reqHeaders.length > 0) {
         this.row('请求头', log.reqHeaders)
@@ -622,7 +625,7 @@ export struct LogPage {
         this.row('响应头', log.respHeaders)
       }
       if (log.detail.length > 0) {
-        this.row('详情', log.detail)
+        this.row(T('详情'), log.detail)
       }
       if (log.bodyPreview.length > 0 || log.fullBody.length > 0) {
         this.row('响应体', log.fullBody.length > 0 ? log.fullBody : log.bodyPreview)
@@ -700,7 +703,7 @@ export struct LogPage {
             this.exitSelect();
           }
         }) {
-          Text('取消')
+          Text(T('取消'))
             .fontSize(13)
             .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
             .padding({ left: 14, right: 14, top: 6, bottom: 6 })
@@ -720,7 +723,7 @@ export struct LogPage {
             this.exportSelected();
           }
         }) {
-          Text('导出选中')
+          Text(T('导出选中'))
             .fontSize(13)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.brand_on'))
@@ -740,7 +743,7 @@ export struct LogPage {
             this.exportAll();
           }
         }) {
-          Text('全部导出')
+          Text(T('全部导出'))
             .fontSize(13)
             .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
             .fontColor($r('app.color.brand_on'))
@@ -776,9 +779,9 @@ export struct LogPage {
     Stack() {
       Column() {
       PageHeader({
-        title: '日志详情',
-        subtitle: LogStore.enabled() ? (this.collecting ? '正在收集' : '已暂停') : '日志调试未开启',
-        actionText: '清空',
+        title: T('日志详情'),
+        subtitle: LogStore.enabled() ? (this.collecting ? '正在收集' : T('已暂停')) : '日志调试未开启',
+        actionText: T('清空'),
         showActionToggle: true,
         actionToggleOn: this.collecting,
         onBack: onBack,

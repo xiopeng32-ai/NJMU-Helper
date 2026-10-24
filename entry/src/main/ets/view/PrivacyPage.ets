@@ -6,9 +6,12 @@ import { webview } from '@kit.ArkWeb';
 import { AppState } from '../common/AppState';
 import { Const } from '../common/Constants';
 import { PageHeader } from './common/UiKit';
+import { T } from '../common/I18n';
 
 @Component
 export struct PrivacyPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   @StorageProp('topInsetPx') topInsetPx: number = 0;
   @StorageProp('bottomInsetPx') bottomInsetPx: number = 0;
   private controller: webview.WebviewController = new webview.WebviewController();
@@ -38,7 +41,7 @@ export struct PrivacyPage {
               const url: string = event.data.getRequestUrl();
               if (url.startsWith('http://') || url.startsWith('https://')) {
                 AppState.webUrl = url;
-                AppState.webTitle = 'GitHub 开源仓库';
+                AppState.webTitle = T('GitHub 开源仓库');
                 AppState.stack.pushPath({ name: Const.ROUTE_WEB_PAGE });
                 return true;
               }
@@ -48,7 +51,7 @@ export struct PrivacyPage {
 
         // 统一头部（悬浮层）
         PageHeader({
-          title: '隐私政策',
+          title: T('隐私政策'),
           onBack: () => {
             AppState.stack.pop();
           }

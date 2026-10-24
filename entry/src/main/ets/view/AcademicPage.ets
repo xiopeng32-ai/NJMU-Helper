@@ -44,6 +44,7 @@ import { SheetUtil } from '../common/SheetUtil';
 import { sheetBlurStyle } from '../common/SystemMaterial';
 import { ImageExport, ExportResult } from '../common/ScoreImageExport';
 import { common } from '@kit.AbilityKit';
+import { T } from '../common/I18n';
 
 /** 成绩明细统计结果（基于成绩接口，非未开放的学业情况页） */
 interface GradeStats {
@@ -55,16 +56,16 @@ interface GradeStats {
 /** 课程明细示例数据：教务未开放「课程修读」数据时（overallCourses 为空）填充展示，
  *  全部为中性假数据（示例教师/通用课程名），不含任何真实个人信息 */
 const MOCK_DETAIL_COURSES: ScoreItem[] = [
-  { id: 'mock01', courseName: '高等数学（上）', credit: 4, score: 91, scoreText: '91', gradePoint: 4.0, courseType: '必修', examType: '正常考试', teacher: '示例教师A', termId: '2023-2024-1', kclbmc: '必修课', isCore: false },
-  { id: 'mock02', courseName: '大学外语（一）', credit: 3, score: 86, scoreText: '86', gradePoint: 3.7, courseType: '必修', examType: '正常考试', teacher: '示例教师B', termId: '2023-2024-1', kclbmc: '必修课', isCore: false },
-  { id: 'mock03', courseName: '思想道德与法治', credit: 3, score: -1, scoreText: '良好', gradePoint: 3.3, courseType: '必修', examType: '正常考试', teacher: '示例教师C', termId: '2023-2024-1', kclbmc: '必修课', isCore: false },
-  { id: 'mock04', courseName: '大学计算机基础', credit: 2, score: 94, scoreText: '94', gradePoint: 4.0, courseType: '必修', examType: '正常考试', teacher: '示例教师D', termId: '2023-2024-2', kclbmc: '必修课', isCore: false },
-  { id: 'mock05', courseName: '高等数学（下）', credit: 4, score: 88, scoreText: '88', gradePoint: 3.8, courseType: '必修', examType: '正常考试', teacher: '示例教师A', termId: '2023-2024-2', kclbmc: '必修课', isCore: false },
-  { id: 'mock06', courseName: '大学体育（二）', credit: 1, score: -1, scoreText: '优秀', gradePoint: 4.0, courseType: '必修', examType: '正常考试', teacher: '示例教师E', termId: '2023-2024-2', kclbmc: '必修课', isCore: false },
-  { id: 'mock07', courseName: '有机化学', credit: 4, score: 82, scoreText: '82', gradePoint: 3.2, courseType: '必修', examType: '正常考试', teacher: '示例教师F', termId: '2024-2025-1', kclbmc: '必修课', isCore: false },
-  { id: 'mock08', courseName: '中华优秀传统文化', credit: 2, score: -1, scoreText: '良好', gradePoint: 3.3, courseType: '选修', examType: '正常考试', teacher: '示例教师G', termId: '2024-2025-1', kclbmc: '选修课', isCore: false },
-  { id: 'mock09', courseName: '概率论与数理统计', credit: 3, score: 90, scoreText: '90', gradePoint: 3.9, courseType: '必修', examType: '正常考试', teacher: '示例教师H', termId: '2024-2025-2', kclbmc: '必修课', isCore: false },
-  { id: 'mock10', courseName: '大学生创新创业基础', credit: 2, score: -1, scoreText: '中等', gradePoint: 2.7, courseType: '选修', examType: '正常考试', teacher: '示例教师I', termId: '2024-2025-2', kclbmc: '选修课', isCore: false }
+  { id: 'mock01', courseName: '高等数学（上）', credit: 4, score: 91, scoreText: '91', gradePoint: 4.0, courseType: T('必修'), examType: T('正常考试'), teacher: '示例教师A', termId: '2023-2024-1', kclbmc: T('必修课'), isCore: false },
+  { id: 'mock02', courseName: '大学外语（一）', credit: 3, score: 86, scoreText: '86', gradePoint: 3.7, courseType: T('必修'), examType: T('正常考试'), teacher: '示例教师B', termId: '2023-2024-1', kclbmc: T('必修课'), isCore: false },
+  { id: 'mock03', courseName: '思想道德与法治', credit: 3, score: -1, scoreText: T('良好'), gradePoint: 3.3, courseType: T('必修'), examType: T('正常考试'), teacher: '示例教师C', termId: '2023-2024-1', kclbmc: T('必修课'), isCore: false },
+  { id: 'mock04', courseName: '大学计算机基础', credit: 2, score: 94, scoreText: '94', gradePoint: 4.0, courseType: T('必修'), examType: T('正常考试'), teacher: '示例教师D', termId: '2023-2024-2', kclbmc: T('必修课'), isCore: false },
+  { id: 'mock05', courseName: '高等数学（下）', credit: 4, score: 88, scoreText: '88', gradePoint: 3.8, courseType: T('必修'), examType: T('正常考试'), teacher: '示例教师A', termId: '2023-2024-2', kclbmc: T('必修课'), isCore: false },
+  { id: 'mock06', courseName: '大学体育（二）', credit: 1, score: -1, scoreText: T('优秀'), gradePoint: 4.0, courseType: T('必修'), examType: T('正常考试'), teacher: '示例教师E', termId: '2023-2024-2', kclbmc: T('必修课'), isCore: false },
+  { id: 'mock07', courseName: '有机化学', credit: 4, score: 82, scoreText: '82', gradePoint: 3.2, courseType: T('必修'), examType: T('正常考试'), teacher: '示例教师F', termId: '2024-2025-1', kclbmc: T('必修课'), isCore: false },
+  { id: 'mock08', courseName: '中华优秀传统文化', credit: 2, score: -1, scoreText: T('良好'), gradePoint: 3.3, courseType: T('选修'), examType: T('正常考试'), teacher: '示例教师G', termId: '2024-2025-1', kclbmc: T('选修课'), isCore: false },
+  { id: 'mock09', courseName: '概率论与数理统计', credit: 3, score: 90, scoreText: '90', gradePoint: 3.9, courseType: T('必修'), examType: T('正常考试'), teacher: '示例教师H', termId: '2024-2025-2', kclbmc: T('必修课'), isCore: false },
+  { id: 'mock10', courseName: '大学生创新创业基础', credit: 2, score: -1, scoreText: T('中等'), gradePoint: 2.7, courseType: T('选修'), examType: T('正常考试'), teacher: '示例教师I', termId: '2024-2025-2', kclbmc: T('选修课'), isCore: false }
 ];
 
 /** 总体成绩示例统计：教务未开放「学业情况-总体」时（overallStats 为空）填充展示，
@@ -90,6 +91,8 @@ const MOCK_STATS: OverallGradeStats = {
 
 @Component
 export struct AcademicPage {
+  /** 界面语言版本号：切换语言后自增，订阅它即可重建本组件 */
+  @StorageProp('langRev') langRev: number = 0;
   /** 会话级拉取节流：5 分钟内重复进入不再全量拉取（缓存照常展示，下拉刷新强制拉取） */
   private static lastFetchMs: number = 0;
   private static readonly FETCH_TTL_MS: number = 5 * 60 * 1000;
@@ -301,11 +304,11 @@ export struct AcademicPage {
     }
     this.showExportSheet = false;
     if (this.exportModules.length === 0) {
-      this.getUIContext().getPromptAction().showToast({ message: '请至少选择一个导出模块' });
+      this.getUIContext().getPromptAction().showToast({ message: T('请至少选择一个导出模块') });
       return;
     }
     this.exportingImage = true;
-    this.getUIContext().getPromptAction().showToast({ message: '正在生成学业情况图片…' });
+    this.getUIContext().getPromptAction().showToast({ message: T('正在生成学业情况图片…') });
     try {
       const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
       // 文件名不能含 / 等特殊字符，日期用紧凑格式（如 20261018）
@@ -631,7 +634,7 @@ export struct AcademicPage {
 
     // 无任何风险时给正向提示（此时仅可能剩正向的 CET4/计算机提示）
     if (out.length === 0) {
-      out.push('当前学业状态良好，必修课程与平均学分绩点均达标，请继续保持。');
+      out.push(T('当前学业状态良好，必修课程与平均学分绩点均达标，请继续保持。'));
     }
     return out;
   }
@@ -776,12 +779,12 @@ export struct AcademicPage {
     }) {
     Column() {
       Row() {
-        Text(this.gpaCardMode === 'overall' ? '学业总评成绩' : '平均学分绩点（GPA）')
+        Text(this.gpaCardMode === 'overall' ? T('学业总评成绩') : '平均学分绩点（GPA）')
           .fontSize(13)
           .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         Blank()
         // 导出学业情况图片（选择模块）
-        Text('导出')
+        Text(T('导出'))
           .fontSize(11)
           .fontColor($r('app.color.brand'))
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
@@ -792,7 +795,7 @@ export struct AcademicPage {
             this.openExportSheet();
           })
         // 显示内容切换：绩点 ⇄ 总评（持久化，下次进入保持所选）
-        Text(this.gpaCardMode === 'overall' ? '切换为绩点' : '切换为总评')
+        Text(this.gpaCardMode === 'overall' ? T('切换为绩点') : T('切换为总评'))
           .fontSize(11)
           .fontColor($r('app.color.brand'))
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
@@ -864,11 +867,11 @@ export struct AcademicPage {
     }) {
     Row() {
       Column() {
-        Text('成绩查询')
+        Text(T('成绩查询'))
           .fontSize(15)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
-        Text('各学期成绩明细 · 绩点 · 排序与统计')
+        Text(T('各学期成绩明细 · 绩点 · 排序与统计'))
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .margin({ top: 2 })
@@ -899,9 +902,9 @@ export struct AcademicPage {
     Row() {
       StatCell({
         value: `${this.passedCountOf()}`,
-        label: '已修',
+        label: T('已修'),
         color: $r('app.color.brand'),
-        onTap: (): void => { this.openStatSheet('passed', '已修课程（通过）'); }
+        onTap: (): void => { this.openStatSheet('passed', T('已修课程（通过）')); }
       })
       Divider()
         .vertical(true)
@@ -909,9 +912,9 @@ export struct AcademicPage {
         .color($r('app.color.divider'))
       StatCell({
         value: `${this.studyingCountOf()}`,
-        label: '在读',
+        label: T('在读'),
         color: $r('app.color.accent_blue'),
-        onTap: (): void => { this.openStatSheet('studying', '在读课程'); }
+        onTap: (): void => { this.openStatSheet('studying', T('在读课程')); }
       })
       Divider()
         .vertical(true)
@@ -919,9 +922,9 @@ export struct AcademicPage {
         .color($r('app.color.divider'))
       StatCell({
         value: `${this.unearnedCountOf()}`,
-        label: '未修',
+        label: T('未修'),
         color: $r('app.color.accent_orange'),
-        onTap: (): void => { this.openStatSheet('unearned', '未修课程'); }
+        onTap: (): void => { this.openStatSheet('unearned', T('未修课程')); }
       })
       Divider()
         .vertical(true)
@@ -929,9 +932,9 @@ export struct AcademicPage {
         .color($r('app.color.divider'))
       StatCell({
         value: `${this.failedCountOf()}`,
-        label: '未通过',
+        label: T('未通过'),
         color: this.failedCountOf() > 0 ? $r('app.color.state_danger') : $r('app.color.text_primary'),
-        onTap: (): void => { this.openStatSheet('failed', '未通过课程'); }
+        onTap: (): void => { this.openStatSheet('failed', T('未通过课程')); }
       })
     }
     .width('100%')
@@ -1042,7 +1045,7 @@ export struct AcademicPage {
                     .margin({ left: 12 })
                     .layoutWeight(1)
                   // 「标记已修 / 取消」：用户自定义课程为已修（写入本地白名单，持久化）
-                  Text(this.isWhitelisted(nm) ? '已标记' : '标记已修')
+                  Text(this.isWhitelisted(nm) ? T('已标记') : T('标记已修'))
                     .fontSize(12)
                     .fontColor(this.isWhitelisted(nm) ? $r('app.color.brand') : $r('app.color.text_secondary'))
                     .padding({ left: 10, right: 10, top: 4, bottom: 4 })
@@ -1080,7 +1083,7 @@ export struct AcademicPage {
             .padding({ left: 20, right: 20, top: 4, bottom: 20 })
         }
       } else if (this.statSheetList.length === 0) {
-        Text(this.statSheetHint.length > 0 ? this.statSheetHint : '暂无相关课程记录')
+        Text(this.statSheetHint.length > 0 ? this.statSheetHint : T('暂无相关课程记录'))
           .fontSize(13)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .width('100%')
@@ -1152,7 +1155,7 @@ export struct AcademicPage {
     }) {
     Column() {
       Row() {
-        Text('课程分类与修读情况')
+        Text(T('课程分类与修读情况'))
           .fontSize(16)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
@@ -1228,7 +1231,7 @@ export struct AcademicPage {
     }) {
     Column() {
       Row() {
-        Text('学业提醒')
+        Text(T('学业提醒'))
           .fontSize(16)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
@@ -1274,18 +1277,18 @@ export struct AcademicPage {
   @Builder
   exportSheet() {
     MaterialSheetPanel({ panelRadius: 20, panelPadding: 0, panelFillHeight: false,
-      panelTitle: '选择要导出的内容', panelShowClose: true, panelOnClose: (): void => { this.showExportSheet = false; } }) {
+      panelTitle: T('选择要导出的内容'), panelShowClose: true, panelOnClose: (): void => { this.showExportSheet = false; } }) {
     Column() {
-      Text('勾选要导出到图片中的模块（可多选）')
+      Text(T('勾选要导出到图片中的模块（可多选）'))
         .fontSize(12)
         .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
         .width('100%')
         .padding({ left: 20, right: 20, top: 4, bottom: 8 })
 
       Column() {
-        this.exportModuleRow('overview', '学业概览', 'GPA · 学业总评 · 已修/在读/未修/未通过 · 成绩分布')
-        this.exportModuleRow('detail', '课程明细', '各学期课程成绩 · 学分 · 绩点')
-        this.exportModuleRow('warning', '学业提醒', '留降级/学位/CET 等预警提示')
+        this.exportModuleRow('overview', T('学业概览'), T('GPA · 学业总评 · 已修/在读/未修/未通过 · 成绩分布'))
+        this.exportModuleRow('detail', T('课程明细'), T('各学期课程成绩 · 学分 · 绩点'))
+        this.exportModuleRow('warning', T('学业提醒'), '留降级/学位/CET 等预警提示')
       }
       .width('100%')
       .padding({ left: 20, right: 20 })
@@ -1299,7 +1302,7 @@ export struct AcademicPage {
         btnMargin: { top: 16, left: 20, right: 20, bottom: 24 },
         btnOnClick: () => { this.exportAcademicImage(); }
       }) {
-        Text(this.exportingImage ? '生成中…' : '导出图片')
+        Text(this.exportingImage ? T('生成中…') : T('导出图片'))
           .fontSize(15)
           .fontColor('#FFFFFF')
           .width('100%')
@@ -1361,14 +1364,14 @@ export struct AcademicPage {
     }) {
     Column() {
       Row() {
-        Text('总体成绩')
+        Text(T('总体成绩'))
           .fontSize(16)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
         Blank()
         // 学业总评成绩被隐藏时的常驻恢复入口（卡片隐藏后唯一的找回途径）
         if (!this.showOverallScore) {
-          Text('其他成绩已隐藏 · 恢复')
+          Text(T('其他成绩已隐藏 · 恢复'))
             .fontSize(11)
             .fontColor($r('app.color.brand'))
             .padding({ left: 8, right: 8, top: 4, bottom: 4 })
@@ -1382,7 +1385,7 @@ export struct AcademicPage {
         }
         // 教务未开放总体统计时回落示例数据，加角标防误解
         if (this.overallStats === null) {
-          Text('示例数据')
+          Text(T('示例数据'))
             .fontSize(10)
             .fontColor(Theme.colorOf(this.themeColor))
             .border({ width: 1, color: Theme.colorOf(this.themeColor) })
@@ -1400,15 +1403,15 @@ export struct AcademicPage {
       Row() {
         StatCell({
           value: this.displayStats().gpa,
-          label: '累计绩点'
+          label: T('累计绩点')
         })
         StatCell({
           value: this.displayStats().credits,
-          label: '已修学分'
+          label: T('已修学分')
         })
         StatCell({
           value: `${this.displayStats().courseCount}`,
-          label: '总课程'
+          label: T('总课程')
         })
       }
       .width('100%')
@@ -1435,13 +1438,13 @@ export struct AcademicPage {
     }) {
     Column() {
       Row() {
-        Text('其他成绩')
+        Text(T('其他成绩'))
           .fontSize(16)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
         Blank()
         // 隐藏按钮：点击后卡片整体隐藏，改由上方「总体成绩」卡内的常驻恢复入口重新显示
-        Text('隐藏')
+        Text(T('隐藏'))
           .fontSize(12)
           .fontColor($r('app.color.brand'))
           .onClick(() => {
@@ -1454,7 +1457,7 @@ export struct AcademicPage {
 
       if (this.otherExamItems().length > 0) {
           Row() {
-            Text('等级考试')
+            Text(T('等级考试'))
               .fontSize(11)
               .fontWeight(this.fwMode === 'follow' ? FontWeight.Medium : AppearanceStore.fontWeight(FontWeight.Medium))
               .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
@@ -1465,7 +1468,7 @@ export struct AcademicPage {
           ForEach(this.otherExamItems(), (it: LevelExamItem) => {
             Row() {
               Column() {
-                Text(it.name.length > 0 ? it.name : '等级考试')
+                Text(it.name.length > 0 ? it.name : T('等级考试'))
                   .fontSize(13)
                   .fontColor($r('app.color.text_primary'))
                 if (it.examTime.length > 0) {
@@ -1488,14 +1491,14 @@ export struct AcademicPage {
             .padding({ top: 6, bottom: 6 })
           }, (it: LevelExamItem) => it.id.length > 0 ? it.id : `${it.name}-${it.examTime}`)
 
-        Text('数据来源：教务系统「等级考试」报名成绩（四六级 / 计算机等级 / 普通话水平测试）')
+        Text(T('数据来源：教务系统「等级考试」报名成绩（四六级 / 计算机等级 / 普通话水平测试）'))
           .fontSize(10)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
           .width('100%')
           .margin({ top: 12 })
       } else {
         // 无数据：提示
-        Text('暂无四六级 / 计算机等级 / 普通话水平测试成绩记录')
+        Text(T('暂无四六级 / 计算机等级 / 普通话水平测试成绩记录'))
           .fontSize(12)
           .lineHeight(20)
           .fontColor(GlassMaterial.graySecondary(this.grayTick, $r('app.color.text_secondary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
@@ -1522,14 +1525,14 @@ export struct AcademicPage {
     }) {
     Column() {
       Row() {
-        Text('成绩分布')
+        Text(T('成绩分布'))
           .fontSize(16)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
         Blank()
         // 教务未开放总体统计时回落示例数据，加角标防误解
         if (this.overallStats === null) {
-          Text('示例数据')
+          Text(T('示例数据'))
             .fontSize(10)
             .fontColor(Theme.colorOf(this.themeColor))
             .border({ width: 1, color: Theme.colorOf(this.themeColor) })
@@ -1537,7 +1540,7 @@ export struct AcademicPage {
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
             .margin({ right: 6 })
         }
-        Text('按已统计课程划分')
+        Text(T('按已统计课程划分'))
           .fontSize(11)
           .fontColor(GlassMaterial.grayTertiary(this.grayTick, $r('app.color.text_tertiary'))).fontStyle(GlassMaterial.styleItalic(this.grayTick)).fontWeight(GlassMaterial.styleWeight(this.grayTick)).linearGradient({ angle: 90, colors: GlassMaterial.styleGlowColors(this.grayTick) })
       }
@@ -1576,9 +1579,9 @@ export struct AcademicPage {
       .margin({ bottom: 12 })
 
       Row() {
-        this.distItem('优', this.distCount(0), $r('app.color.brand'), 0)
-        this.distItem('良', this.distCount(1), $r('app.color.accent_blue'), 1)
-        this.distItem('中', this.distCount(2), $r('app.color.accent_orange'), 2)
+        this.distItem(T('优'), this.distCount(0), $r('app.color.brand'), 0)
+        this.distItem(T('良'), this.distCount(1), $r('app.color.accent_blue'), 1)
+        this.distItem(T('中'), this.distCount(2), $r('app.color.accent_orange'), 2)
         this.distItem('及', this.distCount(3), $r('app.color.accent_purple'), 3)
       }
       .width('100%')
@@ -1633,14 +1636,14 @@ export struct AcademicPage {
     }) {
     Column() {
       Row() {
-        Text('课程明细')
+        Text(T('课程明细'))
           .fontSize(16)
           .fontWeight(this.fwMode === 'follow' ? FontWeight.Bold : AppearanceStore.fontWeight(FontWeight.Bold))
           .fontColor($r('app.color.text_primary'))
         Blank()
         // 教务未开放课程修读数据时回落示例数据，加角标防误解
         if (this.overallCourses.length === 0) {
-          Text('示例数据')
+          Text(T('示例数据'))
             .fontSize(10)
             .fontColor(Theme.colorOf(this.themeColor))
             .border({ width: 1, color: Theme.colorOf(this.themeColor) })
@@ -1745,7 +1748,7 @@ export struct AcademicPage {
   /** 学期 id → 学期名称（如 2024-2025-1 → 2024-2025学年 第一学期） */
   private termLabelOf(termId: string): string {
     if (termId.length === 0) {
-      return '学期未知';
+      return T('学期未知');
     }
     if (this.termLabels.length === 0) {
       const terms: TermInfo[] = JwApi.buildLocalTerms();
@@ -1830,129 +1833,174 @@ export struct AcademicPage {
 
   /** 学业情况导出卡片（挂载但离屏，供 getComponentSnapshot 快照生成图片）
    *  按导出面板勾选的模块渲染。 */
+  /** 离屏导出卡：深蓝渐变头 + 白色主体（与考试导出卡同一视觉体系） */
   @Builder
   academicExportCard() {
     Column() {
-      // 标题
-      Row() {
-        Text('学业情况')
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
-        Blank()
-        Text(new Date().toLocaleDateString('zh-CN'))
-          .fontSize(11)
-          .fontColor('#AFC6E4')
+      // 头部
+      Column() {
+        Row() {
+          Column() {
+            Text(T('学业情况'))
+              .fontSize(21)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#FFFFFF')
+            Text(T('GPA · 学分 · 课程明细'))
+              .fontSize(10)
+              .fontColor('#A9C4E4')
+              .margin({ top: 3 })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+
+          Text(this.exportDate())
+            .fontSize(10)
+            .fontColor('#D6E6F8')
+            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+            .backgroundColor('rgba(255,255,255,0.16)')
+            .borderRadius(9)
+        }
+        .width('100%')
+        .alignItems(VerticalAlign.Top)
+
+        if (AppState.profile !== null) {
+          Text(`${AppState.profile.name} · ${AppState.profile.studentId} · ${AppState.profile.major}`)
+            .fontSize(11)
+            .fontColor('#C7DBF1')
+            .margin({ top: 8 })
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+
+        if (this.isExportModule('overview')) {
+          Row() {
+            this.exportStatCell(this.currentGpa().toFixed(2), T('平均绩点'))
+            Column().width(1).height(22).backgroundColor('rgba(255,255,255,0.18)')
+            this.exportStatCell(this.currentOverallScore() >= 0 ? this.currentOverallScore().toFixed(2) : '--', T('学业总评'))
+            Column().width(1).height(22).backgroundColor('rgba(255,255,255,0.18)')
+            this.exportStatCell(`${this.passedCountOf()}`, '已修')
+            Column().width(1).height(22).backgroundColor('rgba(255,255,255,0.18)')
+            this.exportStatCell(`${this.failedCountOf()}`, '未通过')
+          }
+          .width('100%')
+          .margin({ top: 14 })
+        }
       }
       .width('100%')
-      .alignItems(VerticalAlign.Center)
+      .padding({ left: 20, right: 20, top: 20, bottom: 18 })
+      .linearGradient({ angle: 135, colors: [['#12304F', 0.0], ['#1B3A63', 0.55], ['#2A5580', 1.0]] })
 
-      if (AppState.profile !== null) {
-        Text(`${AppState.profile.name} · ${AppState.profile.studentId} · ${AppState.profile.major}`)
-          .fontSize(12)
-          .fontColor('#E8F0F8')
-          .margin({ top: 4 })
-      }
+      // 主体
+      Column() {
+        if (this.isExportModule('detail')) {
+          Text(T('课程明细'))
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#2F6FDE')
+            .width('100%')
+            .margin({ bottom: 6 })
+          Column() {
+            ForEach(this.displayCourses().slice(0, 30), (it: ScoreItem, idx: number) => {
+              Row() {
+                Text(it.courseName)
+                  .fontSize(11)
+                  .fontColor('#1A1D1C')
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .layoutWeight(1)
+                Text(`${it.credit.toFixed(1)} 学分`)
+                  .fontSize(9)
+                  .fontColor('#8A939E')
+                  .margin({ left: 8, right: 8 })
+                Text(it.scoreText)
+                  .fontSize(11)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor('#1E9E5A')
+              }
+              .width('100%')
+              .padding({ top: 5, bottom: 5 })
+              .border({ width: { bottom: 1 }, color: '#F2F4F7' })
+            }, (it: ScoreItem, idx: number) => `ae${idx}_${it.id}`)
+          }
+          .width('100%')
+        }
 
-      Divider()
-        .color('#3A5B8C')
-        .margin({ top: 12, bottom: 10 })
+        if (this.isExportModule('warning')) {
+          Text(T('学业提醒'))
+            .fontSize(12)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#2F6FDE')
+            .width('100%')
+            .margin({ top: this.isExportModule('detail') ? 14 : 0, bottom: 6 })
+          Column() {
+            ForEach(this.buildWarnings(), (w: string, idx: number) => {
+              Row() {
+                Text(`${idx + 1}`)
+                  .fontSize(9)
+                  .fontColor('#FFFFFF')
+                  .width(14)
+                  .height(14)
+                  .lineHeight(14)
+                  .textAlign(TextAlign.Center)
+                  .backgroundColor('#2F6FDE')
+                  .borderRadius(7)
+                Text(w)
+                  .fontSize(10)
+                  .lineHeight(16)
+                  .fontColor('#3F4A57')
+                  .margin({ left: 7 })
+                  .layoutWeight(1)
+              }
+              .width('100%')
+              .alignItems(VerticalAlign.Top)
+              .padding({ top: 4, bottom: 4 })
+            }, (w: string, idx: number) => `aw${idx}`)
+          }
+          .width('100%')
+        }
 
-      // 学业概览模块
-      if (this.isExportModule('overview')) {
-        Text('学业概览')
-          .fontSize(13)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#BBD8FF')
-          .margin({ bottom: 8 })
         Row() {
-          this.academicExportMetric('平均绩点', this.currentGpa().toFixed(2))
-          this.academicExportMetric('学业总评', this.currentOverallScore() >= 0 ? this.currentOverallScore().toFixed(2) : '--')
-          this.academicExportMetric('已修', `${this.passedCountOf()}`)
-          this.academicExportMetric('未通过', `${this.failedCountOf()}`)
+          Text(T('南医助手 · 学业情况'))
+            .fontSize(9)
+            .fontColor('#9AA6B4')
+          Blank()
+          Text(this.exportDate())
+            .fontSize(9)
+            .fontColor('#9AA6B4')
         }
         .width('100%')
-        Divider().color('#3A5B8C').margin({ top: 12, bottom: 12 })
+        .margin({ top: 14, bottom: 2 })
       }
-
-      // 课程明细模块
-      if (this.isExportModule('detail')) {
-        Text('课程明细')
-          .fontSize(13)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#BBD8FF')
-          .margin({ bottom: 8 })
-        Column() {
-          ForEach(this.displayCourses().slice(0, 30), (it: ScoreItem, idx: number) => {
-            Row() {
-              Text(it.courseName)
-                .fontSize(12)
-                .fontColor('#FFFFFF')
-                .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
-                .layoutWeight(1)
-              Text(`${it.credit.toFixed(1)}学分`)
-                .fontSize(10)
-                .fontColor('#AFC6E4')
-                .margin({ left: 8, right: 8 })
-              Text(it.scoreText)
-                .fontSize(12)
-                .fontWeight(FontWeight.Medium)
-                .fontColor('#8FF0C0')
-            }
-            .width('100%')
-            .padding({ top: 4, bottom: 4 })
-          }, (it: ScoreItem, idx: number) => `ae${idx}_${it.id}`)
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
-        Divider().color('#3A5B8C').margin({ top: 12, bottom: 12 })
-      }
-
-      // 学业提醒模块
-      if (this.isExportModule('warning')) {
-        Text('学业提醒')
-          .fontSize(13)
-          .fontWeight(FontWeight.Medium)
-          .fontColor('#BBD8FF')
-          .margin({ bottom: 8 })
-        Column() {
-          ForEach(this.buildWarnings(), (w: string, idx: number) => {
-            Row() {
-              Text(`${idx + 1}`)
-                .fontSize(10)
-                .fontColor('#1B3A63')
-                .width(16)
-                .height(16)
-                .lineHeight(16)
-                .textAlign(TextAlign.Center)
-                .backgroundColor('#BBD8FF')
-                .borderRadius(8)
-              Text(w)
-                .fontSize(11)
-                .lineHeight(17)
-                .fontColor('#E8F0F8')
-                .margin({ left: 8 })
-                .layoutWeight(1)
-            }
-            .width('100%')
-            .alignItems(VerticalAlign.Top)
-            .padding({ top: 4, bottom: 4 })
-          }, (w: string, idx: number) => `aw${idx}`)
-        }
-        .width('100%')
-        .alignItems(HorizontalAlign.Start)
-      }
-
-      Text('南医助手 · 学业情况')
-        .fontSize(10)
-        .fontColor('#7F9BC4')
-        .margin({ top: 14 })
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+      .backgroundColor('#FFFFFF')
     }
     .width(360)
-    .padding(20)
-    .backgroundColor('#1B3A63')
     .borderRadius(16)
+    .clip(true)
+  }
+
+  /** 导出卡日期（紧凑） */
+  private exportDate(): string {
+    const d: Date = new Date();
+    return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  }
+
+  /** 导出卡头部统计格 */
+  @Builder
+  exportStatCell(value: string, label: string) {
+    Column() {
+      Text(value)
+        .fontSize(17)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#FFFFFF')
+      Text(label)
+        .fontSize(9)
+        .fontColor('#A9C4E4')
+        .margin({ top: 2 })
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Center)
   }
 
   /** 学业概览导出指标（卡片内小格） */
@@ -2027,9 +2075,9 @@ export struct AcademicPage {
       .height('100%')
         // 顶栏悬浮（最上层）：正文 Scroll 顶部已让位，上滑可滚入其渐变下层透出
         PageHeader({
-          title: '学业情况',
+          title: T('学业情况'),
           subtitle: AppState.profile !== null ? `${AppState.profile.major} · ${AppState.profile.grade}` : '',
-          actionText: '刷新',
+          actionText: T('刷新'),
           actionTone: 'glass',
           showBack: !this.isTab,
           onAction: () => {

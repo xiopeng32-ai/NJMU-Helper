@@ -1,9 +1,3 @@
-import { uiMaterial } from '@kit.ArkUI';
-import { AppearanceStore } from './AppearanceStore';
-import { DataStore } from './DataStore';
-import { Theme } from './ThemeUtil';
-import { WallpaperTone } from './WallpaperTone';
-
 /**
  * 玻璃质感（GlassMaterial）—— 全应用统一的按钮与卡片材质
  *
@@ -21,6 +15,14 @@ import { WallpaperTone } from './WallpaperTone';
  *   开关默认关闭 → 与原行为完全一致。
  *   对应参考文件：miha_hm `utils/DesignTokens.ets`（卡片底/沾色派生）
  */
+
+import { uiMaterial } from '@kit.ArkUI';
+import { AppearanceStore } from './AppearanceStore';
+import { DataStore } from './DataStore';
+import { Theme } from './ThemeUtil';
+import { WallpaperTone } from './WallpaperTone';
+import { T } from './I18n';
+
 export class GlassMaterial {
   /** 细亮边颜色（1vp） */
   static readonly BORDER: string = 'rgba(255,255,255,0.28)';
@@ -70,7 +72,7 @@ export class GlassMaterial {
       return '弱';
     }
     if (lv === GlassMaterial.LEVEL_MID) {
-      return '中';
+      return T('中');
     }
     return '强';
   }

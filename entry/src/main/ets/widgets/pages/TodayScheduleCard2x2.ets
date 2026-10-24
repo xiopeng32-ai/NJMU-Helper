@@ -5,6 +5,8 @@
  *
  * 数据来源：EntryFormAbility 推送的 todayJson（今日课程数组的 JSON 字符串）。
  */
+
+import { T } from '../../common/I18n';
 let localStorageToday = new LocalStorage();
 
 @Entry(localStorageToday)
@@ -43,7 +45,7 @@ struct TodayScheduleCard2x2 {
     Column() {
       // 顶部：标题 + 日期 + 装饰图标
       Row() {
-        Text('今日课程')
+        Text(T('今日课程'))
           .fontSize(13)
           .fontWeight(FontWeight.Bold)
           .fontColor('#1A1D1C')
@@ -62,7 +64,7 @@ struct TodayScheduleCard2x2 {
       if (this.weekLabel.startsWith('距开学') || this.weekLabel === '即将开学') {
         // 学期外空态
         Column() {
-          Text('学期未开始')
+          Text(T('学期未开始'))
             .fontSize(13)
             .fontColor('#999999')
           Text(this.weekLabel.length > 0 ? this.weekLabel : '距离开学还有 N 天')
@@ -89,10 +91,10 @@ struct TodayScheduleCard2x2 {
         // 课程列表
         if (this.coursesList().length === 0) {
           Column() {
-            Text('今日无课')
+            Text(T('今日无课'))
               .fontSize(14)
               .fontColor('#999999')
-            Text('享受悠闲的一天 ☕')
+            Text(T('享受悠闲的一天 ☕'))
               .fontSize(10)
               .fontColor('#BBBBBB')
               .margin({ top: 4 })

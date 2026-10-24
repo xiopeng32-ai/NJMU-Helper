@@ -20,6 +20,8 @@ export const CC_SIGN_KEY: string = '123123';
 export const CC_CLIENT_KEY: string = 'njlz@123';
 export const CC_DES_KEY: string = 'njlz@123';   // 8 字节
 export const CC_DES_IV: string = 'njlz@123';    // 8 字节
+/** 云课堂 localStorage 包装层的 AES-128 密钥（前端硬编码，抓包实测） */
+export const CC_LS_AES_KEY: string = 'mysupersecret123';
 
 /**
  * 计算字符串的 MD5（小写 hex）。
@@ -62,6 +64,95 @@ export async function ccValidCodeEmpty(): Promise<string> {
  */
 export async function ccValidCodeWithId(id: string): Promise<string> {
   return ccMd5(`id=${id}&signKey=${CC_SIGN_KEY}`);
+}
+
+/**
+ * AES-128-ECB-Pkcs7 解密（解云课堂 localStorage 包装层）。
+ *
+ * 依据抓包实测（云课堂WebView接管抓包记录 v2 发现 2）：localStorage 各 key 均为
+ * `{"data":"<base64>","time":<ms>}`，其中 data 用前端 CryptoJS
+ * `AES.encrypt(utf8, "mysupersecret123", {mode:ECB, padding:Pkcs7})` 加密。
+ * 解出的明文是 80 位 hex，再用 ccDesDecrypt 解出 x-Token（UUID）。
+ *
+ * @param b64Cipher localStorage[...].data 的 base64 密文
+ * @param keyText 固定 "mysupersecret123"（16 字节）
+ */
+export async function ccAesEcbDecrypt(b64Cipher: string, keyText: string = CC_LS_AES_KEY): Promise<string> {
+  const ct: Uint8Array = base64ToBytes(b64Cipher);
+  if (ct.length === 0 || ct.length % 16 !== 0) {
+    throw new Error(`密文长度非法（${ct.length} 字节）`);
+  }
+  const keyBytes: Uint8Array = stringToUtf8(keyText);
+  const generator: cryptoFramework.SymKeyGenerator = cryptoFramework.createSymKeyGenerator('AES128');
+  const symKey: cryptoFramework.SymKey = await generator.convertKey({ data: keyBytes });
+  // ⚠ 设备侧 createCipher('AES128|ECB|PKCS7') 直接报 "create C cipher fail"（OpenSSL 后端未编入 ECB）。
+  //   等价变换：ECB 解密 ≡ 每个 16 字节块独立做 CBC 解密且 IV 全零
+  //   （CBC 定义 P = D(C) XOR IV，IV=0 时 P = D(C)，与 ECB 单块结果完全一致）。
+  //   故按块切分，逐块 AES128|CBC|NoPadding + 零 IV 解密，最后手工去 PKCS7 填充。
+  const zeroIv: Uint8Array = new Uint8Array(16);
+  const ivParams: cryptoFramework.IvParamsSpec = {
+    iv: { data: zeroIv },
+    algName: 'IvParamsSpec'
+  };
+  const plain: Uint8Array = new Uint8Array(ct.length);
+  for (let off = 0; off < ct.length; off += 16) {
+    const block: Uint8Array = ct.slice(off, off + 16);
+    const cipher: cryptoFramework.Cipher = cryptoFramework.createCipher('AES128|CBC|NoPadding');
+    cipher.initSync(cryptoFramework.CryptoMode.DECRYPT_MODE, symKey, ivParams);
+    const dec: cryptoFramework.DataBlob = cipher.doFinalSync({ data: block });
+    if (dec.data.length !== 16) {
+      throw new Error(`分块解密长度异常（${dec.data.length}）`);
+    }
+    plain.set(dec.data, off);
+  }
+  // 手工去 PKCS7 填充（末字节 n：末尾 n 个字节都等于 n 才裁掉）
+  const pad: number = plain[plain.length - 1];
+  let end: number = plain.length;
+  if (pad >= 1 && pad <= 16 && pad <= plain.length) {
+    let ok: boolean = true;
+    for (let i = plain.length - pad; i < plain.length; i++) {
+      if (plain[i] !== pad) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) {
+      end = plain.length - pad;
+    }
+  }
+  return utf8ToString(plain.slice(0, end));
+}
+
+/**
+ * 解 localStorage 里的一项：base64 → AES-128-ECB → 明文。
+ * 兼容两种入参：
+ *  ① localStorage 原值 JSON：`{"data":"<base64>","time":...}`（页面脚本可能直接返回原值）
+ *  ② 已提取的 data base64 原文（WebView 侧已 JSON.parse 过时就是这种，128 字符）
+ */
+export async function ccDecodeLsValue(raw: string): Promise<string> {
+  if (raw.length === 0) {
+    return '';
+  }
+  let data: string = raw;
+  // 仅当看起来是 JSON 对象时才解析，否则视为已提取的 base64 原文
+  if (raw.trim().startsWith('{')) {
+    try {
+      const obj: Record<string, Object> = JSON.parse(raw) as Record<string, Object>;
+      data = String(obj['data'] ?? '');
+    } catch (e) {
+      data = raw;
+    }
+  }
+  if (data.length === 0) {
+    return '';
+  }
+  return await ccAesEcbDecrypt(data);
+}
+
+/** base64 → 字节数组 */
+function base64ToBytes(b64: string): Uint8Array {
+  const helper: util.Base64Helper = new util.Base64Helper();
+  return helper.decodeSync(b64);
 }
 
 /**
