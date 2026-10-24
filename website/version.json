@@ -1,15 +1,13 @@
 {
-  "version": "2.2.1",
-  "versionCode": 2000201,
+  "version": "2.2.2",
+  "versionCode": 2000202,
   "date": "2026-10-24",
   "notes": [
-    "修复「关于应用」项目链接：GitHub / Gitee 地址原指向他人仓库（404），改为本项目仓库",
-    "新增「问题反馈（Issues）」与「官方网站」入口",
-    "《用户协议》《隐私政策》联系方式改为本项目 Issues",
-    "链接地址去协议头与末尾斜杠，超长单行省略",
-    "新增 3 条文案的多语言（问题反馈 / 官方网站 / 上游项目）"
+    "修复「检查更新」解析到上游「新农助手」的问题，改为南医助手商店详情页",
+    "「前往更新」跳转同步修正",
+    "上一版：修复关于页 GitHub / Gitee 死链，改为本项目仓库"
   ],
-  "downloadUrl": "assets/download/NJMU-Helper-2.2.1.hap",
+  "downloadUrl": "assets/download/NJMU-Helper-2.2.2.hap",
   "minSupported": "1.9.0",
   "ohVersion": "2.0.15-oh",
   "ohDownloadUrl": "assets/download/NJMU-Helper-2.0.15-oh.hap",

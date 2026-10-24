@@ -211,7 +211,7 @@ export struct AboutPage {
   /** 新版本清单地址（优先）：结构稳定，可带更新说明与下载路径 */
   private static readonly VERSION_JSON_URL: string = 'https://www.sydxky.cn/version.json';
   /** 详情页地址（兜底）：清单不可用时按旧方式解析版本徽标 */
-  private static readonly DETAIL_PAGE_URL: string = 'https://www.sydxky.cn/detail.php?id=796';
+  private static readonly DETAIL_PAGE_URL: string = 'https://www.sydxky.cn/detail.php?id=1034';
   /** 检查结果缓存时长（30 分钟内重复点击直接给结论，不重复请求） */
   private static readonly CHECK_TTL: number = 30 * 60 * 1000;
 
@@ -391,7 +391,7 @@ export struct AboutPage {
       const want: Want = {
         action: 'ohos.want.action.viewData',
         entities: ['entity.system.browsable'],
-        uri: 'https://www.sydxky.cn/detail.php?id=796'
+        uri: AboutPage.DETAIL_PAGE_URL
       };
       ctx.startAbility(want);
     } catch (e) {

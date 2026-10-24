@@ -17,6 +17,11 @@ export const CHANGELOG_MAX: number = 5;
 
 /** 全部更新日志（新版本在最前插入） */
 export const CHANGELOG_ALL: ChangelogItem[] = [
+  { version: '2.2.2', date: '2026-10-24', items: [
+    '修复：「检查更新」读取的详情页 ID 指向了上游「新农助手」（id=796），导致检查结果拿的是别人的版本号',
+    '修复：「前往更新」跳转的页面同样指向上游应用，现统一改为南医助手的商店详情页（id=1034）',
+    '优化：检查更新的两个入口共用同一常量，避免以后再出现地址与实际应用不一致'
+  ] },
   { version: '2.2.1', date: '2026-10-24', items: [
     '修复：「关于应用 → 项目链接」的 GitHub / Gitee 地址指向了他人仓库（均为 404 死链），改为本项目仓库 github.com/xiopeng32-ai/NJMU-Helper',
     '新增：项目链接补充「问题反馈（GitHub Issues）」与「官方网站」入口，上游与参考项目链接逐条核验可达',
